@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Teacher Profile Submission</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"/>
+<style>
+/* ═══════════════════════════════════════
+   ROOT & RESET
+═══════════════════════════════════════ */
+:root{
+  --ink:#1c1c1e; --ink2:#48484a; --ink3:#8e8e93;
+  --bg:#f5f5f0; --bg2:#ebebе6; --surface:#ffffff;
+  --gold:#c9973a; --gold2:#f0d89a; --gold3:#7a5a1a;
+  --green:#1e6b45; --green2:#d1ead9;
+  --red:#b0282a; --red2:#fce8e8;
+  --blue:#1a3f7a; --blue2:#e4ecfb;
+  --border:#ddddd5; --radius:12px; --shadow:0 2px 16px rgba(0,0,0,.07);
+  --admin:#0f2744; --admin2:#1a3a60; --admin3:#c9973a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:15px;line-height:1.6;}
+h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
+
+/* ═══════════════════════════════════════
+   VIEWS — only one visible at a time
+═══════════════════════════════════════ */
+.view{display:none;animation:fadeIn .35s ease;}
+.view.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* ═══════════════════════════════════════
+   TEACHER FORM VIEW
+═══════════════════════════════════════ */
+.form-hero{
+  background:var(--ink);
+  color:#fff;
+  padding:3rem 1.5rem 2.5rem;
+  text-align:center;
+  position:relative;
+  overflow:hidden;
+}
+.form-hero::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(201,151,58,.04) 40px,rgba(201,151,58,.04) 80px);
+}
+.form-hero-inner{position:relative;z-index:1;max-width:540px;margin:0 auto;}
+.form-hero-tag{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:14px;display:block;}
+.form-hero h1{font-size:clamp(24px,5vw,36px);color:#fff;margin-bottom:10px;}
+.form-hero p{font-size:14px;color:#bbb;max-width:420px;margin:0 auto;}
+.form-hero-meta{display:flex;justify-content:center;gap:24px;margin-top:1.5rem;flex-wrap:wrap;}
+.form-hero-meta span{font-size:12px;color:#999;}
+.form-hero-meta strong{color:var(--gold2);}
+
+.form-body{max-width:600px;margin:0 auto;padding:2rem 1rem 5rem;}
+
+.f-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;margin-bottom:1.25rem;box-shadow:var(--shadow);}
+.f-card-title{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3);margin-bottom:1.5rem;padding-bottom:10px;border-bottom:1px solid var(--border);}
+
+.field{margin-bottom:1.2rem;}
+.field:last-child{margin-bottom:0;}
+.field label{display:block;font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:6px;letter-spacing:.3px;}
+.req{color:var(--red);}
+.opt{font-size:11px;font-weight:400;color:var(--ink3);margin-left:4px;}
+.field input,.field textarea,.field select{
+  width:100%;padding:11px 14px;
+  border:1.5px solid var(--border);border-radius:9px;
+  font-size:14px;font-family:'Lato',sans-serif;
+  background:#fafaf8;color:var(--ink);
+  transition:border .2s,box-shadow .2s;
+}
+.field input:focus,.field textarea:focus,.field select:focus{
+  outline:none;border-color:var(--gold);
+  box-shadow:0 0 0 3px rgba(201,151,58,.12);
+  background:#fff;
+}
+.field textarea{resize:vertical;min-height:95px;}
+.field.has-error input,.field.has-error textarea,.field.has-error select{border-color:var(--red);}
+.field-err{font-size:12px;color:var(--red);margin-top:5px;display:none;}
+.field.has-error .field-err{display:block;}
+.field-hint{font-size:12px;color:var(--ink3);margin-top:5px;}
+
+.checkbox-row{display:flex;align-items:center;gap:10px;padding:10px 0;}
+.checkbox-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex-shrink:0;}
+.checkbox-row span{font-size:14px;color:var(--ink);}
+
+/* Photo upload */
+.photo-drop{
+  border:2px dashed var(--border);border-radius:var(--radius);
+  padding:2.25rem 1rem;text-align:center;cursor:pointer;
+  transition:all .25s;position:relative;
+}
+.photo-drop:hover,.photo-drop.drag{border-color:var(--gold);background:rgba(201,151,58,.04);}
+.photo-drop.uploaded{border-style:solid;border-color:var(--green);background:rgba(30,107,69,.03);}
+.photo-drop input{display:none;}
+.photo-drop-icon{font-size:36px;margin-bottom:10px;display:block;}
+.photo-drop h3{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:5px;font-family:'Lato',sans-serif;}
+.photo-drop p{font-size:12px;color:var(--ink3);}
+.photo-pill{display:inline-block;margin-top:12px;font-size:11px;padding:4px 12px;border-radius:20px;background:#f0f0ea;color:var(--ink3);font-weight:700;letter-spacing:.3px;}
+.photo-preview-wrap{display:none;flex-direction:column;align-items:center;gap:12px;}
+.photo-preview-wrap img{width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--green);}
+.photo-filename{font-size:12px;color:var(--green);font-weight:700;}
+.photo-dims{font-size:11px;color:var(--ink3);}
+.photo-change{font-size:12px;color:var(--ink3);cursor:pointer;text-decoration:underline;background:none;border:none;font-family:'Lato',sans-serif;margin-top:2px;}
+.photo-err-msg{font-size:12px;color:var(--red);margin-top:8px;display:none;}
+.photo-reqs{background:linear-gradient(135deg,#fdf8ee,#faf4e4);border:1px solid #e8d090;border-radius:9px;padding:14px 16px;margin-top:14px;}
+.photo-reqs p{font-size:12.5px;color:#6b4e10;line-height:1.9;}
+.photo-reqs strong{color:#4a3408;font-weight:700;}
+
+/* custom section divider */
+.section-divider{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--ink3);border-top:1px solid var(--border);padding-top:16px;margin:4px 0 16px;}
+
+/* Submit */
+.submit-btn{
+  width:100%;padding:16px;
+  background:var(--ink);color:#fff;
+  border:none;border-radius:var(--radius);
+  font-size:16px;font-weight:700;letter-spacing:.5px;
+  cursor:pointer;font-family:'Lato',sans-serif;
+  transition:background .2s,transform .1s;
+  margin-top:.5rem;
+}
+.submit-btn:hover{background:#2c2c2e;}
+.submit-btn:active{transform:scale(.99);}
+
+/* Success */
+.success-wrap{text-align:center;padding:4rem 1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
+.success-icon{font-size:56px;margin-bottom:1.25rem;display:block;}
+.success-wrap h2{font-size:28px;color:var(--ink);margin-bottom:10px;}
+.success-wrap p{font-size:15px;color:var(--ink3);}
+
+/* Deadline banner */
+.deadline-bar{background:var(--red2);border:1px solid #f5c0c0;border-radius:9px;padding:11px 16px;font-size:13px;color:var(--red);margin-bottom:1.25rem;display:none;}
+
+/* Footer trigger */
+.site-footer{text-align:center;padding:2rem 1rem;font-size:12px;color:var(--ink3);}
+.admin-trigger{cursor:default;user-select:none;display:inline-block;padding:6px 10px;border-radius:6px;transition:background .2s;}
+.admin-trigger:hover{background:rgba(0,0,0,.04);}
+
+/* ═══════════════════════════════════════
+   PIN OVERLAY
+═══════════════════════════════════════ */
+.pin-overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:rgba(15,39,68,.85);
+  backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;
+}
+.pin-overlay.active{display:flex;}
+.pin-box{
+  background:var(--surface);border-radius:18px;
+  padding:2.5rem 2rem;text-align:center;
+  width:320px;box-shadow:0 24px 60px rgba(0,0,0,.3);
+}
+.pin-box h2{font-size:22px;margin-bottom:6px;color:var(--ink);}
+.pin-box p{font-size:13px;color:var(--ink3);margin-bottom:1.75rem;}
+.pin-dots{display:flex;justify-content:center;gap:12px;margin-bottom:1.5rem;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);background:transparent;transition:all .2s;}
+.pin-dot.filled{background:var(--ink);border-color:var(--ink);}
+.pin-dot.error{background:var(--red);border-color:var(--red);}
+.pin-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.pin-key{
+  padding:14px;border:1.5px solid var(--border);border-radius:10px;
+  font-size:18px;font-weight:700;cursor:pointer;
+  background:#fafaf8;color:var(--ink);
+  transition:background .15s,transform .1s;font-family:'Lato',sans-serif;
+}
+.pin-key:hover{background:var(--bg);}
+.pin-key:active{transform:scale(.95);}
+.pin-key.del{font-size:14px;color:var(--ink3);}
+.pin-key.zero{grid-column:2;}
+.pin-err{font-size:13px;color:var(--red);margin-top:12px;min-height:20px;}
+.pin-cancel{font-size:13px;color:var(--ink3);cursor:pointer;margin-top:14px;background:none;border:none;font-family:'Lato',sans-serif;text-decoration:underline;}
+
+/* ═══════════════════════════════════════
+   ADMIN VIEW
+═══════════════════════════════════════ */
+.admin-topbar{
+  background:var(--admin);color:#fff;
+  padding:1.1rem 2rem;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.admin-logo{font-family:'Playfair Display',serif;font-size:18px;color:#fff;}
+.admin-logo span{color:var(--admin3);}
+.admin-nav{display:flex;gap:6px;}
+.admin-tab{
+  padding:7px 16px;border-radius:8px;font-size:13px;font-weight:700;
+  cursor:pointer;border:none;font-family:'Lato',sans-serif;
+  background:rgba(255,255,255,.08);color:#ccc;transition:all .2s;
+}
+.admin-tab.active,.admin-tab:hover{background:var(--admin3);color:#fff;}
+.admin-back{font-size:13px;color:#aaa;cursor:pointer;background:none;border:none;font-family:'Lato',sans-serif;text-decoration:underline;}
+
+.admin-body{max-width:820px;margin:0 auto;padding:2rem 1rem 5rem;}
+.admin-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;margin-bottom:1.25rem;box-shadow:var(--shadow);}
+.admin-section-title{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--ink3);margin-bottom:1.25rem;padding-bottom:10px;border-bottom:1px solid var(--border);}
+.admin-note{font-size:13px;color:var(--ink3);margin-bottom:1.1rem;line-height:1.7;}
+
+/* two-col info grid */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.info-grid.full{grid-template-columns:1fr;}
+@media(max-width:520px){.info-grid{grid-template-columns:1fr;}}
+.info-field label{font-size:12px;font-weight:700;color:var(--ink3);display:block;margin-bottom:5px;letter-spacing:.3px;}
+.info-field input,.info-field select{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:'Lato',sans-serif;background:#fafaf8;color:var(--ink);}
+.info-field input:focus,.info-field select:focus{outline:none;border-color:var(--gold);}
+
+/* built-in field rows */
+.builtin-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #f0f0ea;}
+.builtin-row:last-child{border-bottom:none;padding-bottom:0;}
+.builtin-row:first-child{padding-top:0;}
+.builtin-left{flex:1;}
+.builtin-name{font-size:14px;font-weight:700;color:var(--ink);}
+.builtin-desc{font-size:12px;color:var(--ink3);margin-top:2px;}
+.builtin-ctrls{display:flex;align-items:center;gap:10px;}
+.req-pill{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:#f5f5f0;color:var(--ink3);transition:all .2s;white-space:nowrap;}
+.req-pill.on{background:var(--red2);color:var(--red);border-color:#f0b0b0;}
+.tog{position:relative;width:44px;height:25px;cursor:pointer;flex-shrink:0;}
+.tog input{opacity:0;width:0;height:0;}
+.tog-track{position:absolute;inset:0;background:#d1d1d6;border-radius:25px;transition:background .2s;}
+.tog-thumb{position:absolute;width:19px;height:19px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.25);}
+.tog input:checked~.tog-track{background:var(--green);}
+.tog input:checked~.tog-thumb{transform:translateX(19px);}
+
+/* custom fields */
+.cf-card{background:#f8f8f4;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;position:relative;}
+.cf-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+.cf-grp{display:flex;flex-direction:column;gap:4px;}
+.cf-grp label{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
+.cf-grp input,.cf-grp select{padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;background:#fff;color:var(--ink);}
+.cf-grp.grow{flex:1;min-width:160px;}
+.cf-grp.med{min-width:130px;}
+.cf-grp.sm{min-width:100px;}
+.cf-opts{margin-top:10px;}
+.cf-opts label{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;}
+.cf-opts textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;background:#fff;resize:vertical;}
+.cf-opts-hint{font-size:11px;color:var(--ink3);margin-top:3px;}
+.cf-del{position:absolute;top:10px;right:12px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--ink3);line-height:1;padding:0;transition:color .2s;}
+.cf-del:hover{color:var(--red);}
+.add-cf-btn{width:100%;padding:12px;background:var(--blue2);color:var(--blue);border:1.5px dashed #90b4e0;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;margin-top:4px;transition:background .2s;letter-spacing:.3px;}
+.add-cf-btn:hover{background:#d0e4f7;}
+
+/* photo settings */
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;}
+.photo-setting label{font-size:12px;font-weight:700;color:var(--ink3);display:block;margin-bottom:5px;}
+.photo-setting select,.photo-setting input{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;background:#fafaf8;color:var(--ink);}
+
+/* submissions tab */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1.5rem;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;text-align:center;box-shadow:var(--shadow);}
+.stat-num{font-family:'Playfair Display',serif;font-size:30px;color:var(--ink);}
+.stat-lbl{font-size:12px;color:var(--ink3);margin-top:2px;}
+.action-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.5rem;}
+.btn{padding:10px 20px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;border:1.5px solid var(--border);background:var(--surface);color:var(--ink);transition:all .2s;letter-spacing:.3px;}
+.btn:hover{background:var(--bg);}
+.btn-primary{background:var(--admin);color:#fff;border-color:var(--admin);}
+.btn-primary:hover{background:var(--admin2);}
+.btn-danger{background:var(--red);color:#fff;border-color:var(--red);}
+.btn-danger:hover{background:#8b1e20;}
+
+.sub-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem;margin-bottom:1rem;box-shadow:var(--shadow);}
+.sub-top{display:flex;align-items:center;gap:14px;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #f0f0ea;}
+.sub-avatar{width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0;}
+.sub-avatar-init{width:54px;height:54px;border-radius:50%;background:var(--gold2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--gold3);flex-shrink:0;font-family:'Playfair Display',serif;}
+.sub-name{font-size:15px;font-weight:700;color:var(--ink);}
+.sub-meta{font-size:12px;color:var(--ink3);margin-top:2px;}
+.sub-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;}
+@media(max-width:480px){.sub-fields{grid-template-columns:1fr;}}
+.sub-field-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin-bottom:2px;}
+.sub-field-val{font-size:13px;color:var(--ink);}
+.sub-field.wide{grid-column:1/-1;}
+.sub-del{font-size:12px;color:var(--red);cursor:pointer;background:none;border:none;font-family:'Lato',sans-serif;font-weight:700;margin-top:12px;padding:0;}
+.empty-state{text-align:center;padding:3.5rem 1rem;color:var(--ink3);}
+.empty-state h3{font-size:22px;color:var(--ink);margin-bottom:8px;}
+
+/* save bar */
+.save-bar{background:var(--admin);padding:1.25rem 2rem;margin-top:1.5rem;border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
+.save-bar p{font-size:13px;color:#aaa;}
+.save-bar-btn{padding:11px 28px;background:var(--admin3);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;transition:background .2s;}
+.save-bar-btn:hover{background:#b8860b;}
+
+/* link box */
+.link-box{background:var(--green2);border:1px solid #8ecba3;border-radius:var(--radius);padding:1.25rem 1.5rem;margin-top:1.25rem;display:none;}
+.link-box p{font-size:13px;color:var(--green);font-weight:700;margin-bottom:8px;}
+.link-row{display:flex;gap:8px;}
+.link-row input{flex:1;padding:9px 12px;border:1px solid #8ecba3;border-radius:8px;font-size:13px;background:#fff;color:var(--ink);font-family:monospace;}
+.link-copy-btn{padding:9px 16px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+
+@media(max-width:600px){
+  .admin-topbar{padding:1rem;}
+  .admin-nav{gap:4px;}
+  .admin-tab{padding:6px 10px;font-size:12px;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .sub-fields{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     PIN OVERLAY
+══════════════════════════════════════ -->
+<div class="pin-overlay" id="pinOverlay">
+  <div class="pin-box">
+    <h2>Admin Access</h2>
+    <p>Enter your 4-digit PIN to continue</p>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-keypad">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key del" onclick="pinDel()">⌫</button>
+      <button class="pin-key zero" onclick="pinKey('0')">0</button>
+    </div>
+    <div class="pin-err" id="pinErr"></div>
+    <button class="pin-cancel" onclick="closePIN()">Cancel</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     VIEW: TEACHER FORM
+══════════════════════════════════════ -->
+<div class="view active" id="viewForm">
+  <div class="form-hero">
+    <div class="form-hero-inner">
+      <span class="form-hero-tag" id="heroTag">School Magazine</span>
+      <h1 id="heroTitle">Teacher Profile Submission</h1>
+      <p id="heroSubtitle">Please fill in your details carefully. Your profile will be featured in our magazine.</p>
+      <div class="form-hero-meta" id="heroMeta"></div>
+    </div>
+  </div>
+
+  <div class="form-body">
+    <div class="deadline-bar" id="deadlineBar"></div>
+    <div id="formContainer"></div>
+    <div class="success-wrap" id="successWrap" style="display:none;">
+      <span class="success-icon">🎉</span>
+      <h2>Profile Submitted!</h2>
+      <p>Thank you. Your profile has been received and will be featured in the magazine.</p>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <span class="admin-trigger" id="adminTrigger" title="">© Magazine Production System</span>
+  </footer>
+</div>
+
+<!-- ══════════════════════════════════════
+     VIEW: ADMIN
+══════════════════════════════════════ -->
+<div class="view" id="viewAdmin">
+  <div class="admin-topbar">
+    <div class="admin-logo">Magazine<span>Pro</span> <span style="font-size:11px;color:#888;font-family:'Lato',sans-serif;font-weight:400;">Admin</span></div>
+    <div class="admin-nav">
+      <button class="admin-tab active" id="tabSettings" onclick="showAdminTab('settings')">Settings</button>
+      <button class="admin-tab" id="tabSubmissions" onclick="showAdminTab('submissions')">Submissions</button>
+    </div>
+    <button class="admin-back" onclick="exitAdmin()">← Back to form</button>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="admin-body" id="panelSettings">
+
+    <div class="admin-section">
+      <div class="admin-section-title">School &amp; magazine info</div>
+      <div class="info-grid">
+        <div class="info-field"><label>School name</label><input type="text" id="aSchoolName" placeholder="e.g. Greenfield Academy"/></div>
+        <div class="info-field"><label>Magazine edition</label><input type="text" id="aEdition" placeholder="e.g. 2025/2026 Graduation Edition"/></div>
+        <div class="info-field"><label>Submission deadline</label><input type="date" id="aDeadline"/></div>
+        <div class="info-field"><label>Contact number (shown to teachers)</label><input type="text" id="aContact" placeholder="e.g. 08012345678"/></div>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-title">Built-in profile fields</div>
+      <div id="builtinFieldsContainer"></div>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-title">Custom fields <span style="font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;background:var(--blue2);color:var(--blue);margin-left:6px;vertical-align:middle;">ADD YOUR OWN</span></div>
+      <p class="admin-note">Add any extra fields — short text, long answer, dropdown, checkbox (yes/no), or number. They appear on the form below the built-in fields.</p>
+      <div id="customFieldsContainer"></div>
+      <button class="add-cf-btn" onclick="addCustomField()">+ Add a custom field</button>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-title">Photo requirements</div>
+      <div class="builtin-row" style="border-bottom:1px solid #f0f0ea;padding-bottom:14px;margin-bottom:14px;">
+        <div class="builtin-left">
+          <div class="builtin-name">Require a profile photo</div>
+          <div class="builtin-desc">If off, photo upload becomes optional</div>
+        </div>
+        <label class="tog"><input type="checkbox" id="aPhotoRequired" checked/><div class="tog-track"></div><div class="tog-thumb"></div></label>
+      </div>
+      <div class="photo-grid">
+        <div class="photo-setting"><label>Min. width (px)</label><input type="number" id="aMinW" value="400" min="100"/></div>
+        <div class="photo-setting"><label>Min. height (px)</label><input type="number" id="aMinH" value="400" min="100"/></div>
+        <div class="photo-setting"><label>Max file size</label>
+          <select id="aMaxSize"><option value="1">1 MB</option><option value="2" selected>2 MB</option><option value="3">3 MB</option><option value="5">5 MB</option></select>
+        </div>
+        <div class="photo-setting"><label>Accepted formats</label>
+          <select id="aFormats">
+            <option value="jpg,png">JPG &amp; PNG only</option>
+            <option value="jpg,png,webp">JPG, PNG &amp; WebP</option>
+            <option value="jpg">JPG only</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-title">Admin PIN</div>
+      <p class="admin-note">Change the 4-digit PIN used to access this admin panel.</p>
+      <div class="info-grid" style="max-width:320px;">
+        <div class="info-field info-grid full"><label>New PIN (4 digits)</label><input type="number" id="aNewPin" placeholder="e.g. 7878" maxlength="4" min="0" max="9999"/></div>
+      </div>
+    </div>
+
+    <div class="save-bar">
+      <p>Changes are saved to your browser and reflected on the form immediately.</p>
+      <button class="save-bar-btn" onclick="saveSettings()">Save all settings</button>
+    </div>
+    <div class="link-box" id="linkBox">
+      <p>Your form link (share with teachers):</p>
+      <div class="link-row">
+        <input type="text" id="formLinkInput" readonly/>
+        <button class="link-copy-btn" onclick="copyLink()">Copy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUBMISSIONS TAB -->
+  <div class="admin-body" id="panelSubmissions" style="display:none;">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">Total submitted</div></div>
+      <div class="stat-card"><div class="stat-num" id="statPhoto">0</div><div class="stat-lbl">With photos</div></div>
+      <div class="stat-card"><div class="stat-num" id="statToday">0</div><div class="stat-lbl">Today</div></div>
+    </div>
+    <div class="action-row">
+      <button class="btn btn-primary" onclick="exportForClaude()">Export for Claude ↗</button>
+      <button class="btn" onclick="exportCSV()">Download CSV</button>
+      <button class="btn btn-danger" onclick="clearAll()">Clear all</button>
+    </div>
+    <div id="submissionsContainer"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════ -->
+<script>
+/* ─── CONSTANTS & STATE ─── */
+const BUILTIN = [
+  {id:'name',         label:'Full name',                            desc:"Teacher's full name with title (e.g. Mrs. Adeyemi)", on:true,  req:true },
+  {id:'subject',      label:'Subjects taught / Class taught',       desc:'Subject(s) and/or class assigned',                   on:true,  req:true },
+  {id:'background',   label:'Academic Background / Specialization', desc:'Highest qualification or current course of study — whichever applies', on:true, req:false},
+  {id:'message',      label:'Message to students',                  desc:'Personal note or advice to graduating students',     on:true,  req:true },
+  {id:'fun',          label:'Fun fact / Hobbies',                   desc:'Something personal and lighthearted',                on:true,  req:false},
+  {id:'years',        label:'Years at this school',                 desc:"How long they've been teaching here",                on:true,  req:false},
+  {id:'nickname',     label:'Nickname (if any)',                    desc:'What students call them',                            on:false, req:false},
+  {id:'achievement',  label:'Notable achievement',                  desc:'Award, milestone or recognition',                    on:true,  req:false},
+  {id:'quote',        label:'Favourite quote',                      desc:'An inspiring quote they live by',                    on:true,  req:false},
+  {id:'advice',       label:'Career advice to students',            desc:'Guidance for their future',                          on:false, req:false},
+];
+const PLACEHOLDERS = {
+  name:'e.g. Mrs. Funmilayo Adeyemi',
+  subject:'e.g. Mathematics / JSS 3A',
+  background:'e.g. B.Sc. Mathematics, UNILAG  —  or—  Currently studying Education at UI',
+  message:'Write a short personal message or advice to graduating students...',
+  fun:'e.g. I love cooking and reading mystery novels',
+  years:'e.g. 5 years',
+  nickname:'e.g. "Mr. A"',
+  achievement:'e.g. Best Teacher Award 2023',
+  quote:'e.g. "Education is the passport to the future"',
+  advice:'Share your career guidance for students here...',
+};
+const TEXTAREA_IDS = new Set(['message','advice','quote','background']);
+const TYPE_LABELS  = {text:'Short text',textarea:'Long answer',select:'Dropdown list',checkbox:'Checkbox (yes/no)',number:'Number'};
+
+let cfg    = JSON.parse(localStorage.getItem('mag_cfg') || 'null') || defaultCfg();
+let subs   = JSON.parse(localStorage.getItem('mag_subs') || '[]');
+let cfCtr  = Date.now();
+let pinBuf = '';
+let clickCtr = 0, clickTimer = null;
+let photoFile = null, photoDataURL = null;
+let adminUnlocked = false;
+
+function defaultCfg(){
+  return {
+    schoolName:'',edition:'',deadline:'',contact:'',pin:'7878',
+    photoRequired:true,minW:400,minH:400,maxSize:2,formats:'jpg,png',
+    customFields:[],
+    fields: Object.fromEntries(BUILTIN.map(f=>([f.id,{on:f.on,req:f.req,label:f.label}])))
+  };
+}
+
+/* ─── VIEWS ─── */
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);}
+
+/* ─── FOOTER CLICK TRIGGER (5 clicks) ─── */
+document.getElementById('adminTrigger').addEventListener('click',()=>{
+  clickCtr++;
+  clearTimeout(clickTimer);
+  if(clickCtr>=5){clickCtr=0;openPIN();}
+  else{clickTimer=setTimeout(()=>clickCtr=0,1800);}
+});
+
+/* ─── PIN ─── */
+function openPIN(){pinBuf='';updatePinDots();document.getElementById('pinErr').textContent='';document.getElementById('pinOverlay').classList.add('active');}
+function closePIN(){document.getElementById('pinOverlay').classList.remove('active');pinBuf='';}
+function pinKey(d){if(pinBuf.length>=4)return;pinBuf+=d;updatePinDots();if(pinBuf.length===4)checkPIN();}
+function pinDel(){pinBuf=pinBuf.slice(0,-1);updatePinDots();}
+function updatePinDots(){for(let i=0;i<4;i++){const d=document.getElementById('pd'+i);d.classList.toggle('filled',i<pinBuf.length);d.classList.remove('error');}}
+function checkPIN(){
+  if(pinBuf===String(cfg.pin||'7878').padStart(4,'0')||pinBuf===String(cfg.pin||'7878')){
+    closePIN();adminUnlocked=true;enterAdmin();
+  }else{
+    document.querySelectorAll('.pin-dot').forEach(d=>d.classList.add('error'));
+    document.getElementById('pinErr').textContent='Incorrect PIN. Try again.';
+    setTimeout(()=>{pinBuf='';updatePinDots();},900);
+  }
+}
+
+/* ─── ADMIN ─── */
+function enterAdmin(){loadAdminSettings();renderSubmissions();show('viewAdmin');}
+function exitAdmin(){show('viewForm');buildForm();}
+function showAdminTab(tab){
+  document.getElementById('panelSettings').style.display=tab==='settings'?'block':'none';
+  document.getElementById('panelSubmissions').style.display=tab==='submissions'?'block':'none';
+  document.getElementById('tabSettings').classList.toggle('active',tab==='settings');
+  document.getElementById('tabSubmissions').classList.toggle('active',tab==='submissions');
+  if(tab==='submissions')renderSubmissions();
+}
+
+function loadAdminSettings(){
+  document.getElementById('aSchoolName').value = cfg.schoolName||'';
+  document.getElementById('aEdition').value    = cfg.edition||'';
+  document.getElementById('aDeadline').value   = cfg.deadline||'';
+  document.getElementById('aContact').value    = cfg.contact||'';
+  document.getElementById('aPhotoRequired').checked = cfg.photoRequired!==false;
+  document.getElementById('aMinW').value  = cfg.minW||400;
+  document.getElementById('aMinH').value  = cfg.minH||400;
+  document.getElementById('aMaxSize').value  = cfg.maxSize||2;
+  document.getElementById('aFormats').value  = cfg.formats||'jpg,png';
+  document.getElementById('aNewPin').value   = cfg.pin||'7878';
+  renderBuiltin();
+  renderCustomFields();
+}
+
+/* ─── BUILTIN FIELD TOGGLES ─── */
+function renderBuiltin(){
+  document.getElementById('builtinFieldsContainer').innerHTML = BUILTIN.map(f=>{
+    const saved=cfg.fields[f.id]||{};
+    const isOn=saved.on!==undefined?saved.on:f.on;
+    const isReq=saved.req!==undefined?saved.req:f.req;
+    return `<div class="builtin-row" id="brow-${f.id}">
+      <div class="builtin-left">
+        <div class="builtin-name">${f.label}</div>
+        <div class="builtin-desc">${f.desc}</div>
+      </div>
+      <div class="builtin-ctrls">
+        <span class="req-pill${isReq?' on':''}" id="rp-${f.id}" onclick="toggleReq('${f.id}')">${isReq?'Required':'Optional'}</span>
+        <label class="tog"><input type="checkbox" id="tog-${f.id}" ${isOn?'checked':''} onchange="syncReq('${f.id}')"/><div class="tog-track"></div><div class="tog-thumb"></div></label>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleReq(id){
+  const p=document.getElementById('rp-'+id),now=!p.classList.contains('on');
+  p.classList.toggle('on',now);p.textContent=now?'Required':'Optional';
+  if(now)document.getElementById('tog-'+id).checked=true;
+}
+function syncReq(id){
+  if(!document.getElementById('tog-'+id).checked){
+    const p=document.getElementById('rp-'+id);p.classList.remove('on');p.textContent='Optional';
+  }
+}
+
+/* ─── CUSTOM FIELDS ─── */
+function renderCustomFields(){
+  const c=document.getElementById('customFieldsContainer');
+  c.innerHTML=(cfg.customFields||[]).map(cf=>buildCFCard(cf)).join('');
+}
+function buildCFCard(cf){
+  const typeOpts=Object.entries(TYPE_LABELS).map(([v,l])=>`<option value="${v}"${cf.type===v?' selected':''}>${l}</option>`).join('');
+  const needsOpts=cf.type==='select';
+  const isChk=cf.type==='checkbox';
+  return `<div class="cf-card" id="cfc-${cf.id}">
+    <button class="cf-del" onclick="removeCF('${cf.id}')" title="Remove">&times;</button>
+    <div class="cf-row">
+      <div class="cf-grp grow"><label>Field label</label><input type="text" value="${esc(cf.label)}" placeholder="e.g. Department, Blood group..." oninput="setCF('${cf.id}','label',this.value)"/></div>
+      <div class="cf-grp med"><label>Input type</label><select onchange="setCFType('${cf.id}',this.value)">${typeOpts}</select></div>
+      <div class="cf-grp sm"><label>Required?</label><select onchange="setCF('${cf.id}','required',this.value==='yes')"><option value="no"${!cf.required?' selected':''}>Optional</option><option value="yes"${cf.required?' selected':''}>Required</option></select></div>
+    </div>
+    ${!isChk?`<div class="cf-row" style="margin-top:10px;"><div class="cf-grp grow"><label>Placeholder / hint</label><input type="text" value="${esc(cf.placeholder||'')}" placeholder="Shown inside the input..." oninput="setCF('${cf.id}','placeholder',this.value)"/></div></div>`:''}
+    ${needsOpts?`<div class="cf-opts"><label>Dropdown options (one per line)</label><textarea rows="4" placeholder="e.g.\nScience\nArts\nCommercial" oninput="setCF('${cf.id}','options',this.value)">${esc(cf.options||'')}</textarea><div class="cf-opts-hint">Each line = one option in the dropdown.</div></div>`:''}
+    ${isChk?`<div style="margin-top:10px;font-size:12px;color:var(--ink3);">Teachers will see a checkbox — ticked means Yes, unticked means No.</div>`:''}
+  </div>`;
+}
+function addCustomField(){cfCtr++;cfg.customFields.push({id:'cf'+cfCtr,label:'',type:'text',required:false,placeholder:'',options:''});renderCustomFields();document.getElementById('customFieldsContainer').lastElementChild?.scrollIntoView({behavior:'smooth',block:'center'});}
+function removeCF(id){cfg.customFields=cfg.customFields.filter(c=>c.id!==id);renderCustomFields();}
+function setCF(id,key,val){const c=cfg.customFields.find(x=>x.id===id);if(c)c[key]=val;}
+function setCFType(id,t){const c=cfg.customFields.find(x=>x.id===id);if(c){c.type=t;renderCustomFields();}}
+
+/* ─── SAVE ─── */
+function saveSettings(){
+  BUILTIN.forEach(f=>{
+    cfg.fields[f.id]={
+      on:document.getElementById('tog-'+f.id).checked,
+      req:document.getElementById('rp-'+f.id).classList.contains('on'),
+      label:f.label
+    };
+  });
+  cfg.schoolName  = document.getElementById('aSchoolName').value.trim();
+  cfg.edition     = document.getElementById('aEdition').value.trim();
+  cfg.deadline    = document.getElementById('aDeadline').value;
+  cfg.contact     = document.getElementById('aContact').value.trim();
+  cfg.photoRequired = document.getElementById('aPhotoRequired').checked;
+  cfg.minW   = parseInt(document.getElementById('aMinW').value)||400;
+  cfg.minH   = parseInt(document.getElementById('aMinH').value)||400;
+  cfg.maxSize= parseInt(document.getElementById('aMaxSize').value)||2;
+  cfg.formats= document.getElementById('aFormats').value;
+  const pinInput=document.getElementById('aNewPin').value.replace(/\D/g,'').slice(0,4);
+  if(pinInput.length===4)cfg.pin=pinInput;
+  localStorage.setItem('mag_cfg',JSON.stringify(cfg));
+  const lb=document.getElementById('linkBox');lb.style.display='block';
+  document.getElementById('formLinkInput').value=window.location.href.split('?')[0];
+  lb.scrollIntoView({behavior:'smooth'});
+}
+function copyLink(){const i=document.getElementById('formLinkInput');i.select();document.execCommand('copy');const b=document.querySelector('.link-copy-btn');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',2000);}
+
+/* ─── TEACHER FORM ─── */
+function buildForm(){
+  const enabledFields=BUILTIN.filter(f=>(cfg.fields[f.id]||f).on!==false&&(cfg.fields[f.id]?.on!==undefined?cfg.fields[f.id].on:f.on));
+  const cfs=(cfg.customFields||[]).filter(cf=>cf.label);
+  const fmts=(cfg.formats||'jpg,png').toUpperCase().split(',').join(' or ');
+  const photoReq=cfg.photoRequired!==false;
+
+  // Hero
+  document.getElementById('heroTag').textContent=cfg.edition||'School Magazine';
+  document.getElementById('heroTitle').textContent=(cfg.schoolName||'School')+' — Teacher Profiles';
+  const metaItems=[];
+  if(cfg.deadline)metaItems.push(`<span>Deadline: <strong>${new Date(cfg.deadline).toDateString()}</strong></span>`);
+  if(cfg.contact)metaItems.push(`<span>Help: <strong>${cfg.contact}</strong></span>`);
+  document.getElementById('heroMeta').innerHTML=metaItems.join('');
+
+  if(cfg.deadline&&new Date()>new Date(cfg.deadline)){
+    const b=document.getElementById('deadlineBar');
+    b.style.display='block';
+    b.textContent=`⚠️ Submission deadline was ${new Date(cfg.deadline).toDateString()}. Contact ${cfg.contact||'the production manager'} if you still need to submit.`;
+  }
+
+  let html=`<div class="f-card"><div class="f-card-title">Personal details</div>`;
+  enabledFields.forEach(f=>{
+    const fc=cfg.fields[f.id]||f;
+    const req=fc.req!==undefined?fc.req:f.req;
+    const isTA=TEXTAREA_IDS.has(f.id);
+    html+=`<div class="field" id="fw-${f.id}">
+      <label>${f.label}${req?'<span class="req"> *</span>':'<span class="opt">(optional)</span>'}</label>
+      ${isTA?`<textarea id="ff-${f.id}" placeholder="${PLACEHOLDERS[f.id]||''}"></textarea>`:`<input type="text" id="ff-${f.id}" placeholder="${PLACEHOLDERS[f.id]||''}"/>`}
+      ${f.id==='background'?`<div class="field-hint">Fill in whichever applies to you — a completed qualification, or your current course of study.</div>`:''}
+      <div class="field-err">This field is required.</div>
+    </div>`;
+  });
+
+  if(cfs.length){
+    html+=`<div class="section-divider">Additional information</div>`;
+    cfs.forEach(cf=>{
+      html+=`<div class="field" id="fw-${cf.id}">
+        <label>${esc(cf.label)}${cf.required?'<span class="req"> *</span>':'<span class="opt">(optional)</span>'}</label>`;
+      if(cf.type==='textarea')html+=`<textarea id="ff-${cf.id}" placeholder="${esc(cf.placeholder||'')}"></textarea>`;
+      else if(cf.type==='select'){
+        const opts=(cf.options||'').split('\n').map(o=>o.trim()).filter(Boolean);
+        html+=`<select id="ff-${cf.id}"><option value="">— Select an option —</option>${opts.map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
+      }else if(cf.type==='checkbox'){
+        html+=`<div class="checkbox-row"><input type="checkbox" id="ff-${cf.id}"/><span>${esc(cf.label)}</span></div>`;
+      }else if(cf.type==='number'){
+        html+=`<input type="number" id="ff-${cf.id}" placeholder="${esc(cf.placeholder||'')}"/>`;
+      }else{
+        html+=`<input type="text" id="ff-${cf.id}" placeholder="${esc(cf.placeholder||'')}"/>`;
+      }
+      html+=`<div class="field-err">This field is required.</div></div>`;
+    });
+  }
+  html+=`</div>`;
+
+  html+=`<div class="f-card">
+    <div class="f-card-title">Profile photo</div>
+    <div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)">
+      <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/>
+      <div id="photoPlaceholder">
+        <span class="photo-drop-icon">📷</span>
+        <h3>Upload your profile photo${photoReq?' <span class="req">*</span>':' <span class="opt">(optional)</span>'}</h3>
+        <p>Click here or drag &amp; drop your photo</p>
+        <span class="photo-pill">Passport-style · Clear face · Plain background</span>
+      </div>
+      <div class="photo-preview-wrap" id="photoPreviewWrap">
+        <img id="photoPreview" src="" alt="Preview"/>
+        <div class="photo-filename" id="photoFilename"></div>
+        <div class="photo-dims" id="photoDims"></div>
+        <button class="photo-change" onclick="resetPhoto(event)">Change photo</button>
+      </div>
+    </div>
+    <div class="photo-err-msg" id="photoErrMsg"></div>
+    <div class="photo-reqs">
+      <p>
+        <strong>Photo requirements:</strong><br/>
+        · Format: ${fmts}<br/>
+        · Minimum size: <strong>${cfg.minW||400} × ${cfg.minH||400} pixels</strong><br/>
+        · Maximum file size: <strong>${cfg.maxSize||2} MB</strong><br/>
+        · Style: Passport-style, clear face, plain or neutral background, good lighting<br/>
+        · Avoid: group photos, sunglasses, heavy filters, blurry images
+      </p>
+    </div>
+  </div>
+  <button class="submit-btn" onclick="submitForm()">Submit My Profile</button>`;
+
+  document.getElementById('formContainer').innerHTML=html;
+  document.getElementById('formContainer').style.display='block';
+  document.getElementById('successWrap').style.display='none';
+  photoFile=null;photoDataURL=null;
+}
+
+/* ─── PHOTO ─── */
+function dragOver(e){e.preventDefault();document.getElementById('photoDrop').classList.add('drag');}
+function dragLeave(){document.getElementById('photoDrop').classList.remove('drag');}
+function dropPhoto(e){e.preventDefault();dragLeave();const f=e.dataTransfer.files[0];if(f)processPhoto(f);}
+function handlePhoto(e){if(e.target.files[0])processPhoto(e.target.files[0]);}
+function processPhoto(file){
+  const err=document.getElementById('photoErrMsg');err.style.display='none';
+  const maxB=(cfg.maxSize||2)*1024*1024;
+  const allowed=(cfg.formats||'jpg,png').split(',').flatMap(x=>[x.trim(),x.trim()==='jpg'?'jpeg':x.trim()]);
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!allowed.includes(ext)){err.textContent=`Invalid format. Upload a ${(cfg.formats||'jpg,png').toUpperCase().split(',').join(' or ')} file.`;err.style.display='block';return;}
+  if(file.size>maxB){err.textContent=`File too large. Max ${cfg.maxSize||2} MB. Your file is ${(file.size/1024/1024).toFixed(1)} MB.`;err.style.display='block';return;}
+  const img=new Image(),url=URL.createObjectURL(file);
+  img.onload=function(){
+    if(img.width<(cfg.minW||400)||img.height<(cfg.minH||400)){
+      err.textContent=`Image too small. Minimum ${cfg.minW||400}×${cfg.minH||400}px. Your image is ${img.width}×${img.height}px.`;
+      err.style.display='block';URL.revokeObjectURL(url);return;
+    }
+    photoFile=file;
+    new FileReader().onload=ev=>{
+      photoDataURL=ev.target.result;
+      document.getElementById('photoPreview').src=photoDataURL;
+      document.getElementById('photoFilename').textContent=file.name;
+      document.getElementById('photoDims').textContent=`${img.width}×${img.height}px · ${(file.size/1024).toFixed(0)}KB`;
+      document.getElementById('photoPlaceholder').style.display='none';
+      document.getElementById('photoPreviewWrap').style.display='flex';
+      document.getElementById('photoDrop').classList.add('uploaded');
+    };(new FileReader()).onload=ev=>{photoDataURL=ev.target.result;document.getElementById('photoPreview').src=photoDataURL;document.getElementById('photoFilename').textContent=file.name;document.getElementById('photoDims').textContent=`${img.width}×${img.height}px · ${(file.size/1024).toFixed(0)}KB`;document.getElementById('photoPlaceholder').style.display='none';document.getElementById('photoPreviewWrap').style.display='flex';document.getElementById('photoDrop').classList.add('uploaded');};
+    const r=new FileReader();r.onload=ev=>{photoDataURL=ev.target.result;document.getElementById('photoPreview').src=photoDataURL;document.getElementById('photoFilename').textContent=file.name;document.getElementById('photoDims').textContent=`${img.width}×${img.height}px · ${(file.size/1024).toFixed(0)}KB`;document.getElementById('photoPlaceholder').style.display='none';document.getElementById('photoPreviewWrap').style.display='flex';document.getElementById('photoDrop').classList.add('uploaded');};r.readAsDataURL(file);
+    URL.revokeObjectURL(url);
+  };img.src=url;
+}
+function resetPhoto(e){
+  e.stopPropagation();photoFile=null;photoDataURL=null;
+  document.getElementById('photoInput').value='';
+  document.getElementById('photoPreview').src='';
+  document.getElementById('photoPlaceholder').style.display='block';
+  document.getElementById('photoPreviewWrap').style.display='none';
+  document.getElementById('photoDrop').classList.remove('uploaded');
+}
+
+/* ─── SUBMIT ─── */
+function submitForm(){
+  let valid=true;const data={};
+  const enabledBuiltin=BUILTIN.filter(f=>{const fc=cfg.fields[f.id]||f;return fc.on!==undefined?fc.on:f.on;});
+  enabledBuiltin.forEach(f=>{
+    const fc=cfg.fields[f.id]||f;const req=fc.req!==undefined?fc.req:f.req;
+    const el=document.getElementById('ff-'+f.id);const w=document.getElementById('fw-'+f.id);
+    if(!el)return;const val=el.value.trim();
+    data[f.id]={label:f.label,value:val};
+    if(req&&!val){w.classList.add('has-error');valid=false;}else w.classList.remove('has-error');
+  });
+  (cfg.customFields||[]).filter(cf=>cf.label).forEach(cf=>{
+    const el=document.getElementById('ff-'+cf.id);const w=document.getElementById('fw-'+cf.id);
+    if(!el)return;
+    const val=cf.type==='checkbox'?(el.checked?'Yes':'No'):el.value.trim();
+    data[cf.id]={label:cf.label,value:val,type:cf.type};
+    if(cf.required&&cf.type!=='checkbox'&&!val){w.classList.add('has-error');valid=false;}else w.classList.remove('has-error');
+  });
+  if((cfg.photoRequired!==false)&&!photoDataURL){
+    const e=document.getElementById('photoErrMsg');e.textContent='A profile photo is required.';e.style.display='block';valid=false;
+  }
+  if(!valid){(document.querySelector('.has-error')||document.getElementById('photoErrMsg')).scrollIntoView({behavior:'smooth',block:'center'});return;}
+  subs.push({id:Date.now(),ts:new Date().toLocaleString(),data,photoData:photoDataURL||null,photoName:photoFile?.name||null});
+  localStorage.setItem('mag_subs',JSON.stringify(subs));
+  document.getElementById('formContainer').style.display='none';
+  document.getElementById('successWrap').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ─── SUBMISSIONS VIEW ─── */
+function renderSubmissions(){
+  const today=new Date().toDateString();
+  document.getElementById('statTotal').textContent=subs.length;
+  document.getElementById('statPhoto').textContent=subs.filter(s=>s.photoData).length;
+  document.getElementById('statToday').textContent=subs.filter(s=>new Date(s.id).toDateString()===today).length;
+  const c=document.getElementById('submissionsContainer');
+  if(!subs.length){c.innerHTML=`<div class="empty-state"><h3>No submissions yet</h3><p>Share the form link with teachers and their profiles will appear here.</p></div>`;return;}
+  c.innerHTML=subs.map(sub=>{
+    const name=sub.data?.name?.value||'Unknown';
+    const subj=sub.data?.subject?.value||'';
+    const initials=name.trim().split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    const avatar=sub.photoData?`<img class="sub-avatar" src="${sub.photoData}" alt="${name}"/>`:`<div class="sub-avatar-init">${initials}</div>`;
+    const fieldsHtml=Object.entries(sub.data||{}).filter(([k])=>k!=='name'&&k!=='subject').map(([,fc])=>`
+      <div class="sub-field${['message','advice','quote','background'].includes(fc.label?.toLowerCase().replace(/ /g,'_'))?'':''} wide">
+        <div class="sub-field-lbl">${fc.label}</div>
+        <div class="sub-field-val">${fc.value||'—'}</div>
+      </div>`).join('');
+    return `<div class="sub-card">
+      <div class="sub-top">${avatar}<div><div class="sub-name">${name}</div><div class="sub-meta">${subj} · ${sub.ts}</div></div></div>
+      <div class="sub-fields">${fieldsHtml}</div>
+      <button class="sub-del" onclick="deleteSub(${sub.id})">Remove this submission</button>
+    </div>`;
+  }).join('');
+}
+function deleteSub(id){if(!confirm('Remove this submission?'))return;subs=subs.filter(s=>s.id!==id);localStorage.setItem('mag_subs',JSON.stringify(subs));renderSubmissions();}
+function clearAll(){if(!confirm(`Delete all ${subs.length} submissions? This cannot be undone.`))return;subs=[];localStorage.setItem('mag_subs',JSON.stringify(subs));renderSubmissions();}
+
+function exportForClaude(){
+  let txt=`TEACHER PROFILES FOR CLAUDE FORMATTING\nExported: ${new Date().toLocaleString()}\nTotal: ${subs.length}\n\n${'='.repeat(55)}\n\n`;
+  txt+=`INSTRUCTIONS FOR CLAUDE:\nFormat each teacher profile below into a professional, print-ready magazine layout.\n\n${'='.repeat(55)}\n\n`;
+  subs.forEach((s,i)=>{
+    txt+=`TEACHER PROFILE #${i+1}\n`;
+    Object.entries(s.data||{}).forEach(([,fc])=>{txt+=`${fc.label}: ${fc.value||'Not provided'}\n`;});
+    txt+=`Profile photo: ${s.photoData?`YES — ${s.photoName||'provided'}`:'NOT provided'}\n`;
+    txt+=`\n${'-'.repeat(40)}\n\n`;
+  });
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));a.download='teacher_profiles_for_claude.txt';a.click();
+}
+function exportCSV(){
+  if(!subs.length)return;
+  const headers=['#','Submitted',...Object.values(subs[0].data||{}).map(f=>f.label),'Has Photo'];
+  const rows=subs.map((s,i)=>[i+1,s.ts,...Object.values(s.data||{}).map(f=>`"${(f.value||'').replace(/"/g,'""')}"`),s.photoData?'Yes':'No']);
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[headers,...rows].map(r=>r.join(',')).join('\n')],{type:'text/csv'}));a.download='teacher_submissions.csv';a.click();
+}
+
+/* ─── UTILS ─── */
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+/* ─── INIT ─── */
+buildForm();
+</script>
+</body>
+</html>
