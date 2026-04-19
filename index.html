@@ -3,58 +3,110 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Teacher Profile Submission</title>
+<title>MagicEditor — Magazine Production Pipeline</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
-/* ═══════════════════════════════════════
-   ROOT & RESET
-═══════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   MAGICEDITOR — SHARED DESIGN SYSTEM
+═══════════════════════════════════════════════════════════════ */
 :root{
-  --ink:#1c1c1e; --ink2:#48484a; --ink3:#8e8e93;
-  --bg:#f5f5f0; --bg2:#ebebе6; --surface:#ffffff;
+  --ink:#1c1c1e; --ink2:#48484a; --ink3:#8e8e93; --ink4:#c7c7cc;
+  --bg:#f5f5f0; --bg2:#ebebe6; --surface:#ffffff;
   --gold:#c9973a; --gold2:#f0d89a; --gold3:#7a5a1a;
   --green:#1e6b45; --green2:#d1ead9;
   --red:#b0282a; --red2:#fce8e8;
   --blue:#1a3f7a; --blue2:#e4ecfb;
+  --amber:#b8791a; --amber2:#fdf0d8;
+  --purple:#5b3a8a; --purple2:#e9e0f5;
   --border:#ddddd5; --radius:12px; --shadow:0 2px 16px rgba(0,0,0,.07);
   --admin:#0f2744; --admin2:#1a3a60; --admin3:#c9973a;
+  --editor:#2d1b4e; --editor2:#4a2d7a;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
 body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:15px;line-height:1.6;}
 h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 
-/* ═══════════════════════════════════════
-   VIEWS — only one visible at a time
-═══════════════════════════════════════ */
 .view{display:none;animation:fadeIn .35s ease;}
 .view.active{display:block;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 
 /* ═══════════════════════════════════════
-   TEACHER FORM VIEW
+   LANDING PAGE
+═══════════════════════════════════════ */
+.land-hero{
+  background:var(--ink);color:#fff;
+  padding:4rem 1.5rem 3rem;text-align:center;
+  position:relative;overflow:hidden;
+}
+.land-hero::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(201,151,58,.04) 40px,rgba(201,151,58,.04) 80px);
+}
+.land-hero-inner{position:relative;z-index:1;max-width:700px;margin:0 auto;}
+.land-logo{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:16px;display:block;}
+.land-hero h1{font-size:clamp(32px,6vw,54px);color:#fff;margin-bottom:14px;}
+.land-hero h1 .me-magic{color:var(--gold);}
+.land-hero p{font-size:16px;color:#bbb;max-width:520px;margin:0 auto 2rem;}
+.land-admin-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:2rem;}
+.land-admin-btn{
+  background:transparent;border:1.5px solid rgba(255,255,255,.25);
+  color:#fff;padding:10px 22px;border-radius:999px;font-size:13px;
+  cursor:pointer;font-family:'Lato',sans-serif;font-weight:700;
+  letter-spacing:.5px;transition:all .2s;
+}
+.land-admin-btn:hover{border-color:var(--gold);color:var(--gold);}
+
+.land-body{max-width:1000px;margin:0 auto;padding:3rem 1rem 5rem;}
+.land-section-title{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-bottom:1rem;text-align:center;}
+.land-section-h{font-size:28px;text-align:center;margin-bottom:3rem;color:var(--ink);font-family:'Playfair Display',serif;}
+
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;}
+.form-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:1.75rem;
+  cursor:pointer;transition:all .25s;box-shadow:var(--shadow);
+  position:relative;overflow:hidden;
+}
+.form-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.1);border-color:var(--gold);}
+.form-card-icon{font-size:30px;margin-bottom:1rem;display:block;}
+.form-card h3{font-size:20px;margin-bottom:8px;color:var(--ink);}
+.form-card p{font-size:13.5px;color:var(--ink2);line-height:1.6;}
+.form-card-stripe{position:absolute;top:0;left:0;width:4px;height:100%;}
+.stripe-gold{background:var(--gold);}
+.stripe-green{background:var(--green);}
+.stripe-blue{background:var(--blue);}
+.stripe-purple{background:var(--purple);}
+.stripe-amber{background:var(--amber);}
+
+.land-footer{text-align:center;margin-top:4rem;padding-top:2rem;border-top:1px solid var(--border);color:var(--ink3);font-size:12px;}
+
+/* ═══════════════════════════════════════
+   FORM VIEWS (shared between all 5 forms)
 ═══════════════════════════════════════ */
 .form-hero{
-  background:var(--ink);
-  color:#fff;
-  padding:3rem 1.5rem 2.5rem;
-  text-align:center;
-  position:relative;
-  overflow:hidden;
+  background:var(--ink);color:#fff;
+  padding:2.75rem 1.5rem 2.25rem;text-align:center;
+  position:relative;overflow:hidden;
 }
 .form-hero::before{
   content:'';position:absolute;inset:0;
   background:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(201,151,58,.04) 40px,rgba(201,151,58,.04) 80px);
 }
 .form-hero-inner{position:relative;z-index:1;max-width:540px;margin:0 auto;}
-.form-hero-tag{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:14px;display:block;}
-.form-hero h1{font-size:clamp(24px,5vw,36px);color:#fff;margin-bottom:10px;}
+.form-hero-back{
+  position:absolute;top:1.25rem;left:1.25rem;z-index:2;
+  background:transparent;border:1px solid rgba(255,255,255,.25);
+  color:#fff;padding:6px 14px;border-radius:999px;font-size:12px;
+  cursor:pointer;font-family:'Lato',sans-serif;
+}
+.form-hero-back:hover{border-color:var(--gold);color:var(--gold);}
+.form-hero-tag{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:12px;display:block;}
+.form-hero h1{font-size:clamp(22px,5vw,32px);color:#fff;margin-bottom:8px;}
 .form-hero p{font-size:14px;color:#bbb;max-width:420px;margin:0 auto;}
-.form-hero-meta{display:flex;justify-content:center;gap:24px;margin-top:1.5rem;flex-wrap:wrap;}
-.form-hero-meta span{font-size:12px;color:#999;}
-.form-hero-meta strong{color:var(--gold2);}
 
-.form-body{max-width:600px;margin:0 auto;padding:2rem 1rem 5rem;}
+.form-body{max-width:620px;margin:0 auto;padding:2rem 1rem 5rem;}
 
 .f-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;margin-bottom:1.25rem;box-shadow:var(--shadow);}
 .f-card-title{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3);margin-bottom:1.5rem;padding-bottom:10px;border-bottom:1px solid var(--border);}
@@ -77,14 +129,11 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
   background:#fff;
 }
 .field textarea{resize:vertical;min-height:95px;}
+.field textarea.long{min-height:180px;}
 .field.has-error input,.field.has-error textarea,.field.has-error select{border-color:var(--red);}
 .field-err{font-size:12px;color:var(--red);margin-top:5px;display:none;}
 .field.has-error .field-err{display:block;}
 .field-hint{font-size:12px;color:var(--ink3);margin-top:5px;}
-
-.checkbox-row{display:flex;align-items:center;gap:10px;padding:10px 0;}
-.checkbox-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex-shrink:0;}
-.checkbox-row span{font-size:14px;color:var(--ink);}
 
 /* Photo upload */
 .photo-drop{
@@ -100,7 +149,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .photo-drop p{font-size:12px;color:var(--ink3);}
 .photo-pill{display:inline-block;margin-top:12px;font-size:11px;padding:4px 12px;border-radius:20px;background:#f0f0ea;color:var(--ink3);font-weight:700;letter-spacing:.3px;}
 .photo-preview-wrap{display:none;flex-direction:column;align-items:center;gap:12px;}
-.photo-preview-wrap img{width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--green);}
+.photo-preview-wrap img{width:110px;height:110px;border-radius:50%;object-fit:cover;border:3px solid var(--green);}
 .photo-filename{font-size:12px;color:var(--green);font-weight:700;}
 .photo-dims{font-size:11px;color:var(--ink3);}
 .photo-change{font-size:12px;color:var(--ink3);cursor:pointer;text-decoration:underline;background:none;border:none;font-family:'Lato',sans-serif;margin-top:2px;}
@@ -109,752 +158,2553 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .photo-reqs p{font-size:12.5px;color:#6b4e10;line-height:1.9;}
 .photo-reqs strong{color:#4a3408;font-weight:700;}
 
-/* custom section divider */
-.section-divider{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--ink3);border-top:1px solid var(--border);padding-top:16px;margin:4px 0 16px;}
+/* Multi-photo upload (for events) */
+.multi-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:14px;}
+.multi-photo-thumb{
+  position:relative;width:100%;aspect-ratio:1/1;
+  border-radius:9px;overflow:hidden;border:2px solid var(--green);
+  background:#f0f0ea;
+}
+.multi-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.multi-photo-remove{
+  position:absolute;top:4px;right:4px;
+  background:rgba(176,40,42,.9);color:#fff;border:none;
+  width:24px;height:24px;border-radius:50%;font-size:14px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-weight:700;
+}
+.multi-photo-count{
+  background:#f0f0ea;color:var(--ink3);
+  padding:8px 14px;border-radius:999px;font-size:12px;font-weight:700;
+  display:inline-block;margin-top:8px;letter-spacing:.3px;
+}
+.multi-photo-count.full{background:var(--amber2);color:var(--amber);}
 
-/* Submit */
 .submit-btn{
-  width:100%;padding:16px;
-  background:var(--ink);color:#fff;
-  border:none;border-radius:var(--radius);
-  font-size:16px;font-weight:700;letter-spacing:.5px;
-  cursor:pointer;font-family:'Lato',sans-serif;
+  width:100%;padding:15px;background:var(--ink);
+  color:#fff;border:none;border-radius:9px;
+  font-size:15px;font-weight:700;cursor:pointer;
+  font-family:'Lato',sans-serif;letter-spacing:.5px;
   transition:background .2s,transform .1s;
-  margin-top:.5rem;
 }
 .submit-btn:hover{background:#2c2c2e;}
 .submit-btn:active{transform:scale(.99);}
 
-/* Success */
-.success-wrap{text-align:center;padding:4rem 1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
-.success-icon{font-size:56px;margin-bottom:1.25rem;display:block;}
-.success-wrap h2{font-size:28px;color:var(--ink);margin-bottom:10px;}
-.success-wrap p{font-size:15px;color:var(--ink3);}
-
-/* Deadline banner */
-.deadline-bar{background:var(--red2);border:1px solid #f5c0c0;border-radius:9px;padding:11px 16px;font-size:13px;color:var(--red);margin-bottom:1.25rem;display:none;}
-
-/* Footer trigger */
-.site-footer{text-align:center;padding:2rem 1rem;font-size:12px;color:var(--ink3);}
-.admin-trigger{cursor:default;user-select:none;display:inline-block;padding:6px 10px;border-radius:6px;transition:background .2s;}
-.admin-trigger:hover{background:rgba(0,0,0,.04);}
+/* Success wrap */
+.success-wrap{max-width:480px;margin:0 auto;padding:4rem 1rem;text-align:center;}
+.success-icon{font-size:64px;margin-bottom:1rem;}
+.success-wrap h2{font-size:26px;color:var(--green);margin-bottom:10px;}
+.success-wrap p{font-size:15px;color:var(--ink2);margin-bottom:2rem;}
+.success-wrap button{
+  background:var(--ink);color:#fff;border:none;
+  padding:12px 30px;border-radius:999px;font-size:14px;
+  font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;
+}
 
 /* ═══════════════════════════════════════
    PIN OVERLAY
 ═══════════════════════════════════════ */
 .pin-overlay{
-  position:fixed;inset:0;z-index:1000;
-  background:rgba(15,39,68,.85);
-  backdrop-filter:blur(6px);
-  display:none;align-items:center;justify-content:center;
+  display:none;position:fixed;inset:0;
+  background:rgba(15,39,68,.92);z-index:1000;
+  backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;
 }
-.pin-overlay.active{display:flex;}
+.pin-overlay.active{display:flex;animation:fadeIn .2s ease;}
+.pin-overlay.editor{background:rgba(45,27,78,.92);}
 .pin-box{
-  background:var(--surface);border-radius:18px;
-  padding:2.5rem 2rem;text-align:center;
-  width:320px;box-shadow:0 24px 60px rgba(0,0,0,.3);
+  background:var(--surface);border-radius:16px;
+  padding:2rem 1.75rem;max-width:340px;width:90%;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);
 }
-.pin-box h2{font-size:22px;margin-bottom:6px;color:var(--ink);}
-.pin-box p{font-size:13px;color:var(--ink3);margin-bottom:1.75rem;}
+.pin-box h2{font-size:20px;text-align:center;margin-bottom:4px;color:var(--ink);}
+.pin-box .pin-sub{font-size:12.5px;text-align:center;color:var(--ink3);margin-bottom:1.25rem;}
 .pin-dots{display:flex;justify-content:center;gap:12px;margin-bottom:1.5rem;}
-.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);background:transparent;transition:all .2s;}
-.pin-dot.filled{background:var(--ink);border-color:var(--ink);}
-.pin-dot.error{background:var(--red);border-color:var(--red);}
-.pin-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.pin-dot{width:14px;height:14px;border-radius:50%;background:#e5e5e0;transition:background .2s,transform .1s;}
+.pin-dot.filled{background:var(--ink);transform:scale(1.1);}
+.pin-dot.error{background:var(--red)!important;animation:shake .3s;}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .pin-key{
-  padding:14px;border:1.5px solid var(--border);border-radius:10px;
-  font-size:18px;font-weight:700;cursor:pointer;
-  background:#fafaf8;color:var(--ink);
-  transition:background .15s,transform .1s;font-family:'Lato',sans-serif;
+  padding:14px;background:#f5f5f0;border:none;
+  border-radius:10px;font-size:18px;font-weight:600;
+  cursor:pointer;color:var(--ink);font-family:'Lato',sans-serif;
+  transition:background .15s;
 }
-.pin-key:hover{background:var(--bg);}
-.pin-key:active{transform:scale(.95);}
-.pin-key.del{font-size:14px;color:var(--ink3);}
+.pin-key:hover{background:#e9e9e0;}
+.pin-key:active{background:#d9d9d0;}
 .pin-key.zero{grid-column:2;}
-.pin-err{font-size:13px;color:var(--red);margin-top:12px;min-height:20px;}
-.pin-cancel{font-size:13px;color:var(--ink3);cursor:pointer;margin-top:14px;background:none;border:none;font-family:'Lato',sans-serif;text-decoration:underline;}
+.pin-key.del{grid-column:3;color:var(--red);}
+.pin-err-msg{font-size:13px;color:var(--red);text-align:center;min-height:18px;margin-top:10px;}
+.pin-cancel{
+  background:none;border:none;color:var(--ink3);
+  font-size:13px;font-family:'Lato',sans-serif;
+  cursor:pointer;margin-top:12px;display:block;width:100%;
+  padding:8px;
+}
 
 /* ═══════════════════════════════════════
-   ADMIN VIEW
+   ADMIN / PRODUCTION DASHBOARD
 ═══════════════════════════════════════ */
 .admin-topbar{
   background:var(--admin);color:#fff;
-  padding:1.1rem 2rem;
+  padding:1rem 1.5rem;
   display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:100;
+  flex-wrap:wrap;gap:10px;
 }
-.admin-logo{font-family:'Playfair Display',serif;font-size:18px;color:#fff;}
-.admin-logo span{color:var(--admin3);}
-.admin-nav{display:flex;gap:6px;}
+.admin-topbar-left{display:flex;align-items:center;gap:12px;}
+.admin-logo{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--admin3);font-weight:700;}
+.admin-topbar h1{font-size:18px;color:#fff;font-family:'Lato',sans-serif;font-weight:700;}
+.admin-topbar-right{display:flex;gap:10px;align-items:center;}
+.admin-exit{
+  background:transparent;border:1px solid rgba(255,255,255,.2);
+  color:#fff;padding:6px 14px;border-radius:999px;font-size:12px;
+  cursor:pointer;font-family:'Lato',sans-serif;
+}
+.admin-exit:hover{border-color:var(--admin3);color:var(--admin3);}
+
+.admin-tabs{background:#fff;border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;gap:4px;overflow-x:auto;}
 .admin-tab{
-  padding:7px 16px;border-radius:8px;font-size:13px;font-weight:700;
-  cursor:pointer;border:none;font-family:'Lato',sans-serif;
-  background:rgba(255,255,255,.08);color:#ccc;transition:all .2s;
+  background:none;border:none;padding:1rem 1.25rem;
+  font-size:13.5px;font-weight:700;cursor:pointer;
+  color:var(--ink3);font-family:'Lato',sans-serif;
+  border-bottom:2.5px solid transparent;transition:all .15s;
+  white-space:nowrap;
 }
-.admin-tab.active,.admin-tab:hover{background:var(--admin3);color:#fff;}
-.admin-back{font-size:13px;color:#aaa;cursor:pointer;background:none;border:none;font-family:'Lato',sans-serif;text-decoration:underline;}
+.admin-tab:hover{color:var(--ink);}
+.admin-tab.active{color:var(--ink);border-bottom-color:var(--admin3);}
+.admin-tab .tab-count{
+  display:inline-block;margin-left:6px;padding:1px 7px;
+  border-radius:999px;background:#f0f0ea;
+  font-size:11px;color:var(--ink2);font-weight:700;
+}
+.admin-tab.active .tab-count{background:var(--admin3);color:#fff;}
 
-.admin-body{max-width:820px;margin:0 auto;padding:2rem 1rem 5rem;}
-.admin-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;margin-bottom:1.25rem;box-shadow:var(--shadow);}
-.admin-section-title{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--ink3);margin-bottom:1.25rem;padding-bottom:10px;border-bottom:1px solid var(--border);}
-.admin-note{font-size:13px;color:var(--ink3);margin-bottom:1.1rem;line-height:1.7;}
+.admin-body{max-width:1100px;margin:0 auto;padding:2rem 1.5rem 5rem;}
 
-/* two-col info grid */
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.info-grid.full{grid-template-columns:1fr;}
-@media(max-width:520px){.info-grid{grid-template-columns:1fr;}}
-.info-field label{font-size:12px;font-weight:700;color:var(--ink3);display:block;margin-bottom:5px;letter-spacing:.3px;}
-.info-field input,.info-field select{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:'Lato',sans-serif;background:#fafaf8;color:var(--ink);}
-.info-field input:focus,.info-field select:focus{outline:none;border-color:var(--gold);}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:2rem;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;box-shadow:var(--shadow);}
+.stat-num{font-size:32px;font-weight:700;color:var(--ink);font-family:'Playfair Display',serif;line-height:1;margin-bottom:6px;}
+.stat-lbl{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);font-weight:700;}
+.stat-sub{font-size:11px;color:var(--ink3);margin-top:4px;}
+.stat-num.pending{color:var(--amber);}
+.stat-num.approved{color:var(--green);}
+.stat-num.rejected{color:var(--red);}
 
-/* built-in field rows */
-.builtin-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #f0f0ea;}
-.builtin-row:last-child{border-bottom:none;padding-bottom:0;}
-.builtin-row:first-child{padding-top:0;}
-.builtin-left{flex:1;}
-.builtin-name{font-size:14px;font-weight:700;color:var(--ink);}
-.builtin-desc{font-size:12px;color:var(--ink3);margin-top:2px;}
-.builtin-ctrls{display:flex;align-items:center;gap:10px;}
-.req-pill{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:#f5f5f0;color:var(--ink3);transition:all .2s;white-space:nowrap;}
-.req-pill.on{background:var(--red2);color:var(--red);border-color:#f0b0b0;}
-.tog{position:relative;width:44px;height:25px;cursor:pointer;flex-shrink:0;}
-.tog input{opacity:0;width:0;height:0;}
-.tog-track{position:absolute;inset:0;background:#d1d1d6;border-radius:25px;transition:background .2s;}
-.tog-thumb{position:absolute;width:19px;height:19px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.25);}
-.tog input:checked~.tog-track{background:var(--green);}
-.tog input:checked~.tog-thumb{transform:translateX(19px);}
-
-/* custom fields */
-.cf-card{background:#f8f8f4;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;position:relative;}
-.cf-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
-.cf-grp{display:flex;flex-direction:column;gap:4px;}
-.cf-grp label{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
-.cf-grp input,.cf-grp select{padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;background:#fff;color:var(--ink);}
-.cf-grp.grow{flex:1;min-width:160px;}
-.cf-grp.med{min-width:130px;}
-.cf-grp.sm{min-width:100px;}
-.cf-opts{margin-top:10px;}
-.cf-opts label{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;}
-.cf-opts textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;background:#fff;resize:vertical;}
-.cf-opts-hint{font-size:11px;color:var(--ink3);margin-top:3px;}
-.cf-del{position:absolute;top:10px;right:12px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--ink3);line-height:1;padding:0;transition:color .2s;}
-.cf-del:hover{color:var(--red);}
-.add-cf-btn{width:100%;padding:12px;background:var(--blue2);color:var(--blue);border:1.5px dashed #90b4e0;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;margin-top:4px;transition:background .2s;letter-spacing:.3px;}
-.add-cf-btn:hover{background:#d0e4f7;}
-
-/* photo settings */
-.photo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;}
-.photo-setting label{font-size:12px;font-weight:700;color:var(--ink3);display:block;margin-bottom:5px;}
-.photo-setting select,.photo-setting input{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;background:#fafaf8;color:var(--ink);}
-
-/* submissions tab */
-.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1.5rem;}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;text-align:center;box-shadow:var(--shadow);}
-.stat-num{font-family:'Playfair Display',serif;font-size:30px;color:var(--ink);}
-.stat-lbl{font-size:12px;color:var(--ink3);margin-top:2px;}
-.action-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.5rem;}
-.btn{padding:10px 20px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;border:1.5px solid var(--border);background:var(--surface);color:var(--ink);transition:all .2s;letter-spacing:.3px;}
-.btn:hover{background:var(--bg);}
+.action-row{
+  display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.5rem;
+  padding:1rem;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);align-items:center;
+}
+.action-row-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-right:6px;}
+.btn{
+  padding:9px 18px;border-radius:999px;font-size:13px;
+  font-weight:700;cursor:pointer;border:1px solid var(--border);
+  background:#fff;color:var(--ink);font-family:'Lato',sans-serif;
+  transition:all .15s;white-space:nowrap;
+}
+.btn:hover{background:#f5f5f0;}
 .btn-primary{background:var(--admin);color:#fff;border-color:var(--admin);}
 .btn-primary:hover{background:var(--admin2);}
-.btn-danger{background:var(--red);color:#fff;border-color:var(--red);}
-.btn-danger:hover{background:#8b1e20;}
+.btn-gold{background:var(--gold);color:#fff;border-color:var(--gold);}
+.btn-gold:hover{background:var(--gold3);}
+.btn-danger{color:var(--red);border-color:var(--red2);}
+.btn-danger:hover{background:var(--red2);}
 
-.sub-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem;margin-bottom:1rem;box-shadow:var(--shadow);}
-.sub-top{display:flex;align-items:center;gap:14px;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #f0f0ea;}
-.sub-avatar{width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0;}
-.sub-avatar-init{width:54px;height:54px;border-radius:50%;background:var(--gold2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--gold3);flex-shrink:0;font-family:'Playfair Display',serif;}
-.sub-name{font-size:15px;font-weight:700;color:var(--ink);}
-.sub-meta{font-size:12px;color:var(--ink3);margin-top:2px;}
-.sub-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;}
-@media(max-width:480px){.sub-fields{grid-template-columns:1fr;}}
-.sub-field-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin-bottom:2px;}
-.sub-field-val{font-size:13px;color:var(--ink);}
+.filter-select{
+  padding:9px 14px;border-radius:999px;border:1px solid var(--border);
+  background:#fff;font-size:13px;font-family:'Lato',sans-serif;
+  color:var(--ink);cursor:pointer;
+}
+
+.sub-list{display:flex;flex-direction:column;gap:1rem;}
+.sub-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:1.25rem 1.5rem;
+  box-shadow:var(--shadow);
+  position:relative;
+}
+.sub-card.cat-teachers{border-left:4px solid var(--gold);}
+.sub-card.cat-students{border-left:4px solid var(--green);}
+.sub-card.cat-primary5{border-left:4px solid var(--green);}
+.sub-card.cat-jss3{border-left:4px solid var(--green);}
+.sub-card.cat-ss3{border-left:4px solid var(--green);}
+.sub-card.cat-speeches{border-left:4px solid var(--blue);}
+.sub-card.cat-creative{border-left:4px solid var(--purple);}
+.sub-card.cat-events{border-left:4px solid var(--amber);}
+.sub-card.cat-academic{border-left:4px solid var(--blue);}
+.sub-card.cat-interviews{border-left:4px solid var(--green);}
+.sub-card.cat-motivational{border-left:4px solid var(--purple);}
+.sub-card.cat-gallery{border-left:4px solid var(--gold);}
+.sub-card.cat-editorial-note{border-left:4px solid #6a4a20;background:#fefbf4;}
+.sub-card.cat-appreciation{border-left:4px solid #6a4a20;background:#fefbf4;}
+.sub-top{display:flex;align-items:center;gap:14px;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #f0f0ea;flex-wrap:wrap;}
+.sub-avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0;}
+.sub-avatar-init{width:50px;height:50px;border-radius:50%;background:#f0f0ea;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--ink3);font-size:17px;flex-shrink:0;}
+.sub-name{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:2px;}
+.sub-meta{font-size:12px;color:var(--ink3);}
+.sub-meta .cat-pill{
+  display:inline-block;padding:2px 8px;border-radius:999px;
+  font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  margin-right:6px;
+}
+.pill-teachers{background:#fdf0d8;color:#7a5a1a;}
+.pill-students{background:var(--green2);color:var(--green);}
+.pill-primary5{background:var(--green2);color:var(--green);}
+.pill-jss3{background:var(--green2);color:var(--green);}
+.pill-ss3{background:var(--green2);color:var(--green);}
+.pill-speeches{background:var(--blue2);color:var(--blue);}
+.pill-creative{background:var(--purple2);color:var(--purple);}
+.pill-events{background:#fdf0d8;color:var(--amber);}
+.pill-academic{background:var(--blue2);color:var(--blue);}
+.pill-interviews{background:var(--green2);color:var(--green);}
+.pill-motivational{background:var(--purple2);color:var(--purple);}
+.pill-gallery{background:#fdf0d8;color:#7a5a1a;}
+.pill-editorial-note{background:#f5ebd0;color:#4a3408;}
+.pill-appreciation{background:#f5ebd0;color:#4a3408;}
+
+.status-badge{
+  padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;
+  letter-spacing:.5px;text-transform:uppercase;
+}
+.status-draft{background:#f0f0ea;color:var(--ink2);}
+.status-pending{background:var(--amber2);color:var(--amber);}
+.status-approved{background:var(--green2);color:var(--green);}
+.status-rejected{background:var(--red2);color:var(--red);}
+.status-finalized{background:var(--blue2);color:var(--blue);}
+
+.sub-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.9rem;margin-bottom:1rem;}
 .sub-field.wide{grid-column:1/-1;}
-.sub-del{font-size:12px;color:var(--red);cursor:pointer;background:none;border:none;font-family:'Lato',sans-serif;font-weight:700;margin-top:12px;padding:0;}
-.empty-state{text-align:center;padding:3.5rem 1rem;color:var(--ink3);}
-.empty-state h3{font-size:22px;color:var(--ink);margin-bottom:8px;}
+.sub-field-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-bottom:3px;}
+.sub-field-val{font-size:13.5px;color:var(--ink);line-height:1.5;white-space:pre-wrap;}
 
-/* save bar */
-.save-bar{background:var(--admin);padding:1.25rem 2rem;margin-top:1.5rem;border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
-.save-bar p{font-size:13px;color:#aaa;}
-.save-bar-btn{padding:11px 28px;background:var(--admin3);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;transition:background .2s;}
-.save-bar-btn:hover{background:#b8860b;}
+.sub-reviewer-note{
+  background:var(--amber2);border-left:3px solid var(--amber);
+  padding:10px 14px;border-radius:6px;margin-bottom:1rem;
+  font-size:13px;color:var(--ink2);
+}
+.sub-reviewer-note strong{color:var(--amber);}
 
-/* link box */
-.link-box{background:var(--green2);border:1px solid #8ecba3;border-radius:var(--radius);padding:1.25rem 1.5rem;margin-top:1.25rem;display:none;}
-.link-box p{font-size:13px;color:var(--green);font-weight:700;margin-bottom:8px;}
-.link-row{display:flex;gap:8px;}
-.link-row input{flex:1;padding:9px 12px;border:1px solid #8ecba3;border-radius:8px;font-size:13px;background:#fff;color:var(--ink);font-family:monospace;}
-.link-copy-btn{padding:9px 16px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.sub-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.sub-action-btn{
+  font-size:12px;padding:6px 14px;border-radius:999px;
+  border:1px solid var(--border);background:#fff;cursor:pointer;
+  font-family:'Lato',sans-serif;font-weight:700;color:var(--ink2);
+  transition:all .15s;
+}
+.sub-action-btn:hover{background:#f5f5f0;}
+.sub-action-download{color:var(--green);border-color:var(--green2);}
+.sub-action-download:hover{background:var(--green2);}
+.sub-action-send{color:var(--amber);border-color:var(--amber2);}
+.sub-action-send:hover{background:var(--amber2);}
+.sub-action-finalize{color:var(--blue);border-color:var(--blue2);}
+.sub-action-finalize:hover{background:var(--blue2);}
+.sub-action-delete{color:var(--red);border-color:var(--red2);margin-left:auto;}
+.sub-action-delete:hover{background:var(--red2);}
 
-@media(max-width:600px){
-  .admin-topbar{padding:1rem;}
-  .admin-nav{gap:4px;}
-  .admin-tab{padding:6px 10px;font-size:12px;}
-  .stats-row{grid-template-columns:1fr 1fr;}
-  .sub-fields{grid-template-columns:1fr;}
+.empty-state{
+  text-align:center;padding:4rem 1rem;
+  background:var(--surface);border:1px dashed var(--border);
+  border-radius:var(--radius);
+}
+.empty-state-icon{font-size:48px;margin-bottom:1rem;opacity:.5;}
+.empty-state h3{font-size:18px;color:var(--ink2);margin-bottom:6px;font-family:'Lato',sans-serif;}
+.empty-state p{font-size:13.5px;color:var(--ink3);}
+
+/* ═══════════════════════════════════════
+   EDITOR-IN-CHIEF VIEW
+═══════════════════════════════════════ */
+.editor-topbar{background:var(--editor);}
+.editor-topbar h1{color:#fff;}
+.editor-topbar .admin-logo{color:#c6a5f0;}
+.editor-topbar .admin-exit:hover{border-color:#c6a5f0;color:#c6a5f0;}
+
+.editor-intro{
+  background:linear-gradient(135deg,#fdf8ee,#faf4e4);
+  border:1px solid #e8d090;border-radius:var(--radius);
+  padding:1.25rem 1.5rem;margin-bottom:1.5rem;
+}
+.editor-intro h2{font-size:18px;color:#4a3408;margin-bottom:4px;font-family:'Lato',sans-serif;}
+.editor-intro p{font-size:13.5px;color:#6b4e10;line-height:1.6;}
+
+/* ═══════════════════════════════════════
+   EDITORIAL COMPOSE AREA (admin-only)
+═══════════════════════════════════════ */
+.editorial-compose{
+  background:linear-gradient(135deg,#fdf8ee,#faf4e4);
+  border:1px solid #e8d090;border-radius:var(--radius);
+  padding:1.5rem;margin-bottom:1.5rem;
+}
+.editorial-compose h3{font-size:16px;color:#4a3408;margin-bottom:8px;font-family:'Lato',sans-serif;}
+.editorial-compose p.intro{font-size:13px;color:#6b4e10;margin-bottom:1rem;}
+.editorial-compose textarea{
+  width:100%;padding:12px;border:1.5px solid #e8d090;
+  border-radius:9px;font-size:14px;font-family:'Lato',sans-serif;
+  background:#fff;min-height:140px;resize:vertical;
+}
+.editorial-compose input{
+  width:100%;padding:10px 12px;border:1.5px solid #e8d090;
+  border-radius:9px;font-size:14px;font-family:'Lato',sans-serif;
+  background:#fff;margin-bottom:10px;
+}
+.editorial-compose .compose-actions{display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap;}
+
+/* ═══════════════════════════════════════
+   SETTINGS PANEL
+═══════════════════════════════════════ */
+.settings-section{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem;
+  box-shadow:var(--shadow);
+}
+.settings-section h3{font-size:15px;color:var(--ink);margin-bottom:4px;font-family:'Lato',sans-serif;font-weight:700;}
+.settings-section p.desc{font-size:12.5px;color:var(--ink3);margin-bottom:1rem;}
+.settings-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+.settings-row label{font-size:13px;font-weight:700;color:var(--ink2);min-width:140px;}
+.settings-row input{
+  flex:1;min-width:120px;padding:9px 12px;
+  border:1.5px solid var(--border);border-radius:7px;
+  font-size:14px;font-family:'Lato',sans-serif;background:#fafaf8;
+}
+.settings-diag{
+  background:#f5f5f0;padding:12px 14px;border-radius:7px;
+  font-family:'SF Mono',Monaco,monospace;font-size:12px;
+  color:var(--ink2);white-space:pre-wrap;word-break:break-all;
+}
+
+/* ═══════════════════════════════════════
+   SHARE LINKS
+═══════════════════════════════════════ */
+.share-link-row{
+  display:flex;align-items:center;gap:14px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 18px;margin-bottom:12px;
+  box-shadow:var(--shadow);flex-wrap:wrap;
+}
+.share-link-icon{font-size:28px;flex-shrink:0;}
+.share-link-body{flex:1;min-width:200px;}
+.share-link-label{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:2px;}
+.share-link-desc{font-size:12px;color:var(--ink3);margin-bottom:6px;}
+.share-link-url{
+  font-size:11.5px;font-family:'SF Mono',Monaco,monospace;
+  color:var(--blue);background:var(--blue2);
+  padding:5px 9px;border-radius:5px;
+  display:inline-block;word-break:break-all;
+}
+.modal-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.5);z-index:1500;
+  align-items:center;justify-content:center;
+  backdrop-filter:blur(3px);padding:1rem;
+}
+.modal-overlay.active{display:flex;}
+.modal-box{
+  background:var(--surface);border-radius:16px;
+  max-width:500px;width:100%;padding:2rem;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);
+}
+.modal-box h2{font-size:20px;margin-bottom:6px;font-family:'Lato',sans-serif;}
+.modal-box .modal-sub{font-size:13px;color:var(--ink3);margin-bottom:1.25rem;}
+.modal-box textarea{
+  width:100%;padding:12px;border:1.5px solid var(--border);
+  border-radius:9px;font-size:14px;font-family:'Lato',sans-serif;
+  background:#fafaf8;resize:vertical;min-height:100px;
+}
+.modal-actions{display:flex;gap:10px;margin-top:1.25rem;justify-content:flex-end;}
+
+/* ═══════════════════════════════════════
+   FIELD CUSTOMIZATION UI
+═══════════════════════════════════════ */
+.cust-cat-picker{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  background:#fff;padding:14px 18px;border-radius:var(--radius);
+  border:1px solid var(--border);margin-bottom:1.25rem;box-shadow:var(--shadow);
+}
+.cust-cat-picker label{font-size:13px;font-weight:700;color:var(--ink2);}
+.cust-cat-picker select{
+  flex:1;min-width:180px;padding:10px 14px;
+  border:1.5px solid var(--border);border-radius:8px;
+  font-size:14px;background:#fafaf8;font-family:'Lato',sans-serif;
+}
+.cust-field-row{
+  display:flex;align-items:center;gap:10px;
+  background:#fff;border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;margin-bottom:8px;
+  flex-wrap:wrap;
+}
+.cust-field-row.is-hidden{opacity:.55;background:#f7f7f2;}
+.cust-field-row.is-custom{border-left:4px solid var(--gold);}
+.cust-field-row.is-builtin{border-left:4px solid #d5d5d0;}
+.cust-field-main{flex:1;min-width:180px;}
+.cust-field-label{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:2px;}
+.cust-field-meta{font-size:11px;color:var(--ink3);}
+.cust-field-type-pill{
+  display:inline-block;padding:1px 8px;border-radius:999px;
+  background:#f0f0ea;color:var(--ink2);font-size:10px;
+  font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  margin-right:6px;
+}
+.cust-toggle-group{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.cust-chip{
+  font-size:11px;padding:4px 11px;border-radius:999px;
+  border:1.5px solid var(--border);background:#fff;
+  cursor:pointer;font-family:'Lato',sans-serif;font-weight:700;
+  color:var(--ink3);letter-spacing:.3px;
+}
+.cust-chip:hover{background:#f5f5f0;}
+.cust-chip.on{background:var(--green);color:#fff;border-color:var(--green);}
+.cust-chip.on-red{background:var(--red);color:#fff;border-color:var(--red);}
+.cust-chip.warn{color:var(--red);}
+.cust-mini-btn{
+  width:28px;height:28px;border-radius:50%;
+  background:#f5f5f0;border:1px solid var(--border);
+  cursor:pointer;font-size:14px;color:var(--ink2);
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:'Lato',sans-serif;
+}
+.cust-mini-btn:hover{background:#e8e8e0;}
+.cust-actions-row{
+  display:flex;gap:10px;flex-wrap:wrap;margin-top:1.25rem;
+}
+
+/* Modal extras for add/edit custom field */
+.modal-box .field-form{display:flex;flex-direction:column;gap:12px;}
+.modal-box .field-form label{
+  font-size:12px;font-weight:700;color:var(--ink2);
+  letter-spacing:.3px;margin-bottom:4px;display:block;
+}
+.modal-box .field-form input,
+.modal-box .field-form select{
+  width:100%;padding:10px 12px;border:1.5px solid var(--border);
+  border-radius:8px;font-size:14px;background:#fafaf8;
+  font-family:'Lato',sans-serif;
+}
+.modal-box .field-form .row-check{display:flex;align-items:center;gap:8px;}
+.modal-box .field-form .row-check input{width:auto;}
+.modal-box .field-form .options-hint{font-size:11px;color:var(--ink3);font-weight:400;}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════ */
+@media (max-width: 600px){
+  .admin-topbar{padding:.85rem 1rem;}
+  .admin-topbar h1{font-size:15px;}
+  .admin-tabs{padding:0 .5rem;}
+  .admin-tab{padding:.9rem .85rem;font-size:12.5px;}
+  .admin-body{padding:1.5rem 1rem 4rem;}
+  .stat-num{font-size:26px;}
+  .form-hero{padding:3.25rem 1rem 2rem;}
+  .form-hero-back{top:.9rem;left:.9rem;}
 }
 </style>
 </head>
 <body>
 
-<!-- ══════════════════════════════════════
+<!-- ═══════════════════════════════════════
+     LANDING PAGE
+═══════════════════════════════════════ -->
+<div id="viewLanding" class="view active">
+  <div class="land-hero">
+    <div class="land-hero-inner">
+      <span class="land-logo">MagicEditor</span>
+      <h1>The <span class="me-magic">Magic</span> Behind Every Edition</h1>
+      <p>A magazine production pipeline for the Editorial Committee. Submit content, review, approve, export — all in one place.</p>
+      <div class="land-admin-row">
+        <button class="land-admin-btn" onclick="openPIN('admin')">⚙ Production Admin</button>
+        <button class="land-admin-btn" onclick="openPIN('editor')">✎ Editor-in-Chief</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="land-body">
+    <div class="land-section-title">Submission Portals</div>
+    <h2 class="land-section-h">Choose a content category</h2>
+
+    <div class="form-grid">
+      <div class="form-card" onclick="openForm('teachers')">
+        <span class="form-card-stripe stripe-gold"></span>
+        <span class="form-card-icon">👩‍🏫</span>
+        <h3>Teacher Profiles</h3>
+        <p>For teaching staff. Share your journey, subjects, and message to the graduating class.</p>
+      </div>
+      <div class="form-card" onclick="openForm('primary5')">
+        <span class="form-card-stripe stripe-green"></span>
+        <span class="form-card-icon">🧒</span>
+        <h3>Primary 5 Graduates</h3>
+        <p>For Primary 5 pupils moving on. Tell the world who you are.</p>
+      </div>
+      <div class="form-card" onclick="openForm('jss3')">
+        <span class="form-card-stripe stripe-green"></span>
+        <span class="form-card-icon">🎒</span>
+        <h3>JSS3 Graduates</h3>
+        <p>For Junior Secondary 3 students finishing this phase.</p>
+      </div>
+      <div class="form-card" onclick="openForm('ss3')">
+        <span class="form-card-stripe stripe-green"></span>
+        <span class="form-card-icon">🎓</span>
+        <h3>SS3 Graduates</h3>
+        <p>For the main graduating class. Your legacy, your ambitions, your message.</p>
+      </div>
+      <div class="form-card" onclick="openForm('speeches')">
+        <span class="form-card-stripe stripe-blue"></span>
+        <span class="form-card-icon">🎤</span>
+        <h3>Speeches & Addresses</h3>
+        <p>Proprietor, Senior Boy, guest speakers, class messages — formal addresses for the edition.</p>
+      </div>
+      <div class="form-card" onclick="openForm('creative')">
+        <span class="form-card-stripe stripe-purple"></span>
+        <span class="form-card-icon">✍️</span>
+        <h3>Creative Corner</h3>
+        <p>Poems, short stories, jokes, riddles — creative writing from across the school.</p>
+      </div>
+      <div class="form-card" onclick="openForm('events')">
+        <span class="form-card-stripe stripe-amber"></span>
+        <span class="form-card-icon">📸</span>
+        <h3>School Life & Events</h3>
+        <p>Sports days, excursions, competitions, achievements — the year's memorable moments.</p>
+      </div>
+      <div class="form-card" onclick="openForm('academic')">
+        <span class="form-card-stripe stripe-blue"></span>
+        <span class="form-card-icon">📚</span>
+        <h3>Academic & Educational</h3>
+        <p>Articles, subject features, research write-ups, and educational content.</p>
+      </div>
+      <div class="form-card" onclick="openForm('interviews')">
+        <span class="form-card-stripe stripe-green"></span>
+        <span class="form-card-icon">🎙️</span>
+        <h3>Interviews</h3>
+        <p>Q&A with old students, guest speakers, senior staff, and notable voices.</p>
+      </div>
+      <div class="form-card" onclick="openForm('motivational')">
+        <span class="form-card-stripe stripe-purple"></span>
+        <span class="form-card-icon">💡</span>
+        <h3>Motivational Articles</h3>
+        <p>Inspirational messages and wisdom for the graduating class.</p>
+      </div>
+      <div class="form-card" onclick="openForm('gallery')">
+        <span class="form-card-stripe stripe-gold"></span>
+        <span class="form-card-icon">🖼️</span>
+        <h3>Photo Gallery</h3>
+        <p>Submit standalone photos with captions for the gallery section.</p>
+      </div>
+    </div>
+
+    <div class="land-footer">
+      <p>MagicEditor • Magazine Production Pipeline</p>
+      <p style="margin-top:6px;">v1.0 • Maiden Graduation Edition</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     FORM VIEW (dynamic per category)
+═══════════════════════════════════════ -->
+<div id="viewForm" class="view">
+  <div class="form-hero">
+    <button class="form-hero-back" onclick="goLanding()">← Back</button>
+    <div class="form-hero-inner">
+      <span class="form-hero-tag" id="formTag">—</span>
+      <h1 id="formTitle">—</h1>
+      <p id="formSubtitle">—</p>
+    </div>
+  </div>
+
+  <div id="formContainer" class="form-body"></div>
+
+  <div id="successWrap" class="success-wrap" style="display:none;">
+    <div class="success-icon">🎉</div>
+    <h2>Submission Received!</h2>
+    <p>Thank you. Your submission has been sent to the Editorial Committee for review. You'll see it in the magazine if approved.</p>
+    <button onclick="goLanding()">Back to Home</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PRODUCTION DASHBOARD
+═══════════════════════════════════════ -->
+<div id="viewAdmin" class="view">
+  <!-- Mode banner at absolute top - impossible to miss -->
+  <div style="background:#0f2744;color:#fff;padding:14px 20px;text-align:center;font-family:'Lato',sans-serif;border-bottom:4px solid #c9973a;">
+    <div style="font-size:11px;letter-spacing:3px;color:#c9973a;font-weight:700;margin-bottom:4px;">CURRENTLY VIEWING</div>
+    <div style="font-size:22px;font-weight:700;letter-spacing:1px;">⚙ PRODUCTION ADMIN</div>
+    <div style="font-size:12px;color:#bbb;margin-top:3px;">Content intake · Structuring · Routing · Export</div>
+  </div>
+  <div class="admin-topbar">
+    <div class="admin-topbar-left">
+      <div>
+        <span class="admin-logo">MagicEditor</span>
+        <h1>Production Dashboard</h1>
+      </div>
+    </div>
+    <div class="admin-topbar-right">
+      <button class="admin-exit" onclick="goLanding()">← Exit</button>
+    </div>
+  </div>
+
+  <div class="admin-tabs">
+    <button class="admin-tab active" onclick="setCategory('all')" id="tab-all">All <span class="tab-count" id="count-all">0</span></button>
+    <button class="admin-tab" onclick="setCategory('teachers')" id="tab-teachers">Teachers <span class="tab-count" id="count-teachers">0</span></button>
+    <button class="admin-tab" onclick="setCategory('primary5')" id="tab-primary5">Primary 5 <span class="tab-count" id="count-primary5">0</span></button>
+    <button class="admin-tab" onclick="setCategory('jss3')" id="tab-jss3">JSS3 <span class="tab-count" id="count-jss3">0</span></button>
+    <button class="admin-tab" onclick="setCategory('ss3')" id="tab-ss3">SS3 <span class="tab-count" id="count-ss3">0</span></button>
+    <button class="admin-tab" onclick="setCategory('speeches')" id="tab-speeches">Speeches <span class="tab-count" id="count-speeches">0</span></button>
+    <button class="admin-tab" onclick="setCategory('creative')" id="tab-creative">Creative <span class="tab-count" id="count-creative">0</span></button>
+    <button class="admin-tab" onclick="setCategory('events')" id="tab-events">Events <span class="tab-count" id="count-events">0</span></button>
+    <button class="admin-tab" onclick="setCategory('academic')" id="tab-academic">Academic <span class="tab-count" id="count-academic">0</span></button>
+    <button class="admin-tab" onclick="setCategory('interviews')" id="tab-interviews">Interviews <span class="tab-count" id="count-interviews">0</span></button>
+    <button class="admin-tab" onclick="setCategory('motivational')" id="tab-motivational">Motivation <span class="tab-count" id="count-motivational">0</span></button>
+    <button class="admin-tab" onclick="setCategory('gallery')" id="tab-gallery">Gallery <span class="tab-count" id="count-gallery">0</span></button>
+    <button class="admin-tab" onclick="setCategory('editorial')" id="tab-editorial" style="color:var(--gold);font-style:italic;">✎ Editorial <span class="tab-count" id="count-editorial">0</span></button>
+    <button class="admin-tab" onclick="openShareLinks()" id="tab-sharelinks">🔗 Share Links</button>
+    <button class="admin-tab" onclick="openSettings()" id="tab-settings" style="margin-left:auto;">⚙ Settings</button>
+  </div>
+
+  <div class="admin-body">
+    <!-- Default submissions mode -->
+    <div id="adminModeSubs">
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">Total Submissions</div><div class="stat-sub" id="statTotalSub">Across all categories</div></div>
+        <div class="stat-card"><div class="stat-num pending" id="statPending">0</div><div class="stat-lbl">Pending Review</div><div class="stat-sub">Awaiting Editor-in-Chief</div></div>
+        <div class="stat-card"><div class="stat-num approved" id="statApproved">0</div><div class="stat-lbl">Approved</div><div class="stat-sub">Ready for layout</div></div>
+        <div class="stat-card"><div class="stat-num" id="statFinalized">0</div><div class="stat-lbl">Finalized</div><div class="stat-sub">Locked & exported</div></div>
+      </div>
+
+      <div class="action-row">
+        <span class="action-row-label">Filter:</span>
+        <select class="filter-select" id="filterStatus" onchange="renderAdmin()">
+          <option value="all">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="pending">Pending Review</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="finalized">Finalized</option>
+        </select>
+        <span class="action-row-label" style="margin-left:auto;">Export:</span>
+        <button class="btn btn-primary" onclick="exportCurrentCategory()">⬇ Category ZIP</button>
+        <button class="btn btn-gold" onclick="exportMasterMagazine()">⬇ Master Magazine ZIP</button>
+      </div>
+
+      <div id="adminSubList" class="sub-list"></div>
+    </div>
+
+    <!-- Editorial compose mode -->
+    <div id="adminModeEditorial" style="display:none;">
+      <div class="editorial-compose">
+        <h3>📜 Appreciation Section</h3>
+        <p class="intro">Written by Production Admin. Acknowledgements, contributors, sponsors, and thanks. This appears near the end of the magazine.</p>
+        <input type="text" id="apprTitle" placeholder="Section title (e.g., 'With Gratitude')" />
+        <textarea id="apprBody" placeholder="List of contributors, sponsors, special thanks, and acknowledgements. Names, roles, and a brief thank-you note for each..."></textarea>
+        <div class="compose-actions">
+          <button class="btn btn-primary" onclick="saveAppreciation()">Save Appreciation</button>
+          <span id="apprStatus" style="font-size:12px;color:var(--ink3);align-self:center;"></span>
+        </div>
+      </div>
+
+      <div class="editorial-compose" style="background:linear-gradient(135deg,#f4f0fd,#eae4fa);border-color:#c6a5f0;">
+        <h3 style="color:#2d1b4e;">✎ Editorial Note (read-only here)</h3>
+        <p class="intro" style="color:#4a2d7a;">Written by the Editor-in-Chief in their own view. Displayed here for reference.</p>
+        <div id="edNotePreview" style="background:#fff;padding:14px;border-radius:7px;font-size:14px;color:var(--ink2);min-height:80px;white-space:pre-wrap;"></div>
+      </div>
+
+      <h2 style="margin-top:2rem;margin-bottom:1rem;font-size:18px;font-family:'Lato',sans-serif;">Editorial Entries</h2>
+      <div id="editorialList" class="sub-list"></div>
+    </div>
+
+    <!-- Share Links mode -->
+    <div id="adminModeShareLinks" style="display:none;">
+      <div class="editor-intro" style="background:linear-gradient(135deg,#e4ecfb,#d4e0f5);border-color:#a5bef0;">
+        <h2 style="color:#1a3f7a;">🔗 Share Links</h2>
+        <p style="color:#1a3f7a;">Copy the right link and share it with each group (via WhatsApp, email, etc.). Each link opens that category's form directly.</p>
+      </div>
+      <div id="shareLinksContainer"></div>
+    </div>
+
+    <!-- Settings mode -->
+    <div id="adminModeSettings" style="display:none;">
+      <div class="settings-section">
+        <h3>🛠️ Customize Forms</h3>
+        <p class="desc">For each submission form, hide or show built-in fields, toggle their required status, reorder them, or add your own custom fields. Changes apply to new submissions only — existing ones keep their original data.</p>
+        <div class="cust-cat-picker">
+          <label>Edit form:</label>
+          <select id="custCatPicker" onchange="renderFieldCustomizer()">
+            <option value="">— Select a category —</option>
+            <option value="teachers">👩‍🏫 Teacher Profiles</option>
+            <option value="primary5">🧒 Primary 5 Graduates</option>
+            <option value="jss3">🎒 JSS3 Graduates</option>
+            <option value="ss3">🎓 SS3 Graduates</option>
+            <option value="speeches">🎤 Speeches &amp; Addresses</option>
+            <option value="creative">✍️ Creative Corner</option>
+            <option value="events">📸 School Life &amp; Events</option>
+            <option value="academic">📚 Academic &amp; Educational</option>
+            <option value="interviews">🎙️ Interviews</option>
+            <option value="motivational">💡 Motivational Articles</option>
+            <option value="gallery">🖼️ Photo Gallery</option>
+          </select>
+        </div>
+        <div id="custFieldsList"></div>
+        <div id="custActions" class="cust-actions-row" style="display:none;">
+          <button class="btn btn-primary" onclick="openCustomFieldModal()">+ Add Custom Field</button>
+          <button class="btn" onclick="resetCategoryToDefaults()" style="color:var(--amber);border-color:var(--amber2);">↺ Reset this form to defaults</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Change PINs</h3>
+        <p class="desc">Set new 4-digit PINs for Production Admin and Editor-in-Chief. Default values are 1234 and 5678.</p>
+        <div class="settings-row">
+          <label>Production Admin PIN:</label>
+          <input type="text" id="setAdminPin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="4 digits" />
+        </div>
+        <div class="settings-row">
+          <label>Editor-in-Chief PIN:</label>
+          <input type="text" id="setEditorPin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="4 digits" />
+        </div>
+        <button class="btn btn-primary" onclick="savePins()">Save PINs</button>
+        <span id="pinSaveStatus" style="font-size:12px;color:var(--ink3);margin-left:10px;"></span>
+      </div>
+
+      <div class="settings-section">
+        <h3>System Diagnostics</h3>
+        <p class="desc">Current state of the system. Useful for debugging.</p>
+        <div class="settings-diag" id="diagOutput">Loading...</div>
+        <button class="btn" onclick="refreshDiag()" style="margin-top:10px;">Refresh diagnostics</button>
+      </div>
+
+      <div class="settings-section">
+        <h3 style="color:var(--red);">⚠️ Reset Zone</h3>
+        <p class="desc">Reset PINs to defaults (1234 / 5678) or clear ALL submissions. Use with caution.</p>
+        <button class="btn" onclick="resetPinsToDefault()">Reset PINs to defaults</button>
+        <button class="btn btn-danger" onclick="wipeAllData()" style="margin-left:10px;">Wipe all submissions</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     EDITOR-IN-CHIEF VIEW
+═══════════════════════════════════════ -->
+<div id="viewEditor" class="view">
+  <!-- Mode banner at absolute top - impossible to miss -->
+  <div style="background:#2d1b4e;color:#fff;padding:14px 20px;text-align:center;font-family:'Lato',sans-serif;border-bottom:4px solid #c6a5f0;">
+    <div style="font-size:11px;letter-spacing:3px;color:#c6a5f0;font-weight:700;margin-bottom:4px;">CURRENTLY VIEWING</div>
+    <div style="font-size:22px;font-weight:700;letter-spacing:1px;">✎ EDITOR-IN-CHIEF</div>
+    <div style="font-size:12px;color:#c6a5f0;margin-top:3px;">Review · Approve · Reject · Editorial Note</div>
+  </div>
+  <div class="admin-topbar editor-topbar">
+    <div class="admin-topbar-left">
+      <div>
+        <span class="admin-logo">MagicEditor</span>
+        <h1>Editor-in-Chief</h1>
+      </div>
+    </div>
+    <div class="admin-topbar-right">
+      <button class="admin-exit" onclick="goLanding()">← Exit</button>
+    </div>
+  </div>
+
+  <div class="admin-tabs">
+    <button class="admin-tab active" onclick="setEditorCategory('pending')" id="etab-pending">Pending Review <span class="tab-count" id="ecount-pending">0</span></button>
+    <button class="admin-tab" onclick="setEditorCategory('approved')" id="etab-approved">Approved <span class="tab-count" id="ecount-approved">0</span></button>
+    <button class="admin-tab" onclick="setEditorCategory('rejected')" id="etab-rejected">Rejected <span class="tab-count" id="ecount-rejected">0</span></button>
+    <button class="admin-tab" onclick="setEditorCategory('all')" id="etab-all">All <span class="tab-count" id="ecount-all">0</span></button>
+    <button class="admin-tab" onclick="setEditorCategory('editorial')" id="etab-editorial" style="color:#c6a5f0;font-style:italic;">✎ My Editorial Note</button>
+  </div>
+
+  <div class="admin-body">
+    <!-- Default review list mode -->
+    <div id="editorModeList">
+      <div class="editor-intro">
+        <h2>Welcome, Editor-in-Chief</h2>
+        <p>Review submissions from the Production Lead. Approve for magazine inclusion, reject with a note, or request revisions. Your decisions shape the maiden edition.</p>
+      </div>
+      <div id="editorSubList" class="sub-list"></div>
+    </div>
+
+    <!-- Editorial note compose mode -->
+    <div id="editorModeNote" style="display:none;">
+      <div class="editorial-compose" style="background:linear-gradient(135deg,#f4f0fd,#eae4fa);border-color:#c6a5f0;">
+        <h3 style="color:#2d1b4e;">✎ Editorial Note</h3>
+        <p class="intro" style="color:#4a2d7a;">Your opening note for the maiden edition. This appears on page 3 of the magazine. Write as the Editor-in-Chief speaking directly to readers.</p>
+        <input type="text" id="edNoteTitle" placeholder="Note title (e.g., 'A Word from the Editor')" />
+        <textarea id="edNoteBody" placeholder="Your editorial note. Reflect on the maiden edition, the journey, the graduating class, and what this moment means..."></textarea>
+        <div class="compose-actions">
+          <button class="btn btn-primary" style="background:#2d1b4e;border-color:#2d1b4e;" onclick="saveEditorialNote()">Save Editorial Note</button>
+          <span id="edNoteStatus" style="font-size:12px;color:var(--ink3);align-self:center;"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
      PIN OVERLAY
-══════════════════════════════════════ -->
-<div class="pin-overlay" id="pinOverlay">
+═══════════════════════════════════════ -->
+<div id="pinOverlay" class="pin-overlay">
   <div class="pin-box">
-    <h2>Admin Access</h2>
-    <p>Enter your 4-digit PIN to continue</p>
-    <div class="pin-dots" id="pinDots">
-      <div class="pin-dot" id="pd0"></div>
-      <div class="pin-dot" id="pd1"></div>
-      <div class="pin-dot" id="pd2"></div>
-      <div class="pin-dot" id="pd3"></div>
+    <div id="pinModeBadge" style="display:inline-block;padding:4px 12px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;"></div>
+    <h2 id="pinTitle">Enter PIN</h2>
+    <p class="pin-sub" id="pinSub">Enter your 4-digit PIN to continue</p>
+    <div class="pin-dots">
+      <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
     </div>
-    <div class="pin-keypad">
-      <button class="pin-key" onclick="pinKey('1')">1</button>
-      <button class="pin-key" onclick="pinKey('2')">2</button>
-      <button class="pin-key" onclick="pinKey('3')">3</button>
-      <button class="pin-key" onclick="pinKey('4')">4</button>
-      <button class="pin-key" onclick="pinKey('5')">5</button>
-      <button class="pin-key" onclick="pinKey('6')">6</button>
-      <button class="pin-key" onclick="pinKey('7')">7</button>
-      <button class="pin-key" onclick="pinKey('8')">8</button>
-      <button class="pin-key" onclick="pinKey('9')">9</button>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey(1)">1</button>
+      <button class="pin-key" onclick="pinKey(2)">2</button>
+      <button class="pin-key" onclick="pinKey(3)">3</button>
+      <button class="pin-key" onclick="pinKey(4)">4</button>
+      <button class="pin-key" onclick="pinKey(5)">5</button>
+      <button class="pin-key" onclick="pinKey(6)">6</button>
+      <button class="pin-key" onclick="pinKey(7)">7</button>
+      <button class="pin-key" onclick="pinKey(8)">8</button>
+      <button class="pin-key" onclick="pinKey(9)">9</button>
       <button class="pin-key del" onclick="pinDel()">⌫</button>
-      <button class="pin-key zero" onclick="pinKey('0')">0</button>
+      <button class="pin-key zero" onclick="pinKey(0)">0</button>
     </div>
-    <div class="pin-err" id="pinErr"></div>
+    <div class="pin-err-msg" id="pinErr"></div>
     <button class="pin-cancel" onclick="closePIN()">Cancel</button>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════
-     VIEW: TEACHER FORM
-══════════════════════════════════════ -->
-<div class="view active" id="viewForm">
-  <div class="form-hero">
-    <div class="form-hero-inner">
-      <span class="form-hero-tag" id="heroTag">School Magazine</span>
-      <h1 id="heroTitle">Teacher Profile Submission</h1>
-      <p id="heroSubtitle">Please fill in your details carefully. Your profile will be featured in our magazine.</p>
-      <div class="form-hero-meta" id="heroMeta"></div>
-    </div>
-  </div>
-
-  <div class="form-body">
-    <div class="deadline-bar" id="deadlineBar"></div>
-    <div id="formContainer"></div>
-    <div class="success-wrap" id="successWrap" style="display:none;">
-      <span class="success-icon">🎉</span>
-      <h2>Profile Submitted!</h2>
-      <p>Thank you. Your profile has been received and will be featured in the magazine.</p>
-    </div>
-  </div>
-
-  <footer class="site-footer">
-    <span class="admin-trigger" id="adminTrigger" title="">© Magazine Production System</span>
-  </footer>
-</div>
-
-<!-- ══════════════════════════════════════
-     VIEW: ADMIN
-══════════════════════════════════════ -->
-<div class="view" id="viewAdmin">
-  <div class="admin-topbar">
-    <div class="admin-logo">Magazine<span>Pro</span> <span style="font-size:11px;color:#888;font-family:'Lato',sans-serif;font-weight:400;">Admin</span></div>
-    <div class="admin-nav">
-      <button class="admin-tab active" id="tabSettings" onclick="showAdminTab('settings')">Settings</button>
-      <button class="admin-tab" id="tabSubmissions" onclick="showAdminTab('submissions')">Submissions</button>
-    </div>
-    <button class="admin-back" onclick="exitAdmin()">← Back to form</button>
-  </div>
-
-  <!-- SETTINGS TAB -->
-  <div class="admin-body" id="panelSettings">
-
-    <div class="admin-section">
-      <div class="admin-section-title">School &amp; magazine info</div>
-      <div class="info-grid">
-        <div class="info-field"><label>School name</label><input type="text" id="aSchoolName" placeholder="e.g. Greenfield Academy"/></div>
-        <div class="info-field"><label>Magazine edition</label><input type="text" id="aEdition" placeholder="e.g. 2025/2026 Graduation Edition"/></div>
-        <div class="info-field"><label>Submission deadline</label><input type="date" id="aDeadline"/></div>
-        <div class="info-field"><label>Contact number (shown to teachers)</label><input type="text" id="aContact" placeholder="e.g. 08012345678"/></div>
+<!-- ═══════════════════════════════════════
+     CUSTOM FIELD EDITOR MODAL
+═══════════════════════════════════════ -->
+<div id="customFieldModal" class="modal-overlay">
+  <div class="modal-box">
+    <h2 id="cfmTitle">Add Custom Field</h2>
+    <p class="modal-sub">Define a new field to appear on the selected form.</p>
+    <div class="field-form">
+      <div>
+        <label>Field label (what users see)</label>
+        <input type="text" id="cfmLabel" placeholder="e.g. State of origin" maxlength="80"/>
+      </div>
+      <div>
+        <label>Field type</label>
+        <select id="cfmType" onchange="updateCustomFieldModalOptions()">
+          <option value="text">Short text (single line)</option>
+          <option value="textarea">Long text (paragraph)</option>
+          <option value="select">Dropdown (choose from list)</option>
+          <option value="date">Date</option>
+          <option value="checkbox">Yes/No checkbox</option>
+          <option value="number">Number</option>
+        </select>
+      </div>
+      <div id="cfmOptionsWrap" style="display:none;">
+        <label>Dropdown options</label>
+        <input type="text" id="cfmOptions" placeholder="Option 1, Option 2, Option 3"/>
+        <div class="options-hint">Separate options with commas or new lines.</div>
+      </div>
+      <div>
+        <label>Placeholder / hint (optional)</label>
+        <input type="text" id="cfmPlaceholder" placeholder="e.g. Lagos, Ogun, …" maxlength="100"/>
+      </div>
+      <div class="row-check">
+        <input type="checkbox" id="cfmRequired"/>
+        <label for="cfmRequired" style="margin-bottom:0;cursor:pointer;">Required field</label>
       </div>
     </div>
-
-    <div class="admin-section">
-      <div class="admin-section-title">Built-in profile fields</div>
-      <div id="builtinFieldsContainer"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeCustomFieldModal()">Cancel</button>
+      <button class="btn btn-primary" id="cfmSaveBtn" onclick="saveCustomField()">Save Field</button>
     </div>
-
-    <div class="admin-section">
-      <div class="admin-section-title">Custom fields <span style="font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;background:var(--blue2);color:var(--blue);margin-left:6px;vertical-align:middle;">ADD YOUR OWN</span></div>
-      <p class="admin-note">Add any extra fields — short text, long answer, dropdown, checkbox (yes/no), or number. They appear on the form below the built-in fields.</p>
-      <div id="customFieldsContainer"></div>
-      <button class="add-cf-btn" onclick="addCustomField()">+ Add a custom field</button>
-    </div>
-
-    <div class="admin-section">
-      <div class="admin-section-title">Photo requirements</div>
-      <div class="builtin-row" style="border-bottom:1px solid #f0f0ea;padding-bottom:14px;margin-bottom:14px;">
-        <div class="builtin-left">
-          <div class="builtin-name">Require a profile photo</div>
-          <div class="builtin-desc">If off, photo upload becomes optional</div>
-        </div>
-        <label class="tog"><input type="checkbox" id="aPhotoRequired" checked/><div class="tog-track"></div><div class="tog-thumb"></div></label>
-      </div>
-      <div class="photo-grid">
-        <div class="photo-setting"><label>Min. width (px)</label><input type="number" id="aMinW" value="400" min="100"/></div>
-        <div class="photo-setting"><label>Min. height (px)</label><input type="number" id="aMinH" value="400" min="100"/></div>
-        <div class="photo-setting"><label>Max file size</label>
-          <select id="aMaxSize"><option value="1">1 MB</option><option value="2" selected>2 MB</option><option value="3">3 MB</option><option value="5">5 MB</option></select>
-        </div>
-        <div class="photo-setting"><label>Accepted formats</label>
-          <select id="aFormats">
-            <option value="jpg,png">JPG &amp; PNG only</option>
-            <option value="jpg,png,webp">JPG, PNG &amp; WebP</option>
-            <option value="jpg">JPG only</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <div class="admin-section">
-      <div class="admin-section-title">Admin PIN</div>
-      <p class="admin-note">Change the 4-digit PIN used to access this admin panel.</p>
-      <div class="info-grid" style="max-width:320px;">
-        <div class="info-field info-grid full"><label>New PIN (4 digits)</label><input type="number" id="aNewPin" placeholder="e.g. 7878" maxlength="4" min="0" max="9999"/></div>
-      </div>
-    </div>
-
-    <div class="save-bar">
-      <p>Changes are saved to your browser and reflected on the form immediately.</p>
-      <button class="save-bar-btn" onclick="saveSettings()">Save all settings</button>
-    </div>
-    <div class="link-box" id="linkBox">
-      <p>Your form link (share with teachers):</p>
-      <div class="link-row">
-        <input type="text" id="formLinkInput" readonly/>
-        <button class="link-copy-btn" onclick="copyLink()">Copy</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- SUBMISSIONS TAB -->
-  <div class="admin-body" id="panelSubmissions" style="display:none;">
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">Total submitted</div></div>
-      <div class="stat-card"><div class="stat-num" id="statPhoto">0</div><div class="stat-lbl">With photos</div></div>
-      <div class="stat-card"><div class="stat-num" id="statToday">0</div><div class="stat-lbl">Today</div></div>
-    </div>
-    <div class="action-row">
-      <button class="btn btn-primary" onclick="exportForClaude()">Export for Claude ↗</button>
-      <button class="btn" onclick="exportCSV()">Download CSV</button>
-      <button class="btn btn-danger" onclick="clearAll()">Clear all</button>
-    </div>
-    <div id="submissionsContainer"></div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════
-     JAVASCRIPT
-══════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════
+     REVIEW MODAL (editor approval)
+═══════════════════════════════════════ -->
+<div id="reviewModal" class="modal-overlay">
+  <div class="modal-box">
+    <h2 id="reviewTitle">Review Submission</h2>
+    <p class="modal-sub" id="reviewSub">Add an optional note with your decision.</p>
+    <textarea id="reviewNote" placeholder="Feedback or reason (optional)"></textarea>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeReviewModal()">Cancel</button>
+      <button class="btn btn-primary" id="reviewConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script>
-/* ─── CONSTANTS & STATE ─── */
-const BUILTIN = [
-  {id:'name',         label:'Full name',                            desc:"Teacher's full name with title (e.g. Mrs. Adeyemi)", on:true,  req:true },
-  {id:'subject',      label:'Subjects taught / Class taught',       desc:'Subject(s) and/or class assigned',                   on:true,  req:true },
-  {id:'background',   label:'Academic Background / Specialization', desc:'Highest qualification or current course of study — whichever applies', on:true, req:false},
-  {id:'message',      label:'Message to students',                  desc:'Personal note or advice to graduating students',     on:true,  req:true },
-  {id:'fun',          label:'Fun fact / Hobbies',                   desc:'Something personal and lighthearted',                on:true,  req:false},
-  {id:'years',        label:'Years at this school',                 desc:"How long they've been teaching here",                on:true,  req:false},
-  {id:'nickname',     label:'Nickname (if any)',                    desc:'What students call them',                            on:false, req:false},
-  {id:'achievement',  label:'Notable achievement',                  desc:'Award, milestone or recognition',                    on:true,  req:false},
-  {id:'quote',        label:'Favourite quote',                      desc:'An inspiring quote they live by',                    on:true,  req:false},
-  {id:'advice',       label:'Career advice to students',            desc:'Guidance for their future',                          on:false, req:false},
-];
-const PLACEHOLDERS = {
-  name:'e.g. Mrs. Funmilayo Adeyemi',
-  subject:'e.g. Mathematics / JSS 3A',
-  background:'e.g. B.Sc. Mathematics, UNILAG  —  or—  Currently studying Education at UI',
-  message:'Write a short personal message or advice to graduating students...',
-  fun:'e.g. I love cooking and reading mystery novels',
-  years:'e.g. 5 years',
-  nickname:'e.g. "Mr. A"',
-  achievement:'e.g. Best Teacher Award 2023',
-  quote:'e.g. "Education is the passport to the future"',
-  advice:'Share your career guidance for students here...',
+/* ═══════════════════════════════════════════════════════════════
+   MAGICEDITOR — APPLICATION LOGIC
+═══════════════════════════════════════════════════════════════ */
+
+// Categories & their form specifications
+const CATEGORIES = {
+  teachers: {
+    label: 'Teacher Profiles',
+    tag: 'Teachers',
+    title: 'Teacher Profile Submission',
+    subtitle: 'Share your journey and message to the graduating class.',
+    icon: '👩‍🏫',
+    photoRequired: true,
+    fields: [
+      { id:'name', label:'Full name', type:'text', required:true, placeholder:'As it should appear in print' },
+      { id:'title', label:'Title / position', type:'text', required:true, placeholder:'e.g. Head of Mathematics Department' },
+      { id:'subject', label:'Subject(s) taught', type:'text', required:true, placeholder:'e.g. Mathematics, Further Mathematics' },
+      { id:'years', label:'Years at the school', type:'text', required:true, placeholder:'e.g. 8 years' },
+      { id:'qualification', label:'Highest qualification', type:'text', required:true, placeholder:'e.g. M.Sc. Mathematics, B.Ed.' },
+      { id:'bio', label:'Short bio', type:'textarea', required:true, long:true, hint:'50–80 words about you — background, passion, teaching philosophy' },
+      { id:'quote', label:'Favourite quote or motto', type:'textarea', required:false, hint:'Optional. One or two sentences.' },
+      { id:'message', label:'Message to the graduating class', type:'textarea', required:true, long:true, hint:'30–50 words. Wisdom, encouragement, a farewell.' }
+    ]
+  },
+  primary5: {
+    label: 'Primary 5 Graduates',
+    tag: 'Primary 5',
+    title: 'Primary 5 Graduate Profile',
+    subtitle: 'For pupils completing Primary 5 this year.',
+    icon: '🧒',
+    photoRequired: true,
+    fields: [
+      { id:'name', label:'Full name', type:'text', required:true, placeholder:'As it should appear in print' },
+      { id:'nickname', label:'Nickname', type:'text', required:false, placeholder:'Optional — how friends call you' },
+      { id:'parents', label:"Parents' names", type:'text', required:false, placeholder:'Optional — Mr. & Mrs. …' },
+      { id:'favSubject', label:'Favourite subject', type:'text', required:true, placeholder:'e.g. English, Mathematics' },
+      { id:'ambition', label:'What I want to be when I grow up', type:'text', required:true, placeholder:'e.g. Doctor, Pilot, Teacher' },
+      { id:'favActivity', label:'My favourite class activity', type:'text', required:false, placeholder:'e.g. Drawing, storytelling, sports' },
+      { id:'hobbies', label:'Hobbies', type:'text', required:false, placeholder:'e.g. Reading, football, dancing' },
+      { id:'message', label:'A short message to my teachers and friends', type:'textarea', required:true, hint:'2–3 sentences. Thank-you, goodbye, hope for the future.' },
+      { id:'quote', label:'My favourite quote', type:'textarea', required:false, hint:'Optional — a Bible verse, moral lesson, or saying.' }
+    ]
+  },
+  jss3: {
+    label: 'JSS3 Graduates',
+    tag: 'JSS3',
+    title: 'JSS3 Graduate Profile',
+    subtitle: 'For students completing Junior Secondary 3 this year.',
+    icon: '🎒',
+    photoRequired: true,
+    fields: [
+      { id:'name', label:'Full name', type:'text', required:true, placeholder:'As it should appear in print' },
+      { id:'nickname', label:'Nickname', type:'text', required:false, placeholder:'Optional — how friends call you' },
+      { id:'dob', label:'Date of birth', type:'date', required:false },
+      { id:'parents', label:"Parents' names", type:'text', required:false, placeholder:'Optional — Mr. & Mrs. …' },
+      { id:'favSubject', label:'Favourite subject', type:'text', required:true, placeholder:'e.g. Biology, Mathematics' },
+      { id:'ambition', label:'Career ambition', type:'text', required:true, placeholder:'e.g. Engineer, Nurse, Lawyer' },
+      { id:'hobbies', label:'Hobbies & interests', type:'text', required:false, placeholder:'e.g. Football, Reading, Chess' },
+      { id:'message', label:'Personal message', type:'textarea', required:true, long:true, hint:'A message to your classmates, teachers, or family.' },
+      { id:'quote', label:'Favourite quote', type:'textarea', required:false, hint:'Optional — a quote that represents you.' }
+    ]
+  },
+  ss3: {
+    label: 'SS3 Graduates',
+    tag: 'SS3',
+    title: 'SS3 Graduate Profile',
+    subtitle: 'For students completing Senior Secondary 3 — the main graduating class.',
+    icon: '🎓',
+    photoRequired: true,
+    fields: [
+      { id:'name', label:'Full name', type:'text', required:true, placeholder:'As it should appear in print' },
+      { id:'nickname', label:'Nickname', type:'text', required:false, placeholder:'Optional — how friends call you' },
+      { id:'dob', label:'Date of birth', type:'date', required:false },
+      { id:'parents', label:"Parents' names", type:'text', required:false, placeholder:'Optional — Mr. & Mrs. …' },
+      { id:'favSubject', label:'Favourite subject', type:'text', required:true, placeholder:'e.g. Further Mathematics, Literature' },
+      { id:'ambition', label:'Career ambition', type:'text', required:true, placeholder:'e.g. Medical Doctor, Software Engineer' },
+      { id:'nextStop', label:'University / institution (if known)', type:'text', required:false, placeholder:'Optional — where you plan to study' },
+      { id:'hobbies', label:'Hobbies & interests', type:'text', required:false, placeholder:'e.g. Football, Reading, Chess' },
+      { id:'memorableMoment', label:'Most memorable school moment', type:'textarea', required:false, hint:'A day, an event, a lesson you will never forget.' },
+      { id:'message', label:'Personal message / legacy', type:'textarea', required:true, long:true, hint:'Your parting message to classmates, teachers, family.' },
+      { id:'advice', label:'Parting advice to juniors', type:'textarea', required:false, hint:'What would you tell a JSS1 student just starting out?' },
+      { id:'quote', label:'Favourite quote', type:'textarea', required:false, hint:'Optional — a quote that represents you.' }
+    ]
+  },
+  speeches: {
+    label: 'Speeches & Addresses',
+    tag: 'Speeches',
+    title: 'Speech / Address Submission',
+    subtitle: 'Formal addresses for the maiden edition.',
+    icon: '🎤',
+    photoRequired: false,
+    fields: [
+      { id:'speechType', label:'Type of address', type:'select', required:true, options:['Proprietor\'s Speech','Senior Boy\'s Speech','External Body Address','Graduating Class Message','Other'] },
+      { id:'speakerName', label:'Speaker name', type:'text', required:true, placeholder:'Full name' },
+      { id:'speakerTitle', label:'Speaker title / role', type:'text', required:true, placeholder:'e.g. Proprietor, Senior Boy, Guest Speaker' },
+      { id:'speakerOrg', label:'Organization / affiliation', type:'text', required:false, placeholder:'Optional — for external speakers' },
+      { id:'speechTitle', label:'Speech title', type:'text', required:false, placeholder:'Optional — if the speech has a title' },
+      { id:'speechDate', label:'Date of speech', type:'date', required:false },
+      { id:'speechBody', label:'Full speech text', type:'textarea', required:true, long:true, hint:'Paste the complete speech here. This will be edited for print.' }
+    ]
+  },
+  creative: {
+    label: 'Creative Corner',
+    tag: 'Creative',
+    title: 'Creative Submission',
+    subtitle: 'Poems, stories, jokes, and riddles.',
+    icon: '✍️',
+    photoRequired: false,
+    fields: [
+      { id:'contribType', label:'Type of submission', type:'select', required:true, options:['Poem','Short Story','Joke','Riddle','Other'] },
+      { id:'contribName', label:'Your name', type:'text', required:true, placeholder:'As it should appear in print' },
+      { id:'contribRole', label:'Your class or role', type:'text', required:true, placeholder:'e.g. SS3 Science, Teacher, Alumnus' },
+      { id:'contribTitle', label:'Title of your piece', type:'text', required:true, placeholder:'e.g. "The Sunset Over Our School"' },
+      { id:'contribBody', label:'Your submission', type:'textarea', required:true, long:true, hint:'The full poem, story, or joke. Formatting will be preserved where possible.' },
+      { id:'contribNote', label:'Note to editor (optional)', type:'textarea', required:false, hint:'Any context, dedication, or special instructions.' }
+    ]
+  },
+  events: {
+    label: 'School Life & Events',
+    tag: 'Events',
+    title: 'Event / Activity Report',
+    subtitle: 'Sports days, excursions, competitions, achievements.',
+    icon: '📸',
+    photoRequired: true,
+    photoMulti: true,
+    photoMax: 5,
+    fields: [
+      { id:'eventType', label:'Event type', type:'select', required:true, options:['Sports Day','Excursion','Competition','Achievement','Academic Event','Other'] },
+      { id:'eventName', label:'Event name', type:'text', required:true, placeholder:'e.g. Inter-House Sports 2025' },
+      { id:'eventDate', label:'Event date', type:'date', required:false },
+      { id:'eventLocation', label:'Location', type:'text', required:false, placeholder:'Optional — where it took place' },
+      { id:'reporterName', label:'Submitted by', type:'text', required:true, placeholder:'Your name / role' },
+      { id:'eventSummary', label:'Event summary', type:'text', required:true, placeholder:'One-line summary for magazine header' },
+      { id:'eventReport', label:'Full report', type:'textarea', required:true, long:true, hint:'The full story. Who, what, when, where, why — and a bit of colour.' }
+    ]
+  },
+  academic: {
+    label: 'Academic & Educational',
+    tag: 'Academic',
+    title: 'Academic & Educational Content',
+    subtitle: 'Articles, subject features, and educational write-ups.',
+    icon: '📚',
+    photoRequired: false,
+    fields: [
+      { id:'authorName', label:'Author name', type:'text', required:true, placeholder:'As it should appear in print' },
+      { id:'authorRole', label:'Role / title', type:'text', required:true, placeholder:'e.g. Science Teacher, Head of Department' },
+      { id:'subjectArea', label:'Subject area', type:'text', required:true, placeholder:'e.g. Biology, History, Mathematics' },
+      { id:'articleTitle', label:'Article title', type:'text', required:true, placeholder:'The title of your piece' },
+      { id:'articleSummary', label:'Brief summary', type:'textarea', required:false, hint:'Optional — 1-2 sentences for the magazine intro.' },
+      { id:'articleBody', label:'Full article', type:'textarea', required:true, long:true, hint:'The complete article. Will be edited for print.' },
+      { id:'references', label:'References / sources', type:'textarea', required:false, hint:'Optional — cited works, if any.' }
+    ]
+  },
+  interviews: {
+    label: 'Interviews',
+    tag: 'Interview',
+    title: 'Interview Submission',
+    subtitle: 'Q&A with old students, guest speakers, senior staff.',
+    icon: '🎙️',
+    photoRequired: true,
+    fields: [
+      { id:'intervieweeName', label:'Interviewee name', type:'text', required:true, placeholder:'The person being interviewed' },
+      { id:'intervieweeTitle', label:'Interviewee title / role', type:'text', required:true, placeholder:'e.g. Old Student (Class of 2010), Guest Speaker' },
+      { id:'interviewerName', label:'Interviewer name', type:'text', required:true, placeholder:'Who conducted the interview' },
+      { id:'interviewDate', label:'Date of interview', type:'date', required:false },
+      { id:'introParagraph', label:'Introduction paragraph', type:'textarea', required:true, hint:'2-3 sentences introducing the interviewee to readers.' },
+      { id:'qaBody', label:'Interview Q&A', type:'textarea', required:true, long:true, hint:'Format: Q: [question]\\nA: [answer]\\n\\nQ: [next question]\\nA: [next answer]' },
+      { id:'closingNote', label:'Closing note', type:'textarea', required:false, hint:'Optional — brief closing remarks or thank-you.' }
+    ]
+  },
+  motivational: {
+    label: 'Motivational Articles',
+    tag: 'Motivation',
+    title: 'Motivational Article Submission',
+    subtitle: 'Inspirational pieces for the graduating class.',
+    icon: '💡',
+    photoRequired: false,
+    fields: [
+      { id:'authorName', label:'Author name', type:'text', required:true, placeholder:'As it should appear in print' },
+      { id:'authorRole', label:'Role', type:'text', required:true, placeholder:'e.g. Principal, Teacher, Alumnus, Guest' },
+      { id:'articleTitle', label:'Article title', type:'text', required:true, placeholder:'The title of your message' },
+      { id:'articleBody', label:'Article body', type:'textarea', required:true, long:true, hint:'Your message of motivation, wisdom, or encouragement.' },
+      { id:'pullQuote', label:'Pull-out quote', type:'textarea', required:false, hint:'A powerful line from your article to highlight in the layout.' },
+      { id:'dedication', label:'Dedication', type:'textarea', required:false, hint:'Optional — who is this piece dedicated to?' }
+    ]
+  },
+  gallery: {
+    label: 'Photo Gallery',
+    tag: 'Gallery',
+    title: 'Photo Gallery Submission',
+    subtitle: 'Standalone photos for the photo gallery section.',
+    icon: '🖼️',
+    photoRequired: true,
+    fields: [
+      { id:'submitterName', label:'Submitted by', type:'text', required:true, placeholder:'Your name' },
+      { id:'submitterRole', label:'Your role', type:'text', required:false, placeholder:'Optional — e.g. Teacher, Parent, Student' },
+      { id:'photoCaption', label:'Photo caption', type:'textarea', required:true, hint:'A short description — what is happening, when, where.' },
+      { id:'photoCategory', label:'Category', type:'select', required:true, options:['Graduation Day','Classroom Life','Sports','Cultural Day','Award Ceremony','Excursion','Portrait','Candid','Other'] },
+      { id:'photoDate', label:'Date photo was taken', type:'date', required:false }
+    ]
+  }
 };
-const TEXTAREA_IDS = new Set(['message','advice','quote','background']);
-const TYPE_LABELS  = {text:'Short text',textarea:'Long answer',select:'Dropdown list',checkbox:'Checkbox (yes/no)',number:'Number'};
 
-let cfg    = JSON.parse(localStorage.getItem('mag_cfg') || 'null') || defaultCfg();
-let subs   = JSON.parse(localStorage.getItem('mag_subs') || '[]');
-let cfCtr  = Date.now();
-let pinBuf = '';
-let clickCtr = 0, clickTimer = null;
-let photoFile = null, photoDataURL = null;
-let adminUnlocked = false;
+const CATEGORY_KEYS = Object.keys(CATEGORIES);
 
-function defaultCfg(){
-  return {
-    schoolName:'',edition:'',deadline:'',contact:'',pin:'7878',
-    photoRequired:true,minW:400,minH:400,maxSize:2,formats:'jpg,png',
-    customFields:[],
-    fields: Object.fromEntries(BUILTIN.map(f=>([f.id,{on:f.on,req:f.req,label:f.label}])))
-  };
+// Editorial pseudo-categories (admin-only, don't appear on landing)
+const EDITORIAL_META = {
+  'editorial-note': { label: 'Editorial Note', tag: 'Editorial Note' },
+  'appreciation':   { label: 'Appreciation Section', tag: 'Appreciation' }
+};
+
+// Config (PINs stored in localStorage; defaults 1234 / 5678)
+// Defensive: ensure PINs are valid 4-digit strings, else reset to defaults
+function loadCfg(){
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem('me_cfg') || '{}') || {}; }
+  catch(e) { c = {}; }
+  const isValid = p => typeof p === 'string' && /^\d{4}$/.test(p);
+  const adminPin = isValid(c.adminPin) ? c.adminPin : '1234';
+  const editorPin = isValid(c.editorPin) ? c.editorPin : '5678';
+  return { adminPin, editorPin };
 }
+function saveCfg(newCfg){
+  cfg = newCfg;
+  localStorage.setItem('me_cfg', JSON.stringify(newCfg));
+}
+let cfg = loadCfg();
 
-/* ─── VIEWS ─── */
-function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);}
-
-/* ─── FOOTER CLICK TRIGGER (5 clicks) ─── */
-document.getElementById('adminTrigger').addEventListener('click',()=>{
-  clickCtr++;
-  clearTimeout(clickTimer);
-  if(clickCtr>=5){clickCtr=0;openPIN();}
-  else{clickTimer=setTimeout(()=>clickCtr=0,1800);}
-});
-
-/* ─── PIN ─── */
-function openPIN(){pinBuf='';updatePinDots();document.getElementById('pinErr').textContent='';document.getElementById('pinOverlay').classList.add('active');}
-function closePIN(){document.getElementById('pinOverlay').classList.remove('active');pinBuf='';}
-function pinKey(d){if(pinBuf.length>=4)return;pinBuf+=d;updatePinDots();if(pinBuf.length===4)checkPIN();}
-function pinDel(){pinBuf=pinBuf.slice(0,-1);updatePinDots();}
-function updatePinDots(){for(let i=0;i<4;i++){const d=document.getElementById('pd'+i);d.classList.toggle('filled',i<pinBuf.length);d.classList.remove('error');}}
-function checkPIN(){
-  if(pinBuf===String(cfg.pin||'7878').padStart(4,'0')||pinBuf===String(cfg.pin||'7878')){
-    closePIN();adminUnlocked=true;enterAdmin();
-  }else{
-    document.querySelectorAll('.pin-dot').forEach(d=>d.classList.add('error'));
-    document.getElementById('pinErr').textContent='Incorrect PIN. Try again.';
-    setTimeout(()=>{pinBuf='';updatePinDots();},900);
+/* ─── FORM FIELD CUSTOMIZATION ─── */
+// Per-category overrides of built-in fields + custom fields added by admin.
+// Stored under 'me_form_config'. Safe to not exist (means "use all defaults").
+function loadFormConfig(){
+  try {
+    const raw = JSON.parse(localStorage.getItem('me_form_config') || '{}') || {};
+    // Shape-check each category entry
+    Object.keys(raw).forEach(catKey => {
+      if (!raw[catKey]) raw[catKey] = {};
+      if (!raw[catKey].overrides || typeof raw[catKey].overrides !== 'object') raw[catKey].overrides = {};
+      if (!Array.isArray(raw[catKey].customFields)) raw[catKey].customFields = [];
+    });
+    return raw;
+  } catch(e) {
+    console.warn('[MagicEditor] form_config corrupt, resetting:', e.message);
+    return {};
   }
 }
+function saveFormConfig(cfgObj){
+  formConfig = cfgObj;
+  localStorage.setItem('me_form_config', JSON.stringify(cfgObj));
+}
+function resetCategoryConfig(catKey){
+  const c = loadFormConfig();
+  delete c[catKey];
+  saveFormConfig(c);
+}
+let formConfig = loadFormConfig();
 
-/* ─── ADMIN ─── */
-function enterAdmin(){loadAdminSettings();renderSubmissions();show('viewAdmin');}
-function exitAdmin(){show('viewForm');buildForm();}
-function showAdminTab(tab){
-  document.getElementById('panelSettings').style.display=tab==='settings'?'block':'none';
-  document.getElementById('panelSubmissions').style.display=tab==='submissions'?'block':'none';
-  document.getElementById('tabSettings').classList.toggle('active',tab==='settings');
-  document.getElementById('tabSubmissions').classList.toggle('active',tab==='submissions');
-  if(tab==='submissions')renderSubmissions();
-}
+// Return the effective list of fields for a category, respecting overrides and custom fields.
+// Returned array is already filtered to visible fields, in their display order.
+function getEffectiveFields(catKey){
+  const cat = CATEGORIES[catKey];
+  if (!cat) return [];
+  const override = (formConfig[catKey] && formConfig[catKey].overrides) || {};
+  const customFields = (formConfig[catKey] && formConfig[catKey].customFields) || [];
 
-function loadAdminSettings(){
-  document.getElementById('aSchoolName').value = cfg.schoolName||'';
-  document.getElementById('aEdition').value    = cfg.edition||'';
-  document.getElementById('aDeadline').value   = cfg.deadline||'';
-  document.getElementById('aContact').value    = cfg.contact||'';
-  document.getElementById('aPhotoRequired').checked = cfg.photoRequired!==false;
-  document.getElementById('aMinW').value  = cfg.minW||400;
-  document.getElementById('aMinH').value  = cfg.minH||400;
-  document.getElementById('aMaxSize').value  = cfg.maxSize||2;
-  document.getElementById('aFormats').value  = cfg.formats||'jpg,png';
-  document.getElementById('aNewPin').value   = cfg.pin||'7878';
-  renderBuiltin();
-  renderCustomFields();
-}
-
-/* ─── BUILTIN FIELD TOGGLES ─── */
-function renderBuiltin(){
-  document.getElementById('builtinFieldsContainer').innerHTML = BUILTIN.map(f=>{
-    const saved=cfg.fields[f.id]||{};
-    const isOn=saved.on!==undefined?saved.on:f.on;
-    const isReq=saved.req!==undefined?saved.req:f.req;
-    return `<div class="builtin-row" id="brow-${f.id}">
-      <div class="builtin-left">
-        <div class="builtin-name">${f.label}</div>
-        <div class="builtin-desc">${f.desc}</div>
-      </div>
-      <div class="builtin-ctrls">
-        <span class="req-pill${isReq?' on':''}" id="rp-${f.id}" onclick="toggleReq('${f.id}')">${isReq?'Required':'Optional'}</span>
-        <label class="tog"><input type="checkbox" id="tog-${f.id}" ${isOn?'checked':''} onchange="syncReq('${f.id}')"/><div class="tog-track"></div><div class="tog-thumb"></div></label>
-      </div>
-    </div>`;
-  }).join('');
-}
-function toggleReq(id){
-  const p=document.getElementById('rp-'+id),now=!p.classList.contains('on');
-  p.classList.toggle('on',now);p.textContent=now?'Required':'Optional';
-  if(now)document.getElementById('tog-'+id).checked=true;
-}
-function syncReq(id){
-  if(!document.getElementById('tog-'+id).checked){
-    const p=document.getElementById('rp-'+id);p.classList.remove('on');p.textContent='Optional';
-  }
-}
-
-/* ─── CUSTOM FIELDS ─── */
-function renderCustomFields(){
-  const c=document.getElementById('customFieldsContainer');
-  c.innerHTML=(cfg.customFields||[]).map(cf=>buildCFCard(cf)).join('');
-}
-function buildCFCard(cf){
-  const typeOpts=Object.entries(TYPE_LABELS).map(([v,l])=>`<option value="${v}"${cf.type===v?' selected':''}>${l}</option>`).join('');
-  const needsOpts=cf.type==='select';
-  const isChk=cf.type==='checkbox';
-  return `<div class="cf-card" id="cfc-${cf.id}">
-    <button class="cf-del" onclick="removeCF('${cf.id}')" title="Remove">&times;</button>
-    <div class="cf-row">
-      <div class="cf-grp grow"><label>Field label</label><input type="text" value="${esc(cf.label)}" placeholder="e.g. Department, Blood group..." oninput="setCF('${cf.id}','label',this.value)"/></div>
-      <div class="cf-grp med"><label>Input type</label><select onchange="setCFType('${cf.id}',this.value)">${typeOpts}</select></div>
-      <div class="cf-grp sm"><label>Required?</label><select onchange="setCF('${cf.id}','required',this.value==='yes')"><option value="no"${!cf.required?' selected':''}>Optional</option><option value="yes"${cf.required?' selected':''}>Required</option></select></div>
-    </div>
-    ${!isChk?`<div class="cf-row" style="margin-top:10px;"><div class="cf-grp grow"><label>Placeholder / hint</label><input type="text" value="${esc(cf.placeholder||'')}" placeholder="Shown inside the input..." oninput="setCF('${cf.id}','placeholder',this.value)"/></div></div>`:''}
-    ${needsOpts?`<div class="cf-opts"><label>Dropdown options (one per line)</label><textarea rows="4" placeholder="e.g.\nScience\nArts\nCommercial" oninput="setCF('${cf.id}','options',this.value)">${esc(cf.options||'')}</textarea><div class="cf-opts-hint">Each line = one option in the dropdown.</div></div>`:''}
-    ${isChk?`<div style="margin-top:10px;font-size:12px;color:var(--ink3);">Teachers will see a checkbox — ticked means Yes, unticked means No.</div>`:''}
-  </div>`;
-}
-function addCustomField(){cfCtr++;cfg.customFields.push({id:'cf'+cfCtr,label:'',type:'text',required:false,placeholder:'',options:''});renderCustomFields();document.getElementById('customFieldsContainer').lastElementChild?.scrollIntoView({behavior:'smooth',block:'center'});}
-function removeCF(id){cfg.customFields=cfg.customFields.filter(c=>c.id!==id);renderCustomFields();}
-function setCF(id,key,val){const c=cfg.customFields.find(x=>x.id===id);if(c)c[key]=val;}
-function setCFType(id,t){const c=cfg.customFields.find(x=>x.id===id);if(c){c.type=t;renderCustomFields();}}
-
-/* ─── SAVE ─── */
-function saveSettings(){
-  BUILTIN.forEach(f=>{
-    cfg.fields[f.id]={
-      on:document.getElementById('tog-'+f.id).checked,
-      req:document.getElementById('rp-'+f.id).classList.contains('on'),
-      label:f.label
+  // Start with built-in fields, applying override (hidden, required, order)
+  const builtInWithOverride = cat.fields.map((f, i) => {
+    const ov = override[f.id] || {};
+    return {
+      ...f,
+      _isBuiltIn: true,
+      required: ov.required !== undefined ? !!ov.required : !!f.required,
+      hidden: !!ov.hidden,
+      order: ov.order !== undefined ? Number(ov.order) : i
     };
   });
-  cfg.schoolName  = document.getElementById('aSchoolName').value.trim();
-  cfg.edition     = document.getElementById('aEdition').value.trim();
-  cfg.deadline    = document.getElementById('aDeadline').value;
-  cfg.contact     = document.getElementById('aContact').value.trim();
-  cfg.photoRequired = document.getElementById('aPhotoRequired').checked;
-  cfg.minW   = parseInt(document.getElementById('aMinW').value)||400;
-  cfg.minH   = parseInt(document.getElementById('aMinH').value)||400;
-  cfg.maxSize= parseInt(document.getElementById('aMaxSize').value)||2;
-  cfg.formats= document.getElementById('aFormats').value;
-  const pinInput=document.getElementById('aNewPin').value.replace(/\D/g,'').slice(0,4);
-  if(pinInput.length===4)cfg.pin=pinInput;
-  localStorage.setItem('mag_cfg',JSON.stringify(cfg));
-  const lb=document.getElementById('linkBox');lb.style.display='block';
-  document.getElementById('formLinkInput').value=window.location.href.split('?')[0];
-  lb.scrollIntoView({behavior:'smooth'});
+
+  // Custom fields - mark as custom
+  const customWithFlags = customFields.map((cf, i) => ({
+    ...cf,
+    _isBuiltIn: false,
+    order: cf.order !== undefined ? Number(cf.order) : (1000 + i)
+  }));
+
+  // Combine, filter hidden, sort by order
+  return [...builtInWithOverride, ...customWithFlags]
+    .filter(f => !f.hidden)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 }
-function copyLink(){const i=document.getElementById('formLinkInput');i.select();document.execCommand('copy');const b=document.querySelector('.link-copy-btn');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',2000);}
 
-/* ─── TEACHER FORM ─── */
-function buildForm(){
-  const enabledFields=BUILTIN.filter(f=>(cfg.fields[f.id]||f).on!==false&&(cfg.fields[f.id]?.on!==undefined?cfg.fields[f.id].on:f.on));
-  const cfs=(cfg.customFields||[]).filter(cf=>cf.label);
-  const fmts=(cfg.formats||'jpg,png').toUpperCase().split(',').join(' or ');
-  const photoReq=cfg.photoRequired!==false;
-
-  // Hero
-  document.getElementById('heroTag').textContent=cfg.edition||'School Magazine';
-  document.getElementById('heroTitle').textContent=(cfg.schoolName||'School')+' — Teacher Profiles';
-  const metaItems=[];
-  if(cfg.deadline)metaItems.push(`<span>Deadline: <strong>${new Date(cfg.deadline).toDateString()}</strong></span>`);
-  if(cfg.contact)metaItems.push(`<span>Help: <strong>${cfg.contact}</strong></span>`);
-  document.getElementById('heroMeta').innerHTML=metaItems.join('');
-
-  if(cfg.deadline&&new Date()>new Date(cfg.deadline)){
-    const b=document.getElementById('deadlineBar');
-    b.style.display='block';
-    b.textContent=`⚠️ Submission deadline was ${new Date(cfg.deadline).toDateString()}. Contact ${cfg.contact||'the production manager'} if you still need to submit.`;
-  }
-
-  let html=`<div class="f-card"><div class="f-card-title">Personal details</div>`;
-  enabledFields.forEach(f=>{
-    const fc=cfg.fields[f.id]||f;
-    const req=fc.req!==undefined?fc.req:f.req;
-    const isTA=TEXTAREA_IDS.has(f.id);
-    html+=`<div class="field" id="fw-${f.id}">
-      <label>${f.label}${req?'<span class="req"> *</span>':'<span class="opt">(optional)</span>'}</label>
-      ${isTA?`<textarea id="ff-${f.id}" placeholder="${PLACEHOLDERS[f.id]||''}"></textarea>`:`<input type="text" id="ff-${f.id}" placeholder="${PLACEHOLDERS[f.id]||''}"/>`}
-      ${f.id==='background'?`<div class="field-hint">Fill in whichever applies to you — a completed qualification, or your current course of study.</div>`:''}
-      <div class="field-err">This field is required.</div>
-    </div>`;
+// Same as above but INCLUDING hidden fields — used by the customization UI
+function getAllFieldsForEditing(catKey){
+  const cat = CATEGORIES[catKey];
+  if (!cat) return [];
+  const override = (formConfig[catKey] && formConfig[catKey].overrides) || {};
+  const customFields = (formConfig[catKey] && formConfig[catKey].customFields) || [];
+  const builtIn = cat.fields.map((f, i) => {
+    const ov = override[f.id] || {};
+    return {
+      ...f,
+      _isBuiltIn: true,
+      required: ov.required !== undefined ? !!ov.required : !!f.required,
+      hidden: !!ov.hidden,
+      order: ov.order !== undefined ? Number(ov.order) : i
+    };
   });
-
-  if(cfs.length){
-    html+=`<div class="section-divider">Additional information</div>`;
-    cfs.forEach(cf=>{
-      html+=`<div class="field" id="fw-${cf.id}">
-        <label>${esc(cf.label)}${cf.required?'<span class="req"> *</span>':'<span class="opt">(optional)</span>'}</label>`;
-      if(cf.type==='textarea')html+=`<textarea id="ff-${cf.id}" placeholder="${esc(cf.placeholder||'')}"></textarea>`;
-      else if(cf.type==='select'){
-        const opts=(cf.options||'').split('\n').map(o=>o.trim()).filter(Boolean);
-        html+=`<select id="ff-${cf.id}"><option value="">— Select an option —</option>${opts.map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
-      }else if(cf.type==='checkbox'){
-        html+=`<div class="checkbox-row"><input type="checkbox" id="ff-${cf.id}"/><span>${esc(cf.label)}</span></div>`;
-      }else if(cf.type==='number'){
-        html+=`<input type="number" id="ff-${cf.id}" placeholder="${esc(cf.placeholder||'')}"/>`;
-      }else{
-        html+=`<input type="text" id="ff-${cf.id}" placeholder="${esc(cf.placeholder||'')}"/>`;
-      }
-      html+=`<div class="field-err">This field is required.</div></div>`;
-    });
-  }
-  html+=`</div>`;
-
-  html+=`<div class="f-card">
-    <div class="f-card-title">Profile photo</div>
-    <div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)">
-      <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/>
-      <div id="photoPlaceholder">
-        <span class="photo-drop-icon">📷</span>
-        <h3>Upload your profile photo${photoReq?' <span class="req">*</span>':' <span class="opt">(optional)</span>'}</h3>
-        <p>Click here or drag &amp; drop your photo</p>
-        <span class="photo-pill">Passport-style · Clear face · Plain background</span>
-      </div>
-      <div class="photo-preview-wrap" id="photoPreviewWrap">
-        <img id="photoPreview" src="" alt="Preview"/>
-        <div class="photo-filename" id="photoFilename"></div>
-        <div class="photo-dims" id="photoDims"></div>
-        <button class="photo-change" onclick="resetPhoto(event)">Change photo</button>
-      </div>
-    </div>
-    <div class="photo-err-msg" id="photoErrMsg"></div>
-    <div class="photo-reqs">
-      <p>
-        <strong>Photo requirements:</strong><br/>
-        · Format: ${fmts}<br/>
-        · Minimum size: <strong>${cfg.minW||400} × ${cfg.minH||400} pixels</strong><br/>
-        · Maximum file size: <strong>${cfg.maxSize||2} MB</strong><br/>
-        · Style: Passport-style, clear face, plain or neutral background, good lighting<br/>
-        · Avoid: group photos, sunglasses, heavy filters, blurry images
-      </p>
-    </div>
-  </div>
-  <button class="submit-btn" onclick="submitForm()">Submit My Profile</button>`;
-
-  document.getElementById('formContainer').innerHTML=html;
-  document.getElementById('formContainer').style.display='block';
-  document.getElementById('successWrap').style.display='none';
-  photoFile=null;photoDataURL=null;
+  const custom = customFields.map((cf, i) => ({
+    ...cf,
+    _isBuiltIn: false,
+    hidden: !!cf.hidden,
+    order: cf.order !== undefined ? Number(cf.order) : (1000 + i)
+  }));
+  return [...builtIn, ...custom].sort((a, b) => (a.order || 0) - (b.order || 0));
 }
 
-/* ─── PHOTO ─── */
+// All submissions live in one array, tagged by category
+function loadAll(){
+  return JSON.parse(localStorage.getItem('me_subs') || '[]');
+}
+function saveAll(list){
+  localStorage.setItem('me_subs', JSON.stringify(list));
+}
+let subs = loadAll();
+
+// Current state
+let currentFormCategory = null;
+let photoFile = null, photoDataURL = null;
+let photoFilesMulti = [], photoDataURLsMulti = [];
+let pinBuf = '', pinMode = null; // 'admin' or 'editor'
+let currentAdminCat = 'all';
+let currentEditorCat = 'pending';
+let reviewingId = null, reviewingDecision = null;
+
+/* ─── VIEW SWITCHING ─── */
+function show(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function goLanding(){
+  show('viewLanding');
+  currentFormCategory = null;
+  resetFormState();
+}
+
+/* ─── FORM BUILDING ─── */
+function openForm(categoryKey){
+  currentFormCategory = categoryKey;
+  resetFormState();
+  const cat = CATEGORIES[categoryKey];
+  document.getElementById('formTag').textContent = cat.tag;
+  document.getElementById('formTitle').textContent = cat.title;
+  document.getElementById('formSubtitle').textContent = cat.subtitle;
+  document.getElementById('successWrap').style.display = 'none';
+  document.getElementById('formContainer').style.display = 'block';
+  buildForm(categoryKey);
+  show('viewForm');
+}
+
+function resetFormState(){
+  photoFile = null; photoDataURL = null;
+  photoFilesMulti = []; photoDataURLsMulti = [];
+}
+
+function buildForm(categoryKey){
+  const cat = CATEGORIES[categoryKey];
+  const container = document.getElementById('formContainer');
+  let html = `<div class="f-card"><div class="f-card-title">Your Details</div>`;
+  const effectiveFields = getEffectiveFields(categoryKey);
+  effectiveFields.forEach(f => { html += buildFieldHtml(f); });
+  html += `</div>`;
+
+  if (cat.photoRequired && cat.photoMulti) {
+    // Multi-photo upload (Events)
+    const max = cat.photoMax || 5;
+    html += `
+    <div class="f-card">
+      <div class="f-card-title">Event Photos (up to ${max})</div>
+      <div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInputMulti').click()">
+        <input type="file" id="photoInputMulti" accept=".jpg,.jpeg,.png,.webp" multiple onchange="handlePhotoMulti(event, ${max})"/>
+        <div id="photoPlaceholderMulti">
+          <span class="photo-drop-icon">📸</span>
+          <h3>Upload event photos <span class="req">*</span></h3>
+          <p>Tap here to choose 1–${max} photos from your device</p>
+          <span class="photo-pill">Action shots · Group photos · Highlights</span>
+        </div>
+      </div>
+      <div id="multiPhotoGrid" class="multi-photo-grid"></div>
+      <div id="multiPhotoCount" class="multi-photo-count" style="display:none;">0 of ${max} photos selected</div>
+      <div class="photo-err-msg" id="photoErrMsg"></div>
+      <div class="photo-reqs">
+        <p><strong>For print quality:</strong> minimum 600×600 pixels per photo, JPG or PNG, up to 5 MB each. Pick the best action, group, and highlight shots.</p>
+      </div>
+    </div>`;
+  } else if (cat.photoRequired) {
+    // Single-photo upload (other forms)
+    html += `
+    <div class="f-card">
+      <div class="f-card-title">Profile photo</div>
+      <div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)">
+        <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/>
+        <div id="photoPlaceholder">
+          <span class="photo-drop-icon">📷</span>
+          <h3>Upload your profile photo <span class="req">*</span></h3>
+          <p>Click here or drag &amp; drop your photo</p>
+          <span class="photo-pill">Passport-style · Clear face · Plain background</span>
+        </div>
+        <div class="photo-preview-wrap" id="photoPreviewWrap">
+          <img id="photoPreview" src="" alt="Preview"/>
+          <div class="photo-filename" id="photoFilename"></div>
+          <div class="photo-dims" id="photoDims"></div>
+          <button class="photo-change" onclick="resetPhoto(event)">Change photo</button>
+        </div>
+      </div>
+      <div class="photo-err-msg" id="photoErrMsg"></div>
+      <div class="photo-reqs">
+        <p><strong>For print quality:</strong> minimum 600×600 pixels, JPG or PNG, up to 5 MB. Avoid WhatsApp-compressed photos where possible — they lose resolution.</p>
+      </div>
+    </div>`;
+  }
+
+  html += `<button class="submit-btn" onclick="submitForm()">Submit</button>`;
+  container.innerHTML = html;
+}
+
+function buildFieldHtml(f){
+  const req = f.required ? '<span class="req"> *</span>' : '<span class="opt">(optional)</span>';
+  const hint = f.hint ? `<div class="field-hint">${esc(f.hint)}</div>` : '';
+  const err = `<div class="field-err">This field is required.</div>`;
+  const idAttr = `ff-${f.id}`;
+
+  if (f.type === 'textarea') {
+    const cls = f.long ? 'long' : '';
+    return `<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><textarea id="${idAttr}" class="${cls}" placeholder="${esc(f.placeholder||'')}"></textarea>${hint}${err}</div>`;
+  }
+  if (f.type === 'select') {
+    // options can be an array (built-in) or a newline/comma-separated string (custom)
+    let optsArr = [];
+    if (Array.isArray(f.options)) optsArr = f.options;
+    else if (typeof f.options === 'string') optsArr = f.options.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    const opts = optsArr.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+    return `<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><select id="${idAttr}"><option value="">— Select —</option>${opts}</select>${hint}${err}</div>`;
+  }
+  if (f.type === 'checkbox') {
+    // Yes/No toggle — always "optional" in the sense that unchecked is a valid value
+    return `<div class="field" id="fw-${f.id}">
+      <div class="checkbox-row">
+        <input type="checkbox" id="${idAttr}"/>
+        <label for="${idAttr}" style="font-weight:400;display:inline;cursor:pointer;">${esc(f.label)}</label>
+      </div>
+      ${hint}
+    </div>`;
+  }
+  if (f.type === 'number') {
+    return `<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><input type="number" id="${idAttr}" placeholder="${esc(f.placeholder||'')}" inputmode="numeric"/>${hint}${err}</div>`;
+  }
+  // text, date, fallback
+  return `<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><input type="${f.type}" id="${idAttr}" placeholder="${esc(f.placeholder||'')}"/>${hint}${err}</div>`;
+}
+
+/* ─── PHOTO HANDLING ─── */
 function dragOver(e){e.preventDefault();document.getElementById('photoDrop').classList.add('drag');}
-function dragLeave(){document.getElementById('photoDrop').classList.remove('drag');}
+function dragLeave(){const d=document.getElementById('photoDrop');if(d)d.classList.remove('drag');}
 function dropPhoto(e){e.preventDefault();dragLeave();const f=e.dataTransfer.files[0];if(f)processPhoto(f);}
 function handlePhoto(e){if(e.target.files[0])processPhoto(e.target.files[0]);}
+
 function processPhoto(file){
-  const err=document.getElementById('photoErrMsg');err.style.display='none';
-  const maxB=(cfg.maxSize||2)*1024*1024;
-  const allowed=(cfg.formats||'jpg,png').split(',').flatMap(x=>[x.trim(),x.trim()==='jpg'?'jpeg':x.trim()]);
-  const ext=file.name.split('.').pop().toLowerCase();
-  if(!allowed.includes(ext)){err.textContent=`Invalid format. Upload a ${(cfg.formats||'jpg,png').toUpperCase().split(',').join(' or ')} file.`;err.style.display='block';return;}
-  if(file.size>maxB){err.textContent=`File too large. Max ${cfg.maxSize||2} MB. Your file is ${(file.size/1024/1024).toFixed(1)} MB.`;err.style.display='block';return;}
-  const img=new Image(),url=URL.createObjectURL(file);
-  img.onload=function(){
-    if(img.width<(cfg.minW||400)||img.height<(cfg.minH||400)){
-      err.textContent=`Image too small. Minimum ${cfg.minW||400}×${cfg.minH||400}px. Your image is ${img.width}×${img.height}px.`;
-      err.style.display='block';URL.revokeObjectURL(url);return;
+  const err = document.getElementById('photoErrMsg'); err.style.display = 'none';
+  const maxB = 5 * 1024 * 1024;
+  const allowed = ['jpg','jpeg','png','webp'];
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!allowed.includes(ext)) { err.textContent = 'Invalid format. Upload JPG, PNG, or WebP.'; err.style.display = 'block'; return; }
+  if (file.size > maxB) { err.textContent = `File too large. Max 5 MB. Yours is ${(file.size/1024/1024).toFixed(1)} MB.`; err.style.display = 'block'; return; }
+  const img = new Image(), url = URL.createObjectURL(file);
+  img.onload = function(){
+    if (img.width < 600 || img.height < 600) {
+      err.textContent = `Image too small. Minimum 600×600 px. Yours is ${img.width}×${img.height} px.`;
+      err.style.display = 'block'; URL.revokeObjectURL(url); return;
     }
-    photoFile=file;
-    new FileReader().onload=ev=>{
-      photoDataURL=ev.target.result;
-      document.getElementById('photoPreview').src=photoDataURL;
-      document.getElementById('photoFilename').textContent=file.name;
-      document.getElementById('photoDims').textContent=`${img.width}×${img.height}px · ${(file.size/1024).toFixed(0)}KB`;
-      document.getElementById('photoPlaceholder').style.display='none';
-      document.getElementById('photoPreviewWrap').style.display='flex';
+    photoFile = file;
+    const r = new FileReader();
+    r.onload = ev => {
+      photoDataURL = ev.target.result;
+      document.getElementById('photoPreview').src = photoDataURL;
+      document.getElementById('photoFilename').textContent = file.name;
+      document.getElementById('photoDims').textContent = `${img.width}×${img.height}px · ${(file.size/1024).toFixed(0)} KB`;
+      document.getElementById('photoPlaceholder').style.display = 'none';
+      document.getElementById('photoPreviewWrap').style.display = 'flex';
       document.getElementById('photoDrop').classList.add('uploaded');
-    };(new FileReader()).onload=ev=>{photoDataURL=ev.target.result;document.getElementById('photoPreview').src=photoDataURL;document.getElementById('photoFilename').textContent=file.name;document.getElementById('photoDims').textContent=`${img.width}×${img.height}px · ${(file.size/1024).toFixed(0)}KB`;document.getElementById('photoPlaceholder').style.display='none';document.getElementById('photoPreviewWrap').style.display='flex';document.getElementById('photoDrop').classList.add('uploaded');};
-    const r=new FileReader();r.onload=ev=>{photoDataURL=ev.target.result;document.getElementById('photoPreview').src=photoDataURL;document.getElementById('photoFilename').textContent=file.name;document.getElementById('photoDims').textContent=`${img.width}×${img.height}px · ${(file.size/1024).toFixed(0)}KB`;document.getElementById('photoPlaceholder').style.display='none';document.getElementById('photoPreviewWrap').style.display='flex';document.getElementById('photoDrop').classList.add('uploaded');};r.readAsDataURL(file);
+    };
+    r.readAsDataURL(file);
     URL.revokeObjectURL(url);
-  };img.src=url;
+  };
+  img.src = url;
 }
+
 function resetPhoto(e){
-  e.stopPropagation();photoFile=null;photoDataURL=null;
-  document.getElementById('photoInput').value='';
-  document.getElementById('photoPreview').src='';
-  document.getElementById('photoPlaceholder').style.display='block';
-  document.getElementById('photoPreviewWrap').style.display='none';
+  e.stopPropagation();
+  photoFile = null; photoDataURL = null;
+  document.getElementById('photoInput').value = '';
+  document.getElementById('photoPreview').src = '';
+  document.getElementById('photoPlaceholder').style.display = 'block';
+  document.getElementById('photoPreviewWrap').style.display = 'none';
   document.getElementById('photoDrop').classList.remove('uploaded');
 }
 
-/* ─── SUBMIT ─── */
-function submitForm(){
-  let valid=true;const data={};
-  const enabledBuiltin=BUILTIN.filter(f=>{const fc=cfg.fields[f.id]||f;return fc.on!==undefined?fc.on:f.on;});
-  enabledBuiltin.forEach(f=>{
-    const fc=cfg.fields[f.id]||f;const req=fc.req!==undefined?fc.req:f.req;
-    const el=document.getElementById('ff-'+f.id);const w=document.getElementById('fw-'+f.id);
-    if(!el)return;const val=el.value.trim();
-    data[f.id]={label:f.label,value:val};
-    if(req&&!val){w.classList.add('has-error');valid=false;}else w.classList.remove('has-error');
-  });
-  (cfg.customFields||[]).filter(cf=>cf.label).forEach(cf=>{
-    const el=document.getElementById('ff-'+cf.id);const w=document.getElementById('fw-'+cf.id);
-    if(!el)return;
-    const val=cf.type==='checkbox'?(el.checked?'Yes':'No'):el.value.trim();
-    data[cf.id]={label:cf.label,value:val,type:cf.type};
-    if(cf.required&&cf.type!=='checkbox'&&!val){w.classList.add('has-error');valid=false;}else w.classList.remove('has-error');
-  });
-  if((cfg.photoRequired!==false)&&!photoDataURL){
-    const e=document.getElementById('photoErrMsg');e.textContent='A profile photo is required.';e.style.display='block';valid=false;
+/* ─── MULTI-PHOTO (events) ─── */
+function handlePhotoMulti(event, max){
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+  const err = document.getElementById('photoErrMsg');
+  err.style.display = 'none';
+
+  const remaining = max - photoFilesMulti.length;
+  if (remaining <= 0) {
+    err.textContent = `Maximum ${max} photos reached. Remove one before adding another.`;
+    err.style.display = 'block';
+    event.target.value = '';
+    return;
   }
-  if(!valid){(document.querySelector('.has-error')||document.getElementById('photoErrMsg')).scrollIntoView({behavior:'smooth',block:'center'});return;}
-  subs.push({id:Date.now(),ts:new Date().toLocaleString(),data,photoData:photoDataURL||null,photoName:photoFile?.name||null});
-  localStorage.setItem('mag_subs',JSON.stringify(subs));
-  document.getElementById('formContainer').style.display='none';
-  document.getElementById('successWrap').style.display='block';
-  window.scrollTo({top:0,behavior:'smooth'});
+  const filesToAdd = files.slice(0, remaining);
+  if (files.length > remaining) {
+    err.textContent = `You selected ${files.length} photos; only ${remaining} more can be added. The first ${remaining} will be used.`;
+    err.style.display = 'block';
+  }
+
+  filesToAdd.forEach(file => processPhotoForMulti(file, max));
+  event.target.value = ''; // allow re-selecting same file later
 }
 
-/* ─── SUBMISSIONS VIEW ─── */
-function renderSubmissions(){
-  const today=new Date().toDateString();
-  document.getElementById('statTotal').textContent=subs.length;
-  document.getElementById('statPhoto').textContent=subs.filter(s=>s.photoData).length;
-  document.getElementById('statToday').textContent=subs.filter(s=>new Date(s.id).toDateString()===today).length;
-  const c=document.getElementById('submissionsContainer');
-  if(!subs.length){c.innerHTML=`<div class="empty-state"><h3>No submissions yet</h3><p>Share the form link with teachers and their profiles will appear here.</p></div>`;return;}
-  c.innerHTML=subs.map(sub=>{
-    const name=sub.data?.name?.value||'Unknown';
-    const subj=sub.data?.subject?.value||'';
-    const initials=name.trim().split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-    const avatar=sub.photoData?`<img class="sub-avatar" src="${sub.photoData}" alt="${name}"/>`:`<div class="sub-avatar-init">${initials}</div>`;
-    const fieldsHtml=Object.entries(sub.data||{}).filter(([k])=>k!=='name'&&k!=='subject').map(([,fc])=>`
-      <div class="sub-field${['message','advice','quote','background'].includes(fc.label?.toLowerCase().replace(/ /g,'_'))?'':''} wide">
-        <div class="sub-field-lbl">${fc.label}</div>
-        <div class="sub-field-val">${fc.value||'—'}</div>
-      </div>`).join('');
-    return `<div class="sub-card">
-      <div class="sub-top">${avatar}<div><div class="sub-name">${name}</div><div class="sub-meta">${subj} · ${sub.ts}</div></div></div>
-      <div class="sub-fields">${fieldsHtml}</div>
-      <button class="sub-del" onclick="deleteSub(${sub.id})">Remove this submission</button>
+function processPhotoForMulti(file, max){
+  const err = document.getElementById('photoErrMsg');
+  const maxBytes = 5 * 1024 * 1024;
+  const allowed = ['jpg','jpeg','png','webp'];
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!allowed.includes(ext)) {
+    err.textContent = `Skipped "${file.name}": invalid format. Use JPG, PNG, or WebP.`;
+    err.style.display = 'block';
+    return;
+  }
+  if (file.size > maxBytes) {
+    err.textContent = `Skipped "${file.name}": too large (max 5 MB).`;
+    err.style.display = 'block';
+    return;
+  }
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = function(){
+    if (img.width < 600 || img.height < 600) {
+      err.textContent = `Skipped "${file.name}": too small (minimum 600×600 px).`;
+      err.style.display = 'block';
+      URL.revokeObjectURL(url);
+      return;
+    }
+    const r = new FileReader();
+    r.onload = ev => {
+      photoFilesMulti.push(file);
+      photoDataURLsMulti.push(ev.target.result);
+      renderMultiPhotoGrid(max);
+    };
+    r.readAsDataURL(file);
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = () => {
+    err.textContent = `Skipped "${file.name}": could not read image.`;
+    err.style.display = 'block';
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+}
+
+function renderMultiPhotoGrid(max){
+  const grid = document.getElementById('multiPhotoGrid');
+  const placeholder = document.getElementById('photoPlaceholderMulti');
+  const counter = document.getElementById('multiPhotoCount');
+  if (!grid) return;
+
+  if (photoDataURLsMulti.length === 0) {
+    grid.innerHTML = '';
+    if (placeholder) placeholder.style.display = 'block';
+    if (counter) counter.style.display = 'none';
+    return;
+  }
+  if (placeholder) placeholder.style.display = 'none';
+  grid.innerHTML = photoDataURLsMulti.map((url, i) => `
+    <div class="multi-photo-thumb">
+      <img src="${url}" alt="Event photo ${i+1}"/>
+      <button class="multi-photo-remove" type="button" onclick="removeMultiPhoto(${i}, ${max})" title="Remove this photo">×</button>
+    </div>
+  `).join('');
+
+  if (counter) {
+    counter.style.display = 'inline-block';
+    counter.textContent = `${photoDataURLsMulti.length} of ${max} photos selected`;
+    counter.classList.toggle('full', photoDataURLsMulti.length >= max);
+  }
+}
+
+function removeMultiPhoto(index, max){
+  photoFilesMulti.splice(index, 1);
+  photoDataURLsMulti.splice(index, 1);
+  renderMultiPhotoGrid(max);
+}
+
+/* ─── FORM SUBMIT ─── */
+function submitForm(){
+  const cat = CATEGORIES[currentFormCategory];
+  let valid = true;
+  const data = {};
+
+  // Use effective fields (respecting admin's customization)
+  const effectiveFields = getEffectiveFields(currentFormCategory);
+  effectiveFields.forEach(f => {
+    const el = document.getElementById('ff-' + f.id);
+    const w = document.getElementById('fw-' + f.id);
+    if (!el) return;
+
+    let val;
+    if (f.type === 'checkbox') {
+      val = el.checked ? 'Yes' : 'No';
+    } else {
+      val = (el.value || '').trim();
+    }
+    data[f.id] = { label: f.label, value: val, type: f.type };
+
+    // Validation: checkbox is always "valid" (unchecked = No, a valid answer)
+    if (f.required && f.type !== 'checkbox' && !val) {
+      if (w) w.classList.add('has-error');
+      valid = false;
+    } else if (w) {
+      w.classList.remove('has-error');
+    }
+  });
+
+  if (cat.photoRequired && cat.photoMulti) {
+    if (photoDataURLsMulti.length === 0) {
+      const e = document.getElementById('photoErrMsg');
+      e.textContent = 'At least one event photo is required.'; e.style.display = 'block';
+      valid = false;
+    }
+  } else if (cat.photoRequired && !photoDataURL) {
+    const e = document.getElementById('photoErrMsg');
+    e.textContent = 'A profile photo is required.'; e.style.display = 'block';
+    valid = false;
+  }
+
+  if (!valid) {
+    const firstErr = document.querySelector('.has-error') || document.getElementById('photoErrMsg');
+    if (firstErr) firstErr.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+
+  const sub = {
+    id: Date.now() + Math.floor(Math.random()*1000),
+    category: currentFormCategory,
+    ts: new Date().toLocaleString(),
+    createdAt: Date.now(),
+    status: 'draft',
+    reviewerNote: '',
+    reviewedAt: null,
+    data,
+    photoData: photoDataURL || null,
+    photoName: photoFile?.name || null,
+    // For multi-photo forms (events)
+    photos: cat.photoMulti ? photoDataURLsMulti.map((url, i) => ({
+      data: url,
+      name: photoFilesMulti[i]?.name || `photo_${i+1}.jpg`
+    })) : null
+  };
+  subs.push(sub);
+  saveAll(subs);
+
+  document.getElementById('formContainer').style.display = 'none';
+  document.getElementById('successWrap').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ─── PIN LOGIC ─── */
+function openPIN(mode){
+  cfg = loadCfg(); // reload in case PINs changed
+  pinMode = mode;
+  pinBuf = '';
+  updatePinDots();
+  document.getElementById('pinErr').textContent = '';
+  const overlay = document.getElementById('pinOverlay');
+  overlay.classList.toggle('editor', mode === 'editor');
+
+  // Crystal-clear mode badge
+  const badge = document.getElementById('pinModeBadge');
+  if (mode === 'admin') {
+    badge.textContent = '⚙ Production Admin';
+    badge.style.background = '#0f2744';
+    badge.style.color = '#c9973a';
+  } else {
+    badge.textContent = '✎ Editor-in-Chief';
+    badge.style.background = '#2d1b4e';
+    badge.style.color = '#c6a5f0';
+  }
+
+  document.getElementById('pinTitle').textContent = mode === 'admin' ? 'Production Admin' : 'Editor-in-Chief';
+  document.getElementById('pinSub').textContent = mode === 'admin'
+    ? 'Enter Production Admin PIN (default: 1234)'
+    : 'Enter Editor-in-Chief PIN (default: 5678)';
+  overlay.classList.add('active');
+  console.log('[MagicEditor] PIN prompt opened for mode:', mode, '— expecting:', mode === 'admin' ? cfg.adminPin : cfg.editorPin);
+}
+function closePIN(){document.getElementById('pinOverlay').classList.remove('active');pinBuf='';pinMode=null;}
+function pinKey(d){if(pinBuf.length>=4)return;pinBuf+=d;updatePinDots();if(pinBuf.length===4)checkPIN();}
+function pinDel(){pinBuf=pinBuf.slice(0,-1);updatePinDots();}
+function updatePinDots(){for(let i=0;i<4;i++){const dot=document.getElementById('pd'+i);dot.classList.toggle('filled',i<pinBuf.length);dot.classList.remove('error');}}
+function checkPIN(){
+  const expected = pinMode === 'admin' ? cfg.adminPin : cfg.editorPin;
+  if (pinBuf === expected) {
+    const modeSnapshot = pinMode; // save before closePIN() wipes it
+    closePIN();
+    if (modeSnapshot === 'admin') enterAdmin();
+    else enterEditor();
+  } else {
+    for (let i=0;i<4;i++) document.getElementById('pd'+i).classList.add('error');
+    document.getElementById('pinErr').textContent = 'Incorrect PIN';
+    setTimeout(()=>{pinBuf='';updatePinDots();},500);
+  }
+}
+
+/* ─── ADMIN (PRODUCTION DASHBOARD) ─── */
+function enterAdmin(){ subs = loadAll(); renderAdmin(); show('viewAdmin'); }
+
+function setCategory(cat){
+  currentAdminCat = cat;
+  document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));
+  const btn = document.getElementById('tab-' + cat);
+  if (btn) btn.classList.add('active');
+  // Switch admin mode
+  if (cat === 'editorial') {
+    document.getElementById('adminModeSubs').style.display = 'none';
+    document.getElementById('adminModeEditorial').style.display = 'block';
+    document.getElementById('adminModeSettings').style.display = 'none';
+    document.getElementById('adminModeShareLinks').style.display = 'none';
+    renderEditorialMode();
+  } else {
+    document.getElementById('adminModeSubs').style.display = 'block';
+    document.getElementById('adminModeEditorial').style.display = 'none';
+    document.getElementById('adminModeSettings').style.display = 'none';
+    document.getElementById('adminModeShareLinks').style.display = 'none';
+    renderAdmin();
+  }
+}
+
+function openSettings(){
+  document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-settings').classList.add('active');
+  document.getElementById('adminModeSubs').style.display = 'none';
+  document.getElementById('adminModeEditorial').style.display = 'none';
+  document.getElementById('adminModeShareLinks').style.display = 'none';
+  document.getElementById('adminModeSettings').style.display = 'block';
+  // Prefill settings
+  document.getElementById('setAdminPin').value = cfg.adminPin;
+  document.getElementById('setEditorPin').value = cfg.editorPin;
+  document.getElementById('pinSaveStatus').textContent = '';
+  refreshDiag();
+}
+
+function openShareLinks(){
+  document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-sharelinks').classList.add('active');
+  document.getElementById('adminModeSubs').style.display = 'none';
+  document.getElementById('adminModeEditorial').style.display = 'none';
+  document.getElementById('adminModeSettings').style.display = 'none';
+  document.getElementById('adminModeShareLinks').style.display = 'block';
+  renderShareLinks();
+}
+
+function renderAdmin(){
+  subs = loadAll();
+  // Update counts for all categories
+  document.getElementById('count-all').textContent = subs.length;
+  CATEGORY_KEYS.forEach(k => {
+    const el = document.getElementById('count-' + k);
+    if (el) el.textContent = subs.filter(s => s.category === k).length;
+  });
+  // Editorial count (editorial-note + appreciation entries)
+  const edCount = document.getElementById('count-editorial');
+  if (edCount) edCount.textContent = subs.filter(s => s.category === 'editorial-note' || s.category === 'appreciation').length;
+
+  // Stats
+  document.getElementById('statTotal').textContent = subs.length;
+  document.getElementById('statPending').textContent = subs.filter(s=>s.status==='pending').length;
+  document.getElementById('statApproved').textContent = subs.filter(s=>s.status==='approved').length;
+  document.getElementById('statFinalized').textContent = subs.filter(s=>s.status==='finalized').length;
+
+  // Filter
+  const statusFilter = document.getElementById('filterStatus').value;
+  let filtered = subs.slice().reverse();
+  if (currentAdminCat !== 'all') filtered = filtered.filter(s => s.category === currentAdminCat);
+  if (statusFilter !== 'all') filtered = filtered.filter(s => s.status === statusFilter);
+
+  const list = document.getElementById('adminSubList');
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><h3>No submissions to show</h3><p>${subs.length ? 'Try changing the filter or category.' : 'Share the landing page URL with contributors so they can submit.'}</p></div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(s => renderSubCard(s, 'admin')).join('');
+}
+
+function renderSubCard(s, context){
+  // Resolve category info — handle synthetic editorial categories
+  const cat = CATEGORIES[s.category] || EDITORIAL_META[s.category] || { label: s.category, tag: s.category };
+  const nameField = s.data.name?.value
+    || s.data.speakerName?.value
+    || s.data.contribName?.value
+    || s.data.reporterName?.value
+    || s.data.authorName?.value
+    || s.data.intervieweeName?.value
+    || s.data.submitterName?.value
+    || s.data.title?.value
+    || 'Untitled';
+  const subField = s.data.subject?.value
+    || s.data.speechType?.value
+    || s.data.contribType?.value
+    || s.data.eventType?.value
+    || s.data.subjectArea?.value
+    || s.data.articleTitle?.value
+    || s.data.photoCategory?.value
+    || s.data.eventName?.value
+    || s.data.interviewerName?.value
+    || '';
+  const initials = nameField.trim().split(/\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  const avatar = s.photoData
+    ? `<img class="sub-avatar" src="${s.photoData}" alt="${esc(nameField)}"/>`
+    : `<div class="sub-avatar-init">${initials}</div>`;
+
+  const catPillClass = 'pill-' + s.category;
+  const fieldsHtml = Object.entries(s.data).map(([k,fc]) => {
+    if (!fc.value) return '';
+    const isLong = typeof fc.value === 'string' && fc.value.length > 80;
+    return `<div class="sub-field${isLong?' wide':''}">
+      <div class="sub-field-lbl">${esc(fc.label)}</div>
+      <div class="sub-field-val">${esc(fc.value)}</div>
     </div>`;
   }).join('');
-}
-function deleteSub(id){if(!confirm('Remove this submission?'))return;subs=subs.filter(s=>s.id!==id);localStorage.setItem('mag_subs',JSON.stringify(subs));renderSubmissions();}
-function clearAll(){if(!confirm(`Delete all ${subs.length} submissions? This cannot be undone.`))return;subs=[];localStorage.setItem('mag_subs',JSON.stringify(subs));renderSubmissions();}
 
-function exportForClaude(){
-  let txt=`TEACHER PROFILES FOR CLAUDE FORMATTING\nExported: ${new Date().toLocaleString()}\nTotal: ${subs.length}\n\n${'='.repeat(55)}\n\n`;
-  txt+=`INSTRUCTIONS FOR CLAUDE:\nFormat each teacher profile below into a professional, print-ready magazine layout.\n\n${'='.repeat(55)}\n\n`;
-  subs.forEach((s,i)=>{
-    txt+=`TEACHER PROFILE #${i+1}\n`;
-    Object.entries(s.data||{}).forEach(([,fc])=>{txt+=`${fc.label}: ${fc.value||'Not provided'}\n`;});
-    txt+=`Profile photo: ${s.photoData?`YES — ${s.photoName||'provided'}`:'NOT provided'}\n`;
-    txt+=`\n${'-'.repeat(40)}\n\n`;
-  });
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));a.download='teacher_profiles_for_claude.txt';a.click();
+  const noteHtml = s.reviewerNote
+    ? `<div class="sub-reviewer-note"><strong>Editor's note:</strong> ${esc(s.reviewerNote)}</div>`
+    : '';
+
+  let actionsHtml = '';
+  if (context === 'admin') {
+    actionsHtml += `<button class="sub-action-btn sub-action-download" onclick="exportOneSubmission(${s.id})">⬇ Download ZIP</button>`;
+    if (s.status === 'draft') {
+      actionsHtml += `<button class="sub-action-btn sub-action-send" onclick="sendForReview(${s.id})">→ Send for Review</button>`;
+    }
+    if (s.status === 'approved') {
+      actionsHtml += `<button class="sub-action-btn sub-action-finalize" onclick="finalizeSubmission(${s.id})">✓ Finalize</button>`;
+    }
+    actionsHtml += `<button class="sub-action-btn sub-action-delete" onclick="deleteSubmission(${s.id})">Delete</button>`;
+  } else {
+    // Editor context
+    if (s.status === 'pending') {
+      actionsHtml += `<button class="sub-action-btn sub-action-finalize" style="color:var(--green);border-color:var(--green2);" onclick="editorReview(${s.id},'approved')">✓ Approve</button>`;
+      actionsHtml += `<button class="sub-action-btn sub-action-delete" onclick="editorReview(${s.id},'rejected')">✗ Reject</button>`;
+    } else if (s.status === 'approved') {
+      actionsHtml += `<span class="status-badge status-approved">Approved</span>`;
+      actionsHtml += `<button class="sub-action-btn" onclick="editorReview(${s.id},'rejected')">Change to rejected</button>`;
+    } else if (s.status === 'rejected') {
+      actionsHtml += `<span class="status-badge status-rejected">Rejected</span>`;
+      actionsHtml += `<button class="sub-action-btn" onclick="editorReview(${s.id},'approved')">Change to approved</button>`;
+    } else {
+      actionsHtml += `<span class="status-badge status-${s.status}">${s.status}</span>`;
+    }
+  }
+
+  return `<div class="sub-card cat-${s.category}">
+    <div class="sub-top">
+      ${avatar}
+      <div style="flex:1;min-width:200px;">
+        <div class="sub-name">${esc(nameField)}</div>
+        <div class="sub-meta"><span class="cat-pill ${catPillClass}">${cat.tag}</span>${subField ? esc(subField)+' · ' : ''}${esc(s.ts)}</div>
+      </div>
+      <span class="status-badge status-${s.status}">${s.status}</span>
+    </div>
+    ${fieldsHtml ? `<div class="sub-fields">${fieldsHtml}</div>` : ''}
+    ${noteHtml}
+    <div class="sub-actions">${actionsHtml}</div>
+  </div>`;
 }
-function exportCSV(){
-  if(!subs.length)return;
-  const headers=['#','Submitted',...Object.values(subs[0].data||{}).map(f=>f.label),'Has Photo'];
-  const rows=subs.map((s,i)=>[i+1,s.ts,...Object.values(s.data||{}).map(f=>`"${(f.value||'').replace(/"/g,'""')}"`),s.photoData?'Yes':'No']);
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[headers,...rows].map(r=>r.join(',')).join('\n')],{type:'text/csv'}));a.download='teacher_submissions.csv';a.click();
+
+/* ─── ADMIN ACTIONS ─── */
+function sendForReview(id){
+  if (!confirm('Send this submission to the Editor-in-Chief for review?')) return;
+  subs = loadAll();
+  const s = subs.find(x => x.id === id); if (!s) return;
+  s.status = 'pending';
+  saveAll(subs); renderAdmin();
+}
+
+function finalizeSubmission(id){
+  if (!confirm('Finalize this submission? Finalized items are locked and will appear in the master magazine export.')) return;
+  subs = loadAll();
+  const s = subs.find(x => x.id === id); if (!s) return;
+  s.status = 'finalized';
+  saveAll(subs); renderAdmin();
+}
+
+function deleteSubmission(id){
+  if (!confirm('Permanently delete this submission? This cannot be undone.')) return;
+  subs = loadAll();
+  subs = subs.filter(s => s.id !== id);
+  saveAll(subs); renderAdmin();
+}
+
+/* ─── EDITOR ─── */
+function enterEditor(){ subs = loadAll(); renderEditor(); show('viewEditor'); }
+
+function setEditorCategory(status){
+  currentEditorCat = status;
+  document.querySelectorAll('#viewEditor .admin-tab').forEach(t=>t.classList.remove('active'));
+  const btn = document.getElementById('etab-' + status);
+  if (btn) btn.classList.add('active');
+  if (status === 'editorial') {
+    document.getElementById('editorModeList').style.display = 'none';
+    document.getElementById('editorModeNote').style.display = 'block';
+    loadEditorialNoteForEditor();
+  } else {
+    document.getElementById('editorModeList').style.display = 'block';
+    document.getElementById('editorModeNote').style.display = 'none';
+    renderEditor();
+  }
+}
+
+function loadEditorialNoteForEditor(){
+  const all = loadAll();
+  const existing = all.find(s => s.category === 'editorial-note');
+  if (existing) {
+    document.getElementById('edNoteTitle').value = existing.data.title?.value || '';
+    document.getElementById('edNoteBody').value = existing.data.body?.value || '';
+    document.getElementById('edNoteStatus').textContent = 'Last saved: ' + existing.ts;
+  } else {
+    document.getElementById('edNoteTitle').value = '';
+    document.getElementById('edNoteBody').value = '';
+    document.getElementById('edNoteStatus').textContent = 'Not yet saved';
+  }
+}
+
+function saveEditorialNote(){
+  const title = document.getElementById('edNoteTitle').value.trim();
+  const body = document.getElementById('edNoteBody').value.trim();
+  if (!body) { alert('Please write the editorial note before saving.'); return; }
+  subs = loadAll();
+  let existing = subs.find(s => s.category === 'editorial-note');
+  if (existing) {
+    existing.data = { title: { label:'Title', value: title }, body: { label:'Body', value: body } };
+    existing.ts = new Date().toLocaleString();
+  } else {
+    subs.push({
+      id: Date.now() + Math.floor(Math.random()*1000),
+      category: 'editorial-note',
+      ts: new Date().toLocaleString(),
+      createdAt: Date.now(),
+      status: 'approved', // auto-approved since it's by the Editor-in-Chief
+      reviewerNote: '',
+      reviewedAt: Date.now(),
+      data: { title: { label:'Title', value: title }, body: { label:'Body', value: body } },
+      photoData: null,
+      photoName: null
+    });
+  }
+  saveAll(subs);
+  document.getElementById('edNoteStatus').textContent = '✓ Saved ' + new Date().toLocaleTimeString();
+  setTimeout(()=>document.getElementById('edNoteStatus').textContent = 'Last saved: ' + new Date().toLocaleString(), 2000);
+}
+
+function renderEditor(){
+  subs = loadAll();
+  document.getElementById('ecount-pending').textContent = subs.filter(s=>s.status==='pending').length;
+  document.getElementById('ecount-approved').textContent = subs.filter(s=>s.status==='approved').length;
+  document.getElementById('ecount-rejected').textContent = subs.filter(s=>s.status==='rejected').length;
+  document.getElementById('ecount-all').textContent = subs.length;
+
+  let filtered = subs.slice().reverse();
+  if (currentEditorCat !== 'all') filtered = filtered.filter(s => s.status === currentEditorCat);
+
+  const list = document.getElementById('editorSubList');
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✎</div><h3>No submissions here yet</h3><p>${currentEditorCat==='pending' ? 'Nothing awaiting your review. Check back when Production sends items for approval.' : 'Nothing to show in this tab.'}</p></div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(s => renderSubCard(s, 'editor')).join('');
+}
+
+function editorReview(id, decision){
+  reviewingId = id;
+  reviewingDecision = decision;
+  const s = loadAll().find(x => x.id === id);
+  const nameField = s?.data.name?.value
+    || s?.data.speakerName?.value
+    || s?.data.contribName?.value
+    || s?.data.reporterName?.value
+    || s?.data.authorName?.value
+    || s?.data.intervieweeName?.value
+    || s?.data.submitterName?.value
+    || 'this submission';
+  document.getElementById('reviewTitle').textContent = decision === 'approved' ? `Approve "${nameField}"?` : `Reject "${nameField}"?`;
+  document.getElementById('reviewSub').textContent = 'Add a note (optional). This will be visible to the Production Lead.';
+  document.getElementById('reviewNote').value = s?.reviewerNote || '';
+  document.getElementById('reviewConfirm').textContent = decision === 'approved' ? 'Approve' : 'Reject';
+  document.getElementById('reviewConfirm').className = 'btn ' + (decision === 'approved' ? 'btn-primary' : 'btn-danger');
+  document.getElementById('reviewConfirm').onclick = confirmReview;
+  document.getElementById('reviewModal').classList.add('active');
+}
+
+function closeReviewModal(){ document.getElementById('reviewModal').classList.remove('active'); reviewingId=null; reviewingDecision=null; }
+
+function confirmReview(){
+  const note = document.getElementById('reviewNote').value.trim();
+  subs = loadAll();
+  const s = subs.find(x => x.id === reviewingId);
+  if (s) {
+    s.status = reviewingDecision;
+    s.reviewerNote = note;
+    s.reviewedAt = Date.now();
+    saveAll(subs);
+  }
+  closeReviewModal();
+  renderEditor();
+}
+
+/* ─── EDITORIAL ADMIN MODE ─── */
+function renderEditorialMode(){
+  subs = loadAll();
+  // Load Appreciation into the input fields (admin-written)
+  const appr = subs.find(s => s.category === 'appreciation');
+  if (appr) {
+    document.getElementById('apprTitle').value = appr.data.title?.value || '';
+    document.getElementById('apprBody').value = appr.data.body?.value || '';
+    document.getElementById('apprStatus').textContent = 'Last saved: ' + appr.ts;
+  } else {
+    document.getElementById('apprTitle').value = '';
+    document.getElementById('apprBody').value = '';
+    document.getElementById('apprStatus').textContent = 'Not yet saved';
+  }
+  // Show the Editorial Note preview (written by Editor-in-Chief)
+  const edNote = subs.find(s => s.category === 'editorial-note');
+  const preview = document.getElementById('edNotePreview');
+  if (edNote) {
+    const title = edNote.data.title?.value || '';
+    const body = edNote.data.body?.value || '';
+    preview.innerHTML = (title ? `<strong>${esc(title)}</strong>\n\n` : '') + esc(body);
+    preview.style.color = 'var(--ink)';
+  } else {
+    preview.textContent = 'No editorial note written yet. The Editor-in-Chief will compose this in their view.';
+    preview.style.color = 'var(--ink3)';
+    preview.style.fontStyle = 'italic';
+  }
+  // List any editorial entries in the submissions list
+  const list = document.getElementById('editorialList');
+  const editorialEntries = subs.filter(s => s.category === 'editorial-note' || s.category === 'appreciation');
+  if (!editorialEntries.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📜</div><h3>No editorial entries yet</h3><p>Save the Appreciation Section above, or ask the Editor-in-Chief to save their Editorial Note.</p></div>`;
+  } else {
+    list.innerHTML = editorialEntries.map(s => renderSubCard(s, 'admin')).join('');
+  }
+}
+
+function saveAppreciation(){
+  const title = document.getElementById('apprTitle').value.trim();
+  const body = document.getElementById('apprBody').value.trim();
+  if (!body) { alert('Please write the appreciation content before saving.'); return; }
+  subs = loadAll();
+  let existing = subs.find(s => s.category === 'appreciation');
+  if (existing) {
+    existing.data = { title: { label:'Title', value: title }, body: { label:'Body', value: body } };
+    existing.ts = new Date().toLocaleString();
+  } else {
+    subs.push({
+      id: Date.now() + Math.floor(Math.random()*1000),
+      category: 'appreciation',
+      ts: new Date().toLocaleString(),
+      createdAt: Date.now(),
+      status: 'approved', // auto-approved (written by Production Admin)
+      reviewerNote: '',
+      reviewedAt: Date.now(),
+      data: { title: { label:'Title', value: title }, body: { label:'Body', value: body } },
+      photoData: null,
+      photoName: null
+    });
+  }
+  saveAll(subs);
+  document.getElementById('apprStatus').textContent = '✓ Saved ' + new Date().toLocaleTimeString();
+  setTimeout(()=>renderEditorialMode(), 1500);
+}
+
+/* ─── SETTINGS ─── */
+function savePins(){
+  const a = document.getElementById('setAdminPin').value.trim();
+  const e = document.getElementById('setEditorPin').value.trim();
+  const isValid = p => /^\d{4}$/.test(p);
+  if (!isValid(a) || !isValid(e)) {
+    document.getElementById('pinSaveStatus').textContent = '✗ PINs must be exactly 4 digits.';
+    document.getElementById('pinSaveStatus').style.color = 'var(--red)';
+    return;
+  }
+  if (a === e) {
+    document.getElementById('pinSaveStatus').textContent = '✗ Admin and Editor PINs must differ.';
+    document.getElementById('pinSaveStatus').style.color = 'var(--red)';
+    return;
+  }
+  saveCfg({ adminPin: a, editorPin: e });
+  document.getElementById('pinSaveStatus').textContent = '✓ PINs saved.';
+  document.getElementById('pinSaveStatus').style.color = 'var(--green)';
+  refreshDiag();
+}
+
+function resetPinsToDefault(){
+  if (!confirm('Reset PINs to defaults (Admin: 1234, Editor: 5678)?')) return;
+  saveCfg({ adminPin: '1234', editorPin: '5678' });
+  document.getElementById('setAdminPin').value = '1234';
+  document.getElementById('setEditorPin').value = '5678';
+  document.getElementById('pinSaveStatus').textContent = '✓ PINs reset to defaults.';
+  document.getElementById('pinSaveStatus').style.color = 'var(--green)';
+  refreshDiag();
+}
+
+function wipeAllData(){
+  if (!confirm('PERMANENTLY DELETE all submissions? This cannot be undone. Are you sure?')) return;
+  if (!confirm('Really? All teacher, student, speech, creative, event, academic, interview, motivational, gallery, and editorial entries will be lost.')) return;
+  localStorage.removeItem('me_subs');
+  subs = [];
+  refreshDiag();
+  alert('All submissions wiped. PINs are unchanged.');
+}
+
+function refreshDiag(){
+  const all = loadAll();
+  const counts = {};
+  CATEGORY_KEYS.forEach(k => counts[k] = all.filter(s => s.category === k).length);
+  counts['editorial-note'] = all.filter(s => s.category === 'editorial-note').length;
+  counts['appreciation'] = all.filter(s => s.category === 'appreciation').length;
+  const byStatus = {};
+  ['draft','pending','approved','rejected','finalized'].forEach(st => byStatus[st] = all.filter(s => s.status === st).length);
+
+  let storageSize = 0;
+  try { storageSize = (localStorage.getItem('me_subs') || '').length; } catch(e) {}
+
+  const diag = [
+    `MagicEditor v1.0`,
+    `Current time: ${new Date().toLocaleString()}`,
+    ``,
+    `--- PINs ---`,
+    `Admin PIN:  ${cfg.adminPin}`,
+    `Editor PIN: ${cfg.editorPin}`,
+    ``,
+    `--- Submission counts by category ---`,
+    ...Object.entries(counts).map(([k,v]) => `  ${k}: ${v}`),
+    `  TOTAL: ${all.length}`,
+    ``,
+    `--- Counts by status ---`,
+    ...Object.entries(byStatus).map(([k,v]) => `  ${k}: ${v}`),
+    ``,
+    `--- Storage ---`,
+    `localStorage size: ${(storageSize/1024).toFixed(1)} KB`,
+    `User agent: ${navigator.userAgent.substring(0,80)}...`
+  ].join('\n');
+  document.getElementById('diagOutput').textContent = diag;
+}
+
+/* ─── FIELD CUSTOMIZATION UI ─── */
+let currentCustCat = null;
+let editingCustomFieldId = null; // null = adding new, id = editing existing
+
+function renderFieldCustomizer(){
+  const picker = document.getElementById('custCatPicker');
+  const catKey = picker.value;
+  currentCustCat = catKey || null;
+  const list = document.getElementById('custFieldsList');
+  const actions = document.getElementById('custActions');
+
+  if (!catKey) {
+    list.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>Select a form above to customize its fields.</p></div>';
+    actions.style.display = 'none';
+    return;
+  }
+
+  const fields = getAllFieldsForEditing(catKey);
+  if (!fields.length) {
+    list.innerHTML = '<div class="empty-state"><p>No fields configured for this form.</p></div>';
+    actions.style.display = 'flex';
+    return;
+  }
+
+  list.innerHTML = fields.map((f, i) => {
+    const typeLabel = ({text:'Text',textarea:'Long text',select:'Dropdown',date:'Date',checkbox:'Yes/No',number:'Number'})[f.type] || f.type;
+    const origin = f._isBuiltIn ? 'Built-in' : 'Custom';
+    const canMoveUp = i > 0;
+    const canMoveDown = i < fields.length - 1;
+    return `<div class="cust-field-row ${f.hidden?'is-hidden':''} ${f._isBuiltIn?'is-builtin':'is-custom'}">
+      <div class="cust-field-main">
+        <div class="cust-field-label">${esc(f.label)}</div>
+        <div class="cust-field-meta">
+          <span class="cust-field-type-pill">${typeLabel}</span>
+          ${origin}${f.hidden?' · HIDDEN':''}${f.required&&!f.hidden?' · Required':''}
+        </div>
+      </div>
+      <div class="cust-toggle-group">
+        <button class="cust-mini-btn" title="Move up" ${canMoveUp?'':'disabled style="opacity:.3;cursor:not-allowed;"'} onclick="moveField('${f.id}',-1)">↑</button>
+        <button class="cust-mini-btn" title="Move down" ${canMoveDown?'':'disabled style="opacity:.3;cursor:not-allowed;"'} onclick="moveField('${f.id}',1)">↓</button>
+        <button class="cust-chip ${f.hidden?'':'on'}" onclick="toggleFieldHidden('${f.id}')">${f.hidden?'Hidden':'Shown'}</button>
+        ${f.type !== 'checkbox' ? `<button class="cust-chip ${f.required?'on-red':''}" onclick="toggleFieldRequired('${f.id}')">${f.required?'Required':'Optional'}</button>` : ''}
+        ${!f._isBuiltIn ? `<button class="cust-chip" onclick="editCustomField('${f.id}')">Edit</button><button class="cust-chip warn" onclick="deleteCustomField('${f.id}')">Delete</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  actions.style.display = 'flex';
+}
+
+function ensureCatEntry(catKey){
+  if (!formConfig[catKey]) formConfig[catKey] = { overrides: {}, customFields: [] };
+  if (!formConfig[catKey].overrides) formConfig[catKey].overrides = {};
+  if (!formConfig[catKey].customFields) formConfig[catKey].customFields = [];
+  return formConfig[catKey];
+}
+
+function toggleFieldHidden(fieldId){
+  if (!currentCustCat) return;
+  const entry = ensureCatEntry(currentCustCat);
+  const builtIn = CATEGORIES[currentCustCat].fields.find(f => f.id === fieldId);
+  if (builtIn) {
+    // Toggle hidden on built-in
+    if (!entry.overrides[fieldId]) entry.overrides[fieldId] = {};
+    entry.overrides[fieldId].hidden = !entry.overrides[fieldId].hidden;
+  } else {
+    // Custom field
+    const cf = entry.customFields.find(x => x.id === fieldId);
+    if (cf) cf.hidden = !cf.hidden;
+  }
+  saveFormConfig(formConfig);
+  renderFieldCustomizer();
+}
+
+function toggleFieldRequired(fieldId){
+  if (!currentCustCat) return;
+  const entry = ensureCatEntry(currentCustCat);
+  const builtIn = CATEGORIES[currentCustCat].fields.find(f => f.id === fieldId);
+  if (builtIn) {
+    if (!entry.overrides[fieldId]) entry.overrides[fieldId] = {};
+    const current = entry.overrides[fieldId].required !== undefined
+      ? entry.overrides[fieldId].required
+      : !!builtIn.required;
+    entry.overrides[fieldId].required = !current;
+  } else {
+    const cf = entry.customFields.find(x => x.id === fieldId);
+    if (cf) cf.required = !cf.required;
+  }
+  saveFormConfig(formConfig);
+  renderFieldCustomizer();
+}
+
+function moveField(fieldId, direction){
+  if (!currentCustCat) return;
+  const fields = getAllFieldsForEditing(currentCustCat);
+  const idx = fields.findIndex(f => f.id === fieldId);
+  if (idx < 0) return;
+  const targetIdx = idx + direction;
+  if (targetIdx < 0 || targetIdx >= fields.length) return;
+
+  // Swap order values between the two
+  const a = fields[idx];
+  const b = fields[targetIdx];
+  const aOrder = a.order;
+  const bOrder = b.order;
+
+  const entry = ensureCatEntry(currentCustCat);
+  [a, b].forEach((f, i) => {
+    const newOrder = i === 0 ? bOrder : aOrder;
+    if (f._isBuiltIn) {
+      if (!entry.overrides[f.id]) entry.overrides[f.id] = {};
+      entry.overrides[f.id].order = newOrder;
+    } else {
+      const cf = entry.customFields.find(x => x.id === f.id);
+      if (cf) cf.order = newOrder;
+    }
+  });
+  saveFormConfig(formConfig);
+  renderFieldCustomizer();
+}
+
+function resetCategoryToDefaults(){
+  if (!currentCustCat) return;
+  if (!confirm(`Reset "${CATEGORIES[currentCustCat].label}" form to its default fields? All hidden toggles, required toggles, reordering, and custom fields you added will be removed for this form only.`)) return;
+  delete formConfig[currentCustCat];
+  saveFormConfig(formConfig);
+  renderFieldCustomizer();
+}
+
+/* ─── CUSTOM FIELD MODAL ─── */
+function openCustomFieldModal(fieldId){
+  editingCustomFieldId = fieldId || null;
+  const isEditing = !!fieldId;
+  document.getElementById('cfmTitle').textContent = isEditing ? 'Edit Custom Field' : 'Add Custom Field';
+  document.getElementById('cfmSaveBtn').textContent = isEditing ? 'Save Changes' : 'Save Field';
+
+  if (isEditing && currentCustCat) {
+    const cf = (formConfig[currentCustCat]?.customFields || []).find(x => x.id === fieldId);
+    if (cf) {
+      document.getElementById('cfmLabel').value = cf.label || '';
+      document.getElementById('cfmType').value = cf.type || 'text';
+      document.getElementById('cfmOptions').value = cf.options || '';
+      document.getElementById('cfmPlaceholder').value = cf.placeholder || '';
+      document.getElementById('cfmRequired').checked = !!cf.required;
+    }
+  } else {
+    document.getElementById('cfmLabel').value = '';
+    document.getElementById('cfmType').value = 'text';
+    document.getElementById('cfmOptions').value = '';
+    document.getElementById('cfmPlaceholder').value = '';
+    document.getElementById('cfmRequired').checked = false;
+  }
+  updateCustomFieldModalOptions();
+  document.getElementById('customFieldModal').classList.add('active');
+}
+
+function closeCustomFieldModal(){
+  document.getElementById('customFieldModal').classList.remove('active');
+  editingCustomFieldId = null;
+}
+
+function updateCustomFieldModalOptions(){
+  const t = document.getElementById('cfmType').value;
+  document.getElementById('cfmOptionsWrap').style.display = t === 'select' ? 'block' : 'none';
+}
+
+function editCustomField(fieldId){
+  openCustomFieldModal(fieldId);
+}
+
+function saveCustomField(){
+  if (!currentCustCat) return;
+  const label = document.getElementById('cfmLabel').value.trim();
+  const type = document.getElementById('cfmType').value;
+  const options = document.getElementById('cfmOptions').value.trim();
+  const placeholder = document.getElementById('cfmPlaceholder').value.trim();
+  const required = document.getElementById('cfmRequired').checked;
+  if (!label) { alert('Field label is required.'); return; }
+  if (type === 'select' && !options) { alert('Dropdown fields need at least one option.'); return; }
+
+  const entry = ensureCatEntry(currentCustCat);
+  if (editingCustomFieldId) {
+    const cf = entry.customFields.find(x => x.id === editingCustomFieldId);
+    if (cf) {
+      cf.label = label; cf.type = type; cf.options = options;
+      cf.placeholder = placeholder; cf.required = required;
+    }
+  } else {
+    // New field: use safe id
+    const newId = 'cf_' + Date.now().toString(36);
+    const maxOrder = Math.max(0, ...getAllFieldsForEditing(currentCustCat).map(f => f.order || 0));
+    entry.customFields.push({
+      id: newId, label, type, options, placeholder, required,
+      hidden: false, order: maxOrder + 1
+    });
+  }
+  saveFormConfig(formConfig);
+  closeCustomFieldModal();
+  renderFieldCustomizer();
+}
+
+function deleteCustomField(fieldId){
+  if (!currentCustCat) return;
+  const entry = formConfig[currentCustCat];
+  if (!entry) return;
+  const cf = entry.customFields.find(x => x.id === fieldId);
+  if (!cf) return;
+  if (!confirm(`Delete custom field "${cf.label}"? This cannot be undone.`)) return;
+  entry.customFields = entry.customFields.filter(x => x.id !== fieldId);
+  saveFormConfig(formConfig);
+  renderFieldCustomizer();
+}
+
+/* ─── EXPORTS ─── */
+function slugify(s){
+  return (s||'unknown').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').substring(0,40) || 'unknown';
+}
+
+function submissionToText(s, num){
+  const cat = CATEGORIES[s.category] || EDITORIAL_META[s.category] || { label: s.category };
+  let txt = `SUBMISSION ${num ? '#'+num : ''}\n`;
+  txt += `Category: ${cat.label}\n`;
+  txt += `Status: ${s.status.toUpperCase()}\n`;
+  txt += `Submitted: ${s.ts}\n`;
+  if (s.reviewerNote) txt += `Editor's Note: ${s.reviewerNote}\n`;
+  txt += `\n`;
+  Object.entries(s.data).forEach(([,fc]) => {
+    txt += `${fc.label}: ${fc.value || 'Not provided'}\n`;
+  });
+  return txt;
+}
+
+function extractPhoto(s, prefix){
+  if (!s.photoData) return { filename: '(no photo provided)', base64: null };
+  const match = /^data:image\/([a-zA-Z0-9]+);base64,(.+)$/.exec(s.photoData);
+  if (!match) return { filename: '(invalid photo)', base64: null };
+  const ext = match[1].toLowerCase() === 'jpeg' ? 'jpg' : match[1].toLowerCase();
+  const nameField = s.data.name?.value
+    || s.data.speakerName?.value
+    || s.data.contribName?.value
+    || s.data.reporterName?.value
+    || s.data.authorName?.value
+    || s.data.intervieweeName?.value
+    || s.data.submitterName?.value
+    || 'unknown';
+  return { filename: `${prefix}_${slugify(nameField)}.${ext}`, base64: match[2] };
+}
+
+// For multi-photo submissions (events). Returns an array of {filename, base64}.
+function extractAllPhotos(s, prefix){
+  const results = [];
+  const nameField = s.data.name?.value
+    || s.data.eventName?.value
+    || s.data.reporterName?.value
+    || s.data.submitterName?.value
+    || 'unknown';
+  const nameSlug = slugify(nameField);
+
+  // Single photo (backward compatible)
+  if (s.photoData && !s.photos) {
+    const match = /^data:image\/([a-zA-Z0-9]+);base64,(.+)$/.exec(s.photoData);
+    if (match) {
+      const ext = match[1].toLowerCase() === 'jpeg' ? 'jpg' : match[1].toLowerCase();
+      results.push({ filename: `${prefix}_${nameSlug}.${ext}`, base64: match[2] });
+    }
+  }
+  // Multi-photo (events)
+  if (Array.isArray(s.photos) && s.photos.length) {
+    s.photos.forEach((p, i) => {
+      const match = /^data:image\/([a-zA-Z0-9]+);base64,(.+)$/.exec(p.data || '');
+      if (match) {
+        const ext = match[1].toLowerCase() === 'jpeg' ? 'jpg' : match[1].toLowerCase();
+        const num = String(i+1).padStart(2,'0');
+        results.push({ filename: `${prefix}_${nameSlug}_photo${num}.${ext}`, base64: match[2] });
+      }
+    });
+  }
+  return results;
+}
+
+function exportOneSubmission(id){
+  const s = loadAll().find(x => x.id === id);
+  if (!s) return;
+  if (typeof JSZip === 'undefined') { alert('ZIP library not loaded. Refresh and try again.'); return; }
+  const zip = new JSZip();
+  const nameField = s.data.name?.value
+    || s.data.speakerName?.value
+    || s.data.contribName?.value
+    || s.data.reporterName?.value
+    || s.data.authorName?.value
+    || s.data.intervieweeName?.value
+    || s.data.submitterName?.value
+    || s.data.eventName?.value
+    || s.data.title?.value
+    || 'unknown';
+  const slug = slugify(nameField);
+  const allPhotos = extractAllPhotos(s, '01');
+  const catLabel = CATEGORIES[s.category]?.label || EDITORIAL_META[s.category]?.label || s.category;
+  let txt = `${catLabel.toUpperCase()} — SINGLE EXPORT\nExported: ${new Date().toLocaleString()}\n\n${'='.repeat(55)}\n\n`;
+  txt += submissionToText(s);
+  let photoList = '(no photo provided)';
+  if (allPhotos.length) {
+    photoList = allPhotos.map(p => p.filename).join(', ');
+    const photosFolder = zip.folder('photos');
+    allPhotos.forEach(p => photosFolder.file(p.filename, p.base64, { base64: true }));
+  }
+  txt += `PHOTO FILE(S): ${photoList}\n`;
+  zip.file('submission.txt', txt);
+  zip.generateAsync({ type:'blob' }).then(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${s.category}_${slug}.zip`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  }).catch(err => alert('Export failed: ' + err.message));
+}
+
+function exportCurrentCategory(){
+  subs = loadAll();
+  const cat = currentAdminCat === 'all' ? null : currentAdminCat;
+  // Editorial tab aggregates both editorial-note and appreciation
+  let list;
+  if (cat === 'editorial') {
+    list = subs.filter(s => s.category === 'editorial-note' || s.category === 'appreciation');
+  } else {
+    list = cat ? subs.filter(s => s.category === cat) : subs;
+  }
+  if (!list.length) { alert('Nothing to export in this category.'); return; }
+  const catLabel = cat === 'editorial'
+    ? 'EDITORIAL PIECES'
+    : cat
+      ? (CATEGORIES[cat]?.label || EDITORIAL_META[cat]?.label || cat).toUpperCase() + ' — CATEGORY EXPORT'
+      : 'ALL SUBMISSIONS EXPORT';
+  exportZip(list, cat ? `${cat}_export` : 'all_submissions', catLabel);
+}
+
+function exportMasterMagazine(){
+  subs = loadAll();
+  const list = subs.filter(s => s.status === 'approved' || s.status === 'finalized');
+  if (!list.length) { alert('No approved or finalized content yet. Nothing to put in the master magazine ZIP.'); return; }
+  exportZipByCategory(list, 'master_magazine', 'MASTER MAGAZINE EXPORT — Approved & Finalized Content Only');
+}
+
+function exportZip(list, filename, heading){
+  if (typeof JSZip === 'undefined') { alert('ZIP library not loaded. Refresh and try again.'); return; }
+  const zip = new JSZip();
+  const photosFolder = zip.folder('photos');
+  let txt = `${heading}\nExported: ${new Date().toLocaleString()}\nTotal submissions: ${list.length}\n\n${'='.repeat(55)}\n\n`;
+  txt += `INSTRUCTIONS FOR EDITOR/CLAUDE:\nFormat each submission below into a professional, print-ready magazine layout.\nPhotos are in the photos/ folder. Each photo's filename matches the 'PHOTO FILE(S)' entry.\n\n${'='.repeat(55)}\n\n`;
+  let manifest = `MANIFEST — ${heading}\n\n`;
+  list.forEach((s, i) => {
+    const num = String(i+1).padStart(2,'0');
+    const allPhotos = extractAllPhotos(s, num);
+    let photoList = '(no photo provided)';
+    if (allPhotos.length) {
+      photoList = allPhotos.map(p => p.filename).join(', ');
+      allPhotos.forEach(p => photosFolder.file(p.filename, p.base64, { base64: true }));
+    }
+    txt += submissionToText(s, i+1);
+    txt += `PHOTO FILE(S): ${photoList}\n\n${'-'.repeat(40)}\n\n`;
+    manifest += `#${i+1}  [${s.category}]  →  ${photoList}\n`;
+  });
+  zip.file('submissions.txt', txt);
+  zip.file('manifest.txt', manifest);
+  zip.generateAsync({ type:'blob' }).then(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${filename}_${new Date().toISOString().slice(0,10)}.zip`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  }).catch(err => alert('Export failed: ' + err.message));
+}
+
+function exportZipByCategory(list, filename, heading){
+  if (typeof JSZip === 'undefined') { alert('ZIP library not loaded. Refresh and try again.'); return; }
+  const zip = new JSZip();
+  let overview = `${heading}\nExported: ${new Date().toLocaleString()}\nTotal: ${list.length}\n\n${'='.repeat(55)}\n\n`;
+
+  // Auto-gather folder: ALL photos from ALL submissions
+  const autoGallery = zip.folder('_auto_photo_gallery');
+  let galleryManifest = `AUTO-GATHERED PHOTO GALLERY\nAll photos from all submissions, organized in one folder.\nUse these for the magazine's photo gallery section.\n\n`;
+
+  const allKeys = [...CATEGORY_KEYS, 'editorial-note', 'appreciation'];
+  allKeys.forEach(catKey => {
+    const catList = list.filter(s => s.category === catKey);
+    if (!catList.length) return;
+    const catLabel = CATEGORIES[catKey]?.label || EDITORIAL_META[catKey]?.label || catKey;
+    const folder = zip.folder(catKey);
+    const photos = folder.folder('photos');
+    let catTxt = `${catLabel.toUpperCase()}\nTotal in this category: ${catList.length}\n\n${'='.repeat(55)}\n\n`;
+    catList.forEach((s, i) => {
+      const num = String(i+1).padStart(2,'0');
+      const allPhotos = extractAllPhotos(s, num);
+      let photoList = '(no photo provided)';
+      if (allPhotos.length) {
+        photoList = allPhotos.map(p => p.filename).join(', ');
+        allPhotos.forEach(p => {
+          photos.file(p.filename, p.base64, { base64: true });
+          const galleryFilename = `${catKey}_${p.filename}`;
+          autoGallery.file(galleryFilename, p.base64, { base64: true });
+          const nameField = s.data.name?.value || s.data.speakerName?.value || s.data.contribName?.value
+            || s.data.reporterName?.value || s.data.authorName?.value || s.data.intervieweeName?.value
+            || s.data.submitterName?.value || s.data.eventName?.value || 'unknown';
+          galleryManifest += `${galleryFilename}  —  ${catLabel}  —  ${nameField}\n`;
+        });
+      }
+      catTxt += submissionToText(s, i+1);
+      catTxt += `PHOTO FILE(S): ${photoList}\n\n${'-'.repeat(40)}\n\n`;
+    });
+    folder.file(`${catKey}.txt`, catTxt);
+    overview += `${catLabel}: ${catList.length} submissions (in ${catKey}/ folder)\n`;
+  });
+
+  autoGallery.file('_MANIFEST.txt', galleryManifest);
+  overview += `\nBONUS: All photos auto-gathered in _auto_photo_gallery/ folder for easy gallery curation.\n`;
+
+  zip.file('README.txt', overview);
+  zip.generateAsync({ type:'blob' }).then(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${filename}_${new Date().toISOString().slice(0,10)}.zip`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  }).catch(err => alert('Export failed: ' + err.message));
 }
 
 /* ─── UTILS ─── */
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function esc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ─── URL ROUTING ─── */
+// Read the URL's ?form= parameter and open that form directly if specified
+function checkUrlRouting(){
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const formParam = params.get('form');
+    if (formParam && CATEGORIES[formParam]) {
+      openForm(formParam);
+      return true;
+    }
+  } catch(e) {
+    console.warn('[MagicEditor] URL routing skipped:', e.message);
+  }
+  return false;
+}
+
+/* ─── SHARE LINKS ─── */
+function getBaseUrl(){
+  try {
+    return window.location.origin + window.location.pathname;
+  } catch(e) {
+    return '';
+  }
+}
+
+function copyShareLink(formKey){
+  const base = getBaseUrl();
+  const url = formKey === '' ? base : `${base}?form=${formKey}`;
+  try {
+    navigator.clipboard.writeText(url);
+    const btn = document.getElementById('copy-' + (formKey || 'landing'));
+    if (btn) {
+      const originalText = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      btn.style.background = 'var(--green)';
+      btn.style.color = '#fff';
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '';
+        btn.style.color = '';
+      }, 1600);
+    }
+  } catch(e) {
+    alert('Could not copy. URL: ' + url);
+  }
+}
+
+function renderShareLinks(){
+  const container = document.getElementById('shareLinksContainer');
+  if (!container) return;
+  const base = getBaseUrl();
+  const entries = [
+    { key: '', label: 'Landing Page (all forms)', icon: '🏠', desc: 'Full homepage with all 11 category cards' },
+    { key: 'teachers', label: 'Teacher Profiles', icon: '👩‍🏫', desc: 'For teaching staff' },
+    { key: 'primary5', label: 'Primary 5 Graduates', icon: '🧒', desc: 'Primary 5 pupils only' },
+    { key: 'jss3', label: 'JSS3 Graduates', icon: '🎒', desc: 'JSS3 students only' },
+    { key: 'ss3', label: 'SS3 Graduates', icon: '🎓', desc: 'Main graduating class' },
+    { key: 'speeches', label: 'Speeches & Addresses', icon: '🎤', desc: 'Proprietor, Senior Boy, guests' },
+    { key: 'creative', label: 'Creative Corner', icon: '✍️', desc: 'Poems, stories, jokes' },
+    { key: 'events', label: 'School Life & Events', icon: '📸', desc: 'Event reports with photos' },
+    { key: 'academic', label: 'Academic & Educational', icon: '📚', desc: 'Articles and features' },
+    { key: 'interviews', label: 'Interviews', icon: '🎙️', desc: 'Q&A submissions' },
+    { key: 'motivational', label: 'Motivational Articles', icon: '💡', desc: 'Inspirational pieces' },
+    { key: 'gallery', label: 'Photo Gallery', icon: '🖼️', desc: 'Standalone photo uploads' }
+  ];
+  container.innerHTML = entries.map(e => {
+    const url = e.key === '' ? base : `${base}?form=${e.key}`;
+    return `<div class="share-link-row">
+      <div class="share-link-icon">${e.icon}</div>
+      <div class="share-link-body">
+        <div class="share-link-label">${esc(e.label)}</div>
+        <div class="share-link-desc">${esc(e.desc)}</div>
+        <div class="share-link-url">${esc(url)}</div>
+      </div>
+      <button class="btn btn-primary" id="copy-${e.key || 'landing'}" onclick="copyShareLink('${e.key}')">Copy</button>
+    </div>`;
+  }).join('');
+}
 
 /* ─── INIT ─── */
-buildForm();
+// Check if URL requests a specific form; otherwise start at landing
+checkUrlRouting();
 </script>
 </body>
 </html>
