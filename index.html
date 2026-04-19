@@ -687,11 +687,15 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
         <div id="lspanel-aiassist" style="display:none;">
           <div class="ls-ai-panel">
             <h4>✦ Layout AI Assistant</h4>
-            <p style="font-size:12.5px;color:var(--school-navy);margin-bottom:12px;">The AI assists with design decisions and layout suggestions. It <strong>never edits your content text</strong> — only helps with arrangement and design.</p>
+            <p style="font-size:12.5px;color:var(--school-navy);margin-bottom:12px;">The AI assists with design decisions and layout suggestions. It <strong>never edits your content text</strong> — only helps with arrangement and design. Use <strong>✦ Apply to Preview</strong> to automatically implement the AI's recommendations.</p>
             <label style="font-size:12px;font-weight:700;color:var(--ink2);display:block;margin-bottom:6px;">Ask the AI about your magazine layout:</label>
             <textarea id="aiAssistQuery" style="width:100%;padding:12px;border:2px solid var(--school-mint3);border-radius:10px;font-size:14px;font-family:'Lato',sans-serif;min-height:100px;resize:vertical;margin-bottom:10px;background:#fff;display:block;" placeholder="Type your layout question here...&#10;&#10;Examples:&#10;• We have 30 teachers — best layout?&#10;• How should I design the cover page?&#10;• Gallery section feels crowded — suggestions?"></textarea>
-            <button class="btn btn-ai" onclick="runLayoutAI()">✦ Ask AI</button>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <button class="btn btn-ai" onclick="runLayoutAI()">✦ Ask AI</button>
+              <button class="btn btn-primary" id="btnApplyLayout" onclick="applyLayoutSuggestions()" style="display:none;background:var(--school-mint3);color:#fff;border:none;">⚡ Apply to Preview</button>
+            </div>
             <div class="ls-ai-result" id="aiAssistResult"></div>
+            <div id="aiApplyLog" style="display:none;margin-top:12px;background:#f0fdf6;border:1px solid var(--school-mint2);border-radius:9px;padding:12px 14px;font-size:13px;color:var(--green);"></div>
           </div>
           <div class="ls-ai-panel" style="margin-top:1.25rem;">
             <h4>📊 Content Summary</h4>
@@ -1350,7 +1354,7 @@ function renderCurrentPage(){
           const name = resolveName(sub);
           const shortName = name.split(' ').slice(0,3).join(' ');
           const ph = resolvePhotoBlock(sub,'54px','62px','6px',`2px solid ${c2}66`);
-          const allFields = renderAllFields(sub, {skipFirst:true, maxChars:60, textColor, bFont});
+          const allFields = renderAllFields(sub, {skipFirst:true, maxChars:99999, textColor, bFont});
           return `<div style="background:#fafaf8;border-radius:7px;padding:8px 5px 6px;border-top:3px solid ${c2};text-align:center;">
             <div style="margin:0 auto 5px;width:54px;">${ph}</div>
             <div style="font-size:8.5px;font-weight:700;color:${c1};line-height:1.3;margin-bottom:4px;">${esc(shortName)}</div>
@@ -1475,11 +1479,77 @@ function renderTOC(){const c=document.getElementById('tocPreview');if(!c)return;
 
 /* PRINT */
 function openPrintView(){
-  if(!magPages.length){alert('Please click "Generate Preview" first.');return;}
-  const s=lsSettings;const ps=s.pageSize==='a4'?'A4':s.pageSize==='a5'?'A5':'letter';const orient=s.orientation||'portrait';
-  const win=window.open('','_blank','width=900,height=700');
-  if(!win){alert('Please allow popups for this site.');return;}
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;700&family=Crimson+Text:ital,wght@0,400;1,400&display=swap" rel="stylesheet"/><style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#ccc;font-family:'Lato',sans-serif;}@media print{body{background:#fff;}@page{size:${ps} ${orient};margin:0;}.no-print{display:none!important;}}.no-print{padding:20px;text-align:center;background:#1a2744;color:#fff;margin-bottom:20px;position:sticky;top:0;z-index:100;}</style></head><body><div class="no-print"><h2 style="margin-bottom:10px;font-size:18px;">🖨 Print-Ready — ${magPages.length} pages · ${s.magTitle||'The Torch'}</h2><button onclick="window.print()" style="background:#7dd4a8;color:#1a2744;border:none;padding:12px 28px;border-radius:999px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;">Print / Save as PDF</button><p style="font-size:12px;color:#aaa;margin-top:8px;">In print dialog: Paper=A4, Margins=None, enable Background graphics</p></div><div style="padding:20px;text-align:center;color:#888;font-size:14px;"><p>✅ ${magPages.length} pages built in Layout Studio</p><p style="margin-top:8px;">Click the Print button above. The magazine will print in the order you set in Section Manager.</p><p style="margin-top:8px;font-size:12px;">For the full pixel-perfect output, use the Print button — all page content is rendered from your approved submissions.</p></div></body></html>`);
+  if(!magPages.length){alert('Please click "Generate Preview" first to build your magazine pages.');return;}
+  const s=lsSettings;
+  const ps=s.pageSize==='a4'?'A4':s.pageSize==='a5'?'A5':'letter';
+  const orient=s.orientation||'portrait';
+  const{w,h}=getPageDimensions();
+
+  /* Render every page to HTML by cycling through each page index */
+  const savedIdx=currentPageIdx;
+  let allPagesHtml='';
+  for(let i=0;i<magPages.length;i++){
+    currentPageIdx=i;
+    renderCurrentPage();
+    const pageEl=document.getElementById('magCanvas');
+    /* Strip the scale transform — print window uses real dimensions */
+    const inner=pageEl.innerHTML.replace(/transform:scale\([^)]+\);?/g,'').replace(/transform-origin:[^;]+;?/g,'');
+    allPagesHtml+=`<div class="mag-sheet">${inner}</div>`;
+  }
+  /* Restore original page */
+  currentPageIdx=savedIdx;
+  renderCurrentPage();
+  updatePageNavUI();
+
+  const win=window.open('','_blank','width=960,height=800');
+  if(!win){alert('Please allow popups for this site to open the print window.');return;}
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>${esc(s.magTitle||'The Torch')} — Print</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#888;font-family:'Lato',sans-serif;}
+    @media print{
+      body{background:#fff;}
+      @page{size:${ps} ${orient};margin:0;}
+      .no-print{display:none!important;}
+      .mag-sheet{box-shadow:none!important;margin:0!important;page-break-after:always;}
+      .mag-sheet:last-child{page-break-after:auto;}
+    }
+    .no-print{
+      padding:16px 24px;text-align:center;background:#1a2744;color:#fff;
+      position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;
+    }
+    .no-print h2{font-size:16px;margin:0;}
+    .no-print button{
+      background:#7dd4a8;color:#1a2744;border:none;padding:10px 26px;
+      border-radius:999px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;
+    }
+    .no-print p{font-size:11px;color:#aaa;margin:0;}
+    .mag-sheet{
+      width:${w}px;height:${h}px;margin:24px auto;
+      box-shadow:0 4px 24px rgba(0,0,0,.35);overflow:hidden;
+      background:#fff;position:relative;
+    }
+    .mag-page{width:${w}px!important;height:${h}px!important;}
+    .mag-page-inner{width:100%;height:100%;overflow:hidden;}
+    img{max-width:100%;}
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <h2>🖨 ${esc(s.magTitle||'The Torch')} &mdash; ${magPages.length} pages</h2>
+    <button onclick="window.print()">Print / Save as PDF</button>
+    <p>Paper: ${ps} &middot; ${orient} &middot; Margins: None &middot; Enable Background graphics</p>
+  </div>
+  <div id="printPages">
+    ${allPagesHtml}
+  </div>
+</body>
+</html>`);
   win.document.close();
 }
 
@@ -1498,16 +1568,176 @@ async function proofreadWithAI(text,panelEl){
 /* LAYOUT AI */
 async function runLayoutAI(){
   const queryEl=document.getElementById('aiAssistQuery');const resultEl=document.getElementById('aiAssistResult');
+  const applyBtn=document.getElementById('btnApplyLayout');const applyLog=document.getElementById('aiApplyLog');
   if(!queryEl||!resultEl)return;
   const query=queryEl?queryEl.value.trim():'';
   if(!query){alert('Please type a question for the AI layout assistant.');return;}
   const s=loadLsSettings();const apiKey=s.apiKey;const model=s.layoutModel||'anthropic/claude-3-haiku';const maxTokens=parseInt(s.maxTokens)||1000;
   if(!apiKey){resultEl.innerHTML='<strong style="color:var(--red);">No API key configured.</strong> Go to Design Settings → AI Configuration.';resultEl.style.display='block';return;}
+  /* Reset apply state */
+  if(applyBtn)applyBtn.style.display='none';
+  if(applyLog){applyLog.style.display='none';applyLog.innerHTML='';}
   resultEl.innerHTML='<em>✦ Thinking about your layout…</em>';resultEl.style.display='block';
   subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');
   const ctx=`MAGAZINE: ${s.magTitle||'The Torch'} | ${s.schoolName||'Way To Success Standard Schools'} | ${s.edition||'1st Edition'} ${s.year||'2025/2026'}\nCONTENT:\n${CATEGORY_KEYS.map(k=>`  ${CATEGORIES[k].label}: ${approved.filter(x=>x.category===k).length} approved items`).join('\n')}\nSETTINGS: Page: ${s.pageSize||'A4'} ${s.orientation||'portrait'} | Teachers/page: ${s.teachersPerPage||9} | Students/page: ${s.studentsPerPage||2} | Gallery/page: ${s.galleryPerPage||4}`;
-  try{const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Layout AI'},body:JSON.stringify({model,max_tokens:maxTokens,messages:[{role:'system',content:`You are a professional magazine layout consultant for a Nigerian school graduation magazine. Help with page design, layout decisions, and space optimization. You NEVER suggest editing content text — only layout, design, and arrangement. Be practical and specific. Context:\n${ctx}`},{role:'user',content:query}]})});const data=await resp.json();const result=data.choices?.[0]?.message?.content||'No response.';resultEl.innerHTML=esc(result).replace(/\n/g,'<br>');} catch(e){resultEl.innerHTML=`<strong style="color:var(--red);">Error:</strong> ${esc(e.message)}`;}
+  try{
+    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Layout AI'},body:JSON.stringify({model,max_tokens:maxTokens,messages:[{role:'system',content:`You are a professional magazine layout consultant for a Nigerian school graduation magazine. Help with page design, layout decisions, and space optimization. You NEVER suggest editing content text — only layout, design, and arrangement. Be practical and specific. When you recommend a specific number (e.g. teachers per page, students per page, gallery photos per page), state it clearly. Context:\n${ctx}`},{role:'user',content:query}]})});
+    const data=await resp.json();
+    const result=data.choices?.[0]?.message?.content||'No response.';
+    resultEl.innerHTML=esc(result).replace(/\n/g,'<br>');
+    /* Show Apply button now that we have a response */
+    if(applyBtn)applyBtn.style.display='inline-flex';
+    /* Store last AI response text for apply engine */
+    window._lastAILayoutResponse=result;
+  } catch(e){resultEl.innerHTML=`<strong style="color:var(--red);">Error:</strong> ${esc(e.message)}`;}
   resultEl.style.display='block';
+}
+
+/* ── APPLY LAYOUT SUGGESTIONS ENGINE ─────────────────────────────────────────
+   Reads the last AI response, extracts actionable settings using keyword
+   matching and number detection, applies them to lsSettings, updates all
+   UI dropdowns, and regenerates the preview automatically.
+─────────────────────────────────────────────────────────────────────────────── */
+function applyLayoutSuggestions(){
+  const text=window._lastAILayoutResponse||'';
+  if(!text){alert('No AI response to apply. Ask the AI a question first.');return;}
+  const logEl=document.getElementById('aiApplyLog');
+  const s=loadLsSettings();
+  const changes=[];
+
+  /* ── Number extractor helper ── */
+  function extractNum(pattern){
+    const m=text.match(pattern);
+    if(m){const n=parseInt(m[1]||m[2]);if(!isNaN(n))return n;}
+    return null;
+  }
+
+  /* ── 1. Teachers per page ── */
+  const teacherMatch=extractNum(/(\d+)[- ]?(?:teachers?|staff|profiles?)\s*(?:per|a|each)?\s*page/i)
+    ||extractNum(/(?:teachers?|staff)\s*(?:per|a|each)\s*page[:\s]+(\d+)/i)
+    ||extractNum(/(\d+)x(\d+)\s*grid/i);
+  if(teacherMatch){
+    const valid=[6,9,12,15];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-teacherMatch)<Math.abs(a-teacherMatch)?b:a);
+    if(String(snapped)!==String(s.teachersPerPage)){
+      s.teachersPerPage=String(snapped);
+      const el=document.getElementById('ls-teachersPerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Teachers per page → ${snapped}`);
+    }
+  }
+
+  /* ── 2. Students per page ── */
+  const studentMatch=extractNum(/(\d+)[- ]?(?:students?|graduates?|pupils?)\s*(?:per|a|each)?\s*page/i)
+    ||extractNum(/(?:students?|graduates?)\s*(?:per|a|each)\s*page[:\s]+(\d+)/i);
+  if(studentMatch){
+    const valid=[1,2,3,4];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-studentMatch)<Math.abs(a-studentMatch)?b:a);
+    if(String(snapped)!==String(s.studentsPerPage)){
+      s.studentsPerPage=String(snapped);
+      const el=document.getElementById('ls-studentsPerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Students per page → ${snapped}`);
+    }
+  }
+
+  /* ── 3. Gallery photos per page ── */
+  const galleryMatch=extractNum(/(\d+)[- ]?(?:photos?|images?|pictures?)\s*(?:per|a|each)?\s*page/i)
+    ||extractNum(/(?:gallery|photos?)\s*(?:per|a|each)\s*page[:\s]+(\d+)/i);
+  if(galleryMatch){
+    const valid=[2,4,6,9];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-galleryMatch)<Math.abs(a-galleryMatch)?b:a);
+    if(String(snapped)!==String(s.galleryPerPage)){
+      s.galleryPerPage=String(snapped);
+      const el=document.getElementById('ls-galleryPerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Gallery photos per page → ${snapped}`);
+    }
+  }
+
+  /* ── 4. Speeches per page ── */
+  const speechMatch=extractNum(/(\d+)[- ]?speeches?\s*(?:per|a|each)?\s*page/i);
+  if(speechMatch){
+    const valid=[1,2];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-speechMatch)<Math.abs(a-speechMatch)?b:a);
+    if(String(snapped)!==String(s.speechesPerPage)){
+      s.speechesPerPage=String(snapped);
+      const el=document.getElementById('ls-speechesPerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Speeches per page → ${snapped}`);
+    }
+  }
+
+  /* ── 5. Creative items per page ── */
+  const creativeMatch=extractNum(/(\d+)[- ]?(?:creative|poem|stor(?:y|ies)|joke|riddle)\s*(?:items?)?\s*(?:per|a|each)?\s*page/i);
+  if(creativeMatch){
+    const valid=[1,2,3];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-creativeMatch)<Math.abs(a-creativeMatch)?b:a);
+    if(String(snapped)!==String(s.creativePerPage)){
+      s.creativePerPage=String(snapped);
+      const el=document.getElementById('ls-creativePerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Creative items per page → ${snapped}`);
+    }
+  }
+
+  /* ── 6. Page orientation ── */
+  if(/\blandscape\b/i.test(text)&&s.orientation!=='landscape'){
+    s.orientation='landscape';
+    const el=document.getElementById('ls-orientation');if(el)el.value='landscape';
+    changes.push('✅ Orientation → Landscape');
+  } else if(/\bportrait\b/i.test(text)&&s.orientation!=='portrait'){
+    s.orientation='portrait';
+    const el=document.getElementById('ls-orientation');if(el)el.value='portrait';
+    changes.push('✅ Orientation → Portrait');
+  }
+
+  /* ── 7. Page size ── */
+  if(/\bA5\b/i.test(text)&&s.pageSize!=='a5'){
+    s.pageSize='a5';const el=document.getElementById('ls-pageSize');if(el)el.value='a5';
+    changes.push('✅ Page size → A5');
+  } else if(/\bA4\b/i.test(text)&&s.pageSize!=='a4'){
+    s.pageSize='a4';const el=document.getElementById('ls-pageSize');if(el)el.value='a4';
+    changes.push('✅ Page size → A4');
+  } else if(/\b(?:letter|US letter)\b/i.test(text)&&s.pageSize!=='letter'){
+    s.pageSize='letter';const el=document.getElementById('ls-pageSize');if(el)el.value='letter';
+    changes.push('✅ Page size → Letter');
+  }
+
+  /* ── 8. Show/hide page numbers ── */
+  if(/\bpage numbers?\b.*\b(?:hide|remove|off|no)\b|\b(?:hide|remove|turn off|disable)\b.*page numbers?/i.test(text)&&s.pageNums!=='no'){
+    s.pageNums='no';const el=document.getElementById('ls-pageNums');if(el)el.value='no';
+    changes.push('✅ Page numbers → Hidden');
+  } else if(/\b(?:show|add|enable|include)\b.*page numbers?|page numbers?.*\b(?:show|on|yes)\b/i.test(text)&&s.pageNums==='no'){
+    s.pageNums='yes';const el=document.getElementById('ls-pageNums');if(el)el.value='yes';
+    changes.push('✅ Page numbers → Visible');
+  }
+
+  /* ── 9. Auto-trim long text ── */
+  if(/\b(?:full text|no trim|don.t trim|show full|don.t cut|complete text)\b/i.test(text)&&s.autoTrim!=='no'){
+    s.autoTrim='no';const el=document.getElementById('ls-autoTrim');if(el)el.value='no';
+    changes.push('✅ Auto-trim → Off (full text shown)');
+  }
+
+  /* ── Save & regenerate ── */
+  if(!changes.length){
+    if(logEl){
+      logEl.innerHTML='ℹ️ <strong>No specific settings detected</strong> in the AI response.<br>The AI gave general advice. Try asking something more specific like:<br>"How many teachers per page for 30 teachers?" or "Should I use landscape for the gallery?"';
+      logEl.style.display='block';
+    }
+    return;
+  }
+
+  saveLsSettingsToStorage(s);
+  lsSettings=s;
+
+  if(logEl){
+    logEl.innerHTML=`<strong>⚡ Applied ${changes.length} change${changes.length>1?'s':''}:</strong><br><br>${changes.join('<br>')}<br><br>🔄 Regenerating preview…`;
+    logEl.style.display='block';
+  }
+
+  /* Regenerate preview after short delay so user can read the log */
+  setTimeout(()=>{
+    generateMagPreview();
+    if(logEl){
+      logEl.innerHTML=logEl.innerHTML.replace('🔄 Regenerating preview…','✅ Preview updated! Scroll up to see your magazine.');
+    }
+  },600);
 }
 function renderAIContentSummary(){const el=document.getElementById('aiContentSummary');if(!el)return;subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');el.textContent=CATEGORY_KEYS.map(k=>`${CATEGORIES[k].label}: ${approved.filter(x=>x.category===k).length} approved`).join('\n')+`\n\nTotal approved: ${approved.length} | Total submitted: ${subs.length}`;}
 
