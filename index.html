@@ -284,9 +284,10 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .modal-box .field-form .options-hint{font-size:11px;color:var(--ink3);}
 
 /* LAYOUT STUDIO */
-.ls-tabs{background:#f8f8f4;border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;gap:4px;overflow-x:auto;}
-.ls-tab{background:none;border:none;padding:.85rem 1.1rem;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink3);font-family:'Lato',sans-serif;border-bottom:2.5px solid transparent;transition:all .15s;white-space:nowrap;}
-.ls-tab.active{color:var(--school-navy);border-bottom-color:var(--school-mint3);}
+.ls-tabs{background:#f8f8f4;border-bottom:1px solid var(--border);padding:8px 1rem;display:flex;gap:6px;flex-wrap:wrap;}
+.ls-tab{background:#fff;border:1.5px solid var(--border);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink3);font-family:'Lato',sans-serif;transition:all .2s;white-space:nowrap;}
+.ls-tab:hover{border-color:var(--school-mint3);color:var(--school-navy);}
+.ls-tab.active{background:var(--school-navy);color:#fff;border-color:var(--school-navy);}
 .ls-body{padding:1.5rem;max-width:1200px;margin:0 auto;}
 .section-list{display:flex;flex-direction:column;gap:8px;}
 .section-row{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:grab;transition:box-shadow .2s;}
@@ -320,7 +321,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .page-nav button:hover:not(:disabled){background:#f0f0ea;border-color:var(--school-mint3);}
 .page-nav button:disabled{opacity:.35;cursor:default;}
 .page-nav-info{font-size:13px;color:var(--ink2);font-weight:700;padding:0 8px;}
-.mag-canvas{background:#e8e8e0;padding:2rem 1rem;min-height:600px;display:flex;justify-content:center;align-items:flex-start;}
+.mag-canvas{background:#e8e8e0;padding:1.5rem .5rem;min-height:500px;display:flex;justify-content:center;align-items:flex-start;overflow-x:auto;}
 .mag-page{background:#fff;box-shadow:0 4px 30px rgba(0,0,0,.2);position:relative;overflow:hidden;transition:all .3s;}
 .mag-page-inner{padding:0;height:100%;display:flex;flex-direction:column;}
 .ls-ai-panel{background:linear-gradient(135deg,#f0fdf6,#e6faf0);border:1px solid var(--school-mint2);border-radius:var(--radius);padding:1.25rem;margin-bottom:1.25rem;}
@@ -336,8 +337,19 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
   .admin-body{padding:1.5rem 1rem 4rem;}
   .stat-num{font-size:26px;}
   .form-hero{padding:3.25rem 1rem 2rem;}
-  .mag-canvas{padding:1rem .25rem;}
-  .ls-body{padding:1rem .75rem;}
+  .mag-canvas{padding:.5rem .25rem;}
+  .ls-body{padding:.75rem .5rem;}
+  .ls-setting-card{padding:1rem .75rem;}
+  .ls-settings-grid{grid-template-columns:1fr;}
+  .mag-preview-toolbar{padding:8px .75rem;gap:6px;}
+  .mag-preview-toolbar h3{font-size:12px;}
+}
+
+@media(max-width:700px){
+  .ls-settings-grid{grid-template-columns:1fr !important;}
+  .ls-setting-card{padding:1rem .85rem;}
+  .mag-preview-toolbar h3{font-size:12px;width:100%;}
+  .mag-preview-toolbar{gap:6px;flex-wrap:wrap;}
 }
 </style>
 </head>
@@ -467,16 +479,16 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-mint" onclick="generateMagPreview()">▶ Generate Preview</button>
-          <button class="btn btn-ai" onclick="runLayoutAI()">✦ AI Layout Assist</button>
+          <button class="btn btn-ai" onclick="lsTab('aiassist')">✦ AI Assistant</button>
           <button class="btn btn-gold" onclick="openPrintView()">🖨 Open Print View</button>
         </div>
       </div>
       <div class="ls-tabs">
-        <button class="ls-tab active" onclick="lsTab('preview')" id="lstab-preview">📖 Magazine Preview</button>
-        <button class="ls-tab" onclick="lsTab('sections')" id="lstab-sections">📋 Section Manager</button>
-        <button class="ls-tab" onclick="lsTab('design')" id="lstab-design">🎨 Design Settings</button>
-        <button class="ls-tab" onclick="lsTab('toc')" id="lstab-toc">📑 Table of Contents</button>
-        <button class="ls-tab" onclick="lsTab('aiassist')" id="lstab-aiassist">✦ AI Assistant</button>
+        <button class="ls-tab active" onclick="lsTab('preview')" id="lstab-preview">📖 Preview</button>
+        <button class="ls-tab" onclick="lsTab('sections')" id="lstab-sections">📋 Sections</button>
+        <button class="ls-tab" onclick="lsTab('design')" id="lstab-design">🎨 Design</button>
+        <button class="ls-tab" onclick="lsTab('toc')" id="lstab-toc">📑 Contents</button>
+        <button class="ls-tab" onclick="lsTab('aiassist')" id="lstab-aiassist">✦ AI Chat</button>
       </div>
       <div class="ls-body">
         <!-- Preview -->
@@ -677,7 +689,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
             <h4>✦ Layout AI Assistant</h4>
             <p style="font-size:12.5px;color:var(--school-navy);margin-bottom:12px;">The AI assists with design decisions and layout suggestions. It <strong>never edits your content text</strong> — only helps with arrangement and design.</p>
             <label style="font-size:12px;font-weight:700;color:var(--ink2);display:block;margin-bottom:6px;">Ask the AI about your magazine layout:</label>
-            <textarea id="aiAssistQuery" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Lato',sans-serif;min-height:80px;resize:vertical;margin-bottom:8px;" placeholder="e.g. We have 30 teachers — how should I structure the teacher pages?&#10;e.g. How should I design the cover page for maximum impact?&#10;e.g. The gallery section feels crowded — any design suggestions?"></textarea>
+            <textarea id="aiAssistQuery" style="width:100%;padding:12px;border:2px solid var(--school-mint3);border-radius:10px;font-size:14px;font-family:'Lato',sans-serif;min-height:100px;resize:vertical;margin-bottom:10px;background:#fff;display:block;" placeholder="Type your layout question here...&#10;&#10;Examples:&#10;• We have 30 teachers — best layout?&#10;• How should I design the cover page?&#10;• Gallery section feels crowded — suggestions?"></textarea>
             <button class="btn btn-ai" onclick="runLayoutAI()">✦ Ask AI</button>
             <div class="ls-ai-result" id="aiAssistResult"></div>
           </div>
@@ -1251,7 +1263,7 @@ function renderCurrentPage(){
   const canvas=document.getElementById('magCanvas');
   if(!magPages.length){canvas.innerHTML=`<div style="text-align:center;color:var(--ink3);padding:4rem 1rem;"><div style="font-size:48px;margin-bottom:1rem;">🗞</div><h3 style="font-family:'Lato',sans-serif;color:var(--ink2);">No approved content yet</h3><p style="font-size:14px;">Approve submissions and click Generate Preview again.</p></div>`;return;}
   const page=magPages[currentPageIdx];const{w,h}=getPageDimensions();
-  const scale=Math.min(1,(window.innerWidth-40)/w);
+  const scale=Math.min(1,(window.innerWidth-20)/w);
   const s=lsSettings;
   const c1=s.color1||'#1a2744',c2=s.color2||'#7dd4a8',c3=s.color3||'#8b1a1a';
   const hFont=s.headingFont||"'Playfair Display',serif",bFont=s.bodyFont||"'Crimson Text',serif",bSize=s.fontSize||'11px';
@@ -1270,12 +1282,183 @@ function renderCurrentPage(){
   } else if(page.type==='section-content'){
     const sec=page.sec;const items=page.items;const layout=sec.layout;const secLabel=getLabel('section_'+sec.key,sec.label);
     let contentHtml='';
-    if(layout==='teacher-grid'){contentHtml=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${items.map(sub=>{const n=sub.data.name?.value||'Teacher';const t=sub.data.title?.value||'';const ini=n.trim().split(/\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();const ph=sub.photoData?`<img src="${sub.photoData}" style="width:54px;height:60px;object-fit:cover;border-radius:6px;display:block;margin:0 auto 5px;border:2px solid ${c2}33;"/>`:`<div style="width:54px;height:60px;border-radius:6px;background:${c1};display:flex;align-items:center;justify-content:center;margin:0 auto 5px;color:#fff;font-size:18px;font-weight:700;">${ini}</div>`;return`<div style="text-align:center;padding:6px 4px;">${ph}<div style="font-size:9px;font-weight:700;color:${c1};">${esc(n.split(' ').slice(0,2).join(' '))}</div><div style="font-size:8px;color:#888;">${esc(t.substring(0,25))}</div></div>`;}).join('')}</div>`;}
-    else if(layout==='grid'){const cols=items.length===1?1:2;contentHtml=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;">${items.map(sub=>{const n=sub.data.name?.value||'Student';const nick=sub.data.nickname?.value||'';const amb=sub.data.ambition?.value||'';const msg=sub.data.message?.value||'';const ini=n.trim().split(/\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();const ph=sub.photoData?`<img src="${sub.photoData}" style="width:60px;height:70px;object-fit:cover;border-radius:6px;border:2px solid ${c2}44;"/>`:`<div style="width:60px;height:70px;border-radius:6px;background:${c1};display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:700;">${ini}</div>`;return`<div style="display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px;background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};">${ph}<div><div style="font-size:12px;font-weight:700;color:${c1};font-family:${hFont};">${esc(n)}</div>${nick?`<div style="font-size:10px;color:#888;">"${esc(nick)}"</div>`:''} ${amb?`<div style="font-size:9px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:3px;">Ambition: ${esc(amb.substring(0,28))}</div>`:''}<div style="font-size:${bSize};color:${textColor};font-family:${bFont};line-height:1.5;">${esc(msg.substring(0,140))}${msg.length>140?'…':''}</div></div></div>`;}).join('')}</div>`;}
-    else if(layout==='gallery'){contentHtml=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">${items.map(sub=>{const cap=sub.data.photoCaption?.value||sub.data.photoCategory?.value||'';if(sub.photoData)return`<div><img src="${sub.photoData}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;border:2px solid ${c2}33;"/><div style="font-size:9px;color:#888;text-align:center;margin-top:3px;font-style:italic;">${esc(cap.substring(0,50))}</div></div>`;if(sub.photos&&sub.photos.length)return sub.photos.slice(0,2).map(p=>`<div><img src="${p.data}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;"/><div style="font-size:9px;color:#888;text-align:center;margin-top:3px;font-style:italic;">${esc(cap.substring(0,40))}</div></div>`).join('');return'';}).join('')}</div>`;}
-    else if(layout==='double'){contentHtml=`<div style="display:grid;grid-template-columns:${items.length>1?'1fr 1fr':'1fr'};gap:12px;">${items.map(sub=>{const type=sub.data.contribType?.value||sub.data.articleTitle?.value||'';const title=sub.data.contribTitle?.value||sub.data.articleTitle?.value||'';const author=sub.data.contribName?.value||sub.data.authorName?.value||'';const body=sub.data.contribBody?.value||sub.data.articleBody?.value||'';return`<div style="padding:12px;background:linear-gradient(135deg,#faf8ff,#f4f0fd);border-radius:8px;border:1px solid #e0d5f5;"><div style="font-size:8px;letter-spacing:2px;text-transform:uppercase;color:#5b3a8a;font-weight:700;margin-bottom:3px;">${esc(type)}</div><div style="font-family:${hFont};font-size:13px;color:${c1};margin-bottom:3px;">${esc(title)}</div><div style="font-size:9px;color:#888;margin-bottom:8px;">by ${esc(author)}</div><div style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;">${esc(body.substring(0,350))}${body.length>350?'\n…':''}</div></div>`;}).join('')}</div>`;}
-    else if(layout==='events'){contentHtml=items.map(sub=>{const n=sub.data.eventName?.value||'Event';const sum=sub.data.eventSummary?.value||'';const rep=sub.data.eventReport?.value||'';const imgs=sub.photos&&sub.photos.length?sub.photos:sub.photoData?[{data:sub.photoData}]:[];return`<div style="margin-bottom:12px;"><h3 style="font-family:${hFont};font-size:14px;color:${c1};margin-bottom:3px;">${esc(n)}</h3>${sum?`<div style="font-size:10px;font-weight:700;color:${c2};margin-bottom:6px;text-transform:uppercase;">${esc(sum)}</div>`:''} ${imgs.length?`<div style="display:flex;gap:6px;margin-bottom:8px;">${imgs.slice(0,3).map(p=>`<img src="${p.data}" style="flex:1;aspect-ratio:16/9;object-fit:cover;border-radius:6px;max-height:80px;border:1px solid ${c2}33;"/>`).join('')}</div>`:''}<p style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.6;">${esc(rep.substring(0,350))}${rep.length>350?'…':''}</p></div>`;}).join('');}
-    else{contentHtml=items.map(sub=>{const spkName=sub.data.speakerName?.value||sub.data.authorName?.value||sub.data.intervieweeName?.value||sub.data.name?.value||'';const spkTitle=sub.data.speakerTitle?.value||sub.data.authorRole?.value||sub.data.intervieweeTitle?.value||sub.data.title?.value||sub.data.speechType?.value||'';const mainText=sub.data.speechBody?.value||sub.data.articleBody?.value||sub.data.qaBody?.value||sub.data.message?.value||'';const pq=sub.data.pullQuote?.value||'';return`<div style="margin-bottom:16px;">${spkName?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #e8e8e0;">${sub.photoData?`<img src="${sub.photoData}" style="width:50px;height:55px;object-fit:cover;border-radius:6px;border:2px solid ${c2}44;flex-shrink:0;"/>`:''}<div><div style="font-size:13px;font-weight:700;color:${c1};font-family:${hFont};">${esc(spkName)}</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:${c2};font-weight:700;">${esc(spkTitle)}</div></div></div>`:''} ${pq?`<div style="border-left:4px solid ${c2};padding:8px 12px;margin:8px 0;background:${c2}22;border-radius:0 8px 8px 0;"><p style="font-family:${hFont};font-size:12px;color:${c1};font-style:italic;">${esc(pq)}</p></div>`:''}<p style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;">${esc(mainText.substring(0,800))}${mainText.length>800?'\n\n…(continued)':''}</p></div>`;}).join('');}
+
+    /* ── UNIVERSAL FIELD RENDERER ──────────────────────────────────────────────
+       Renders ALL data fields from sub.data dynamically.
+       No hardcoding — whatever was submitted and approved comes through.
+       Fields are rendered in submission order. Long text gets pre-line wrap.
+    ─────────────────────────────────────────────────────────────────────────── */
+    function renderAllFields(sub, opts){
+      opts = opts || {};
+      const maxChars = opts.maxChars || 99999;
+      const skipFirst = opts.skipFirst || false; // skip name field (shown in header)
+      const entries = Object.entries(sub.data || {});
+      if(skipFirst && entries.length > 0) entries.shift();
+      return entries.map(([k, fc]) => {
+        if(!fc || !fc.value) return '';
+        const val = String(fc.value);
+        const isLong = val.length > 60;
+        const display = val.length > maxChars ? val.substring(0, maxChars) + '…' : val;
+        if(isLong){
+          return `<div style="margin-bottom:5px;">
+            <div style="font-size:8px;text-transform:uppercase;letter-spacing:.4px;color:#999;font-weight:700;margin-bottom:1px;">${esc(fc.label)}</div>
+            <div style="font-size:9px;color:${opts.textColor||'#333'};line-height:1.6;white-space:pre-line;font-family:${opts.bFont||'serif'};">${esc(display)}</div>
+          </div>`;
+        } else {
+          return `<div style="margin-bottom:3px;display:flex;gap:4px;flex-wrap:wrap;align-items:baseline;">
+            <span style="font-size:8px;text-transform:uppercase;letter-spacing:.4px;color:#999;font-weight:700;flex-shrink:0;">${esc(fc.label)}:</span>
+            <span style="font-size:9px;color:${opts.textColor||'#333'};">${esc(display)}</span>
+          </div>`;
+        }
+      }).join('');
+    }
+
+    /* ── NAME / HEADLINE RESOLVER ──────────────────────────────────────────── */
+    function resolveName(sub){
+      return sub.data.name?.value || sub.data.speakerName?.value ||
+             sub.data.contribName?.value || sub.data.reporterName?.value ||
+             sub.data.authorName?.value || sub.data.intervieweeName?.value ||
+             sub.data.submitterName?.value || sub.data.eventName?.value ||
+             sub.data.title?.value || 'Untitled';
+    }
+    function resolveSubtitle(sub){
+      return sub.data.title?.value || sub.data.speakerTitle?.value ||
+             sub.data.authorRole?.value || sub.data.intervieweeTitle?.value ||
+             sub.data.contribRole?.value || sub.data.subject?.value ||
+             sub.data.speechType?.value || sub.data.eventType?.value ||
+             sub.data.subjectArea?.value || sub.data.photoCategory?.value || '';
+    }
+    function resolveMainText(sub){
+      return sub.data.speechBody?.value || sub.data.articleBody?.value ||
+             sub.data.contribBody?.value || sub.data.qaBody?.value ||
+             sub.data.eventReport?.value || sub.data.message?.value ||
+             sub.data.introParagraph?.value || '';
+    }
+    function resolvePhotoBlock(sub, w, h, radius, border){
+      const ini = resolveName(sub).trim().split(/\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      if(sub.photoData){
+        return `<img src="${sub.photoData}" style="width:${w};height:${h};object-fit:cover;object-position:top center;border-radius:${radius};flex-shrink:0;border:${border};display:block;"/>`;
+      }
+      return `<div style="width:${w};height:${h};border-radius:${radius};background:${c1};display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0;">${ini}</div>`;
+    }
+
+    /* ── TEACHER GRID ─────────────────────────────────────────────────────── */
+    if(layout==='teacher-grid'){
+      const cols = 3;
+      contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px 8px;">
+        ${items.map(sub => {
+          const name = resolveName(sub);
+          const shortName = name.split(' ').slice(0,3).join(' ');
+          const ph = resolvePhotoBlock(sub,'54px','62px','6px',`2px solid ${c2}66`);
+          const allFields = renderAllFields(sub, {skipFirst:true, maxChars:60, textColor, bFont});
+          return `<div style="background:#fafaf8;border-radius:7px;padding:8px 5px 6px;border-top:3px solid ${c2};text-align:center;">
+            <div style="margin:0 auto 5px;width:54px;">${ph}</div>
+            <div style="font-size:8.5px;font-weight:700;color:${c1};line-height:1.3;margin-bottom:4px;">${esc(shortName)}</div>
+            <div style="text-align:left;padding:0 2px;">${allFields}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+
+    /* ── STUDENT GRID (primary5 / jss3 / ss3) ─────────────────────────────── */
+    else if(layout==='grid'){
+      const cols = items.length === 1 ? 1 : 2;
+      contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;">
+        ${items.map(sub => {
+          const name = resolveName(sub);
+          const ph = resolvePhotoBlock(sub,'62px','74px','6px',`2px solid ${c2}55`);
+          const allFields = renderAllFields(sub, {skipFirst:true, maxChars:120, textColor, bFont});
+          return `<div style="display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px;background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};">
+            ${ph}
+            <div>
+              <div style="font-size:12px;font-weight:700;color:${c1};font-family:${hFont};margin-bottom:5px;">${esc(name)}</div>
+              ${allFields}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+
+    /* ── GALLERY ──────────────────────────────────────────────────────────── */
+    else if(layout==='gallery'){
+      contentHtml = `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+        ${items.map(sub => {
+          // Get all field text for caption area
+          const allFields = renderAllFields(sub, {maxChars:80, textColor:'#666', bFont});
+          if(sub.photoData){
+            return `<div>
+              <img src="${sub.photoData}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;border:1px solid ${c2}33;"/>
+              <div style="padding:4px 2px;font-size:8px;">${allFields}</div>
+            </div>`;
+          }
+          if(sub.photos && sub.photos.length){
+            return sub.photos.slice(0,2).map((p,pi) => `<div>
+              <img src="${p.data}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;border:1px solid ${c2}33;"/>
+              ${pi===0?`<div style="padding:4px 2px;font-size:8px;">${allFields}</div>`:''}
+            </div>`).join('');
+          }
+          return '';
+        }).join('')}
+      </div>`;
+    }
+
+    /* ── DOUBLE / CREATIVE ────────────────────────────────────────────────── */
+    else if(layout==='double'){
+      const cols = items.length > 1 ? '1fr 1fr' : '1fr';
+      contentHtml = `<div style="display:grid;grid-template-columns:${cols};gap:12px;">
+        ${items.map(sub => {
+          const name = resolveName(sub);
+          const subtitle = resolveSubtitle(sub);
+          const allFields = renderAllFields(sub, {skipFirst:true, maxChars:400, textColor, bFont});
+          return `<div style="padding:12px;background:linear-gradient(135deg,#faf8ff,#f4f0fd);border-radius:8px;border:1px solid #e0d5f5;">
+            <div style="font-size:8px;letter-spacing:2px;text-transform:uppercase;color:#5b3a8a;font-weight:700;margin-bottom:3px;">${esc(subtitle)}</div>
+            <div style="font-family:${hFont};font-size:13px;color:${c1};font-weight:700;margin-bottom:6px;">${esc(name)}</div>
+            ${allFields}
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+
+    /* ── EVENTS ───────────────────────────────────────────────────────────── */
+    else if(layout==='events'){
+      contentHtml = items.map(sub => {
+        const name = resolveName(sub);
+        const allFields = renderAllFields(sub, {skipFirst:true, maxChars:400, textColor, bFont});
+        const imgs = sub.photos && sub.photos.length ? sub.photos : sub.photoData ? [{data:sub.photoData}] : [];
+        return `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eee;">
+          <h3 style="font-family:${hFont};font-size:13px;color:${c1};margin-bottom:6px;">${esc(name)}</h3>
+          ${imgs.length ? `<div style="display:flex;gap:5px;margin-bottom:7px;">${imgs.slice(0,3).map(p=>`<img src="${p.data}" style="flex:1;aspect-ratio:16/9;object-fit:cover;border-radius:5px;max-height:75px;"/>`).join('')}</div>` : ''}
+          ${allFields}
+        </div>`;
+      }).join('');
+    }
+
+    /* ── SINGLE / SPEECHES / INTERVIEWS / MOTIVATIONAL / ACADEMIC / DEFAULT ─ */
+    else {
+      contentHtml = items.map(sub => {
+        const name = resolveName(sub);
+        const subtitle = resolveSubtitle(sub);
+        const mainText = resolveMainText(sub);
+        const pullQuote = sub.data.pullQuote?.value || '';
+        const allFields = renderAllFields(sub, {skipFirst:true, maxChars:99999, textColor, bFont});
+        const ph = sub.photoData ? resolvePhotoBlock(sub,'52px','58px','6px',`2px solid ${c2}44`) : '';
+        return `<div style="margin-bottom:16px;">
+          ${name ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #e8e8e0;">
+            ${ph}
+            <div>
+              <div style="font-size:13px;font-weight:700;color:${c1};font-family:${hFont};">${esc(name)}</div>
+              ${subtitle ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:${c2};font-weight:700;">${esc(subtitle)}</div>` : ''}
+            </div>
+          </div>` : ''}
+          ${pullQuote ? `<div style="border-left:4px solid ${c2};padding:8px 12px;margin:8px 0;background:${c2}22;border-radius:0 8px 8px 0;">
+            <p style="font-family:${hFont};font-size:12px;color:${c1};font-style:italic;">${esc(pullQuote)}</p>
+          </div>` : ''}
+          ${mainText ? `<p style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;margin-bottom:10px;">${esc(mainText)}</p>` : ''}
+          ${allFields}
+        </div>`;
+      }).join('');
+    }
+
     inner=`<div style="background:${pageBg};height:100%;display:flex;flex-direction:column;">${page.isFirst?`<div style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.25rem 2rem;min-height:90px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:5px;">Section</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(secLabel)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div>`:`<div style="background:${c1};padding:6px 2rem;"><span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:${c2};font-weight:700;">${esc(secLabel)} (continued)</span></div>`}<div style="padding:1rem 1.5rem;flex:1;overflow:hidden;">${contentHtml}</div>${s.pageNums!=='no'?foot:''}</div>`;
   }
   canvas.innerHTML=`<div class="mag-page" style="width:${w}px;height:${h}px;transform:scale(${scale});transform-origin:top center;"><div class="mag-page-inner">${inner}</div></div>`;
