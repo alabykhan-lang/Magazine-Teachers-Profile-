@@ -6,6 +6,7 @@
 <title>MagicEditor — Way To Success Standard Schools</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --ink:#1c1c1e;--ink2:#48484a;--ink3:#8e8e93;--ink4:#c7c7cc;
@@ -99,6 +100,46 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .photo-err-msg{font-size:12px;color:var(--red);margin-top:8px;display:none;}
 .photo-reqs{background:linear-gradient(135deg,#f0fdf6,#e6faf0);border:1px solid var(--school-mint2);border-radius:9px;padding:14px 16px;margin-top:14px;}
 .photo-reqs p{font-size:12.5px;color:#1a5a35;line-height:1.9;}
+
+/* OCR PANEL */
+.ocr-panel{background:linear-gradient(135deg,#1a2744,#243460);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px;}
+.ocr-panel-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--school-mint);font-weight:700;margin-bottom:10px;}
+.ocr-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.ocr-btn{padding:9px 16px;border:none;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;display:flex;align-items:center;gap:6px;transition:opacity .2s;}
+.ocr-btn-cam{background:var(--school-mint3);color:#fff;}
+.ocr-btn-file{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);}
+.ocr-btn:hover{opacity:.85;}
+.ocr-status{font-size:12px;color:rgba(255,255,255,.7);min-height:18px;font-style:italic;}
+.ocr-status.running{color:var(--school-mint);}
+.ocr-status.done{color:#7dd4a8;}
+.ocr-status.err{color:#f7a0a0;}
+.ocr-preview-img{width:100%;max-height:180px;object-fit:contain;border-radius:8px;margin-top:10px;border:2px solid rgba(125,212,168,.3);display:none;}
+
+/* GALLERY TABS */
+.gallery-tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:1.25rem;}
+.gallery-tab{padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink3);border-bottom:3px solid transparent;margin-bottom:-2px;font-family:'Lato',sans-serif;background:none;border-top:none;border-left:none;border-right:none;transition:all .15s;}
+.gallery-tab.active{color:var(--school-navy);border-bottom-color:var(--school-mint3);}
+.gallery-tab-pane{display:none;}
+.gallery-tab-pane.active{display:block;}
+.bulk-drop-zone{border:3px dashed var(--school-mint3);border-radius:var(--radius);padding:2.5rem 1rem;text-align:center;cursor:pointer;background:rgba(125,212,168,.03);transition:all .2s;}
+.bulk-drop-zone:hover{background:rgba(125,212,168,.08);border-color:var(--school-mint);}
+.bulk-drop-zone h3{font-size:16px;color:var(--ink);margin-bottom:6px;font-family:'Lato',sans-serif;}
+.bulk-drop-zone p{font-size:13px;color:var(--ink3);}
+.bulk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-top:16px;}
+.bulk-thumb{background:#fff;border:1px solid var(--border);border-radius:9px;overflow:hidden;position:relative;}
+.bulk-thumb img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;}
+.bulk-thumb-cap{padding:6px 8px;}
+.bulk-thumb-cap input{width:100%;font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-family:'Lato',sans-serif;color:var(--ink);}
+.bulk-thumb-rm{position:absolute;top:4px;right:4px;background:rgba(176,40,42,.9);color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;}
+
+/* SYNC STATUS */
+.sync-bar{position:fixed;bottom:0;left:0;right:0;background:var(--school-navy);color:#fff;font-size:12px;padding:7px 16px;display:flex;align-items:center;gap:8px;z-index:500;transform:translateY(100%);transition:transform .3s;font-family:'Lato',sans-serif;}
+.sync-bar.visible{transform:translateY(0);}
+.sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.sync-dot.ok{background:var(--school-mint3);}
+.sync-dot.syncing{background:var(--gold);animation:pulse .8s infinite;}
+.sync-dot.err{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 .multi-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:14px;}
 .multi-photo-thumb{position:relative;width:100%;aspect-ratio:1/1;border-radius:9px;overflow:hidden;border:2px solid var(--green);background:#f0f0ea;}
 .multi-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
@@ -988,23 +1029,402 @@ const CATEGORIES={
 const CATEGORY_KEYS=Object.keys(CATEGORIES);
 const EDITORIAL_META={'editorial-note':{label:'Editorial Note',tag:'Editorial Note'},'appreciation':{label:'Appreciation Section',tag:'Appreciation'}};
 
+/* ═══════════════════════════════════════════════════════════
+   SUPABASE DATABASE LAYER
+   Primary store: Supabase (cloud, multi-device)
+   Fallback: localStorage (offline resilience)
+═══════════════════════════════════════════════════════════ */
+const SUPA_URL='https://wdirtvusotsvorocwspk.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkaXJ0dnVzb3Rzdm9yb2N3c3BrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MjE4NDksImV4cCI6MjA5MjI5Nzg0OX0.0XjJu7yAABv9mHf5bqW19MRJmUX38lzYq_-UYT_9lNQ';
+let _supa=null;
+function getSupa(){
+  if(_supa)return _supa;
+  try{_supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);return _supa;}
+  catch(e){console.warn('[DB] Supabase init failed:',e.message);return null;}
+}
+
+/* Sync status bar */
+function showSync(state,msg){
+  let bar=document.getElementById('syncBar');
+  if(!bar){bar=document.createElement('div');bar.id='syncBar';bar.className='sync-bar';bar.innerHTML='<div class="sync-dot" id="syncDot"></div><span id="syncMsg"></span>';document.body.appendChild(bar);}
+  bar.classList.add('visible');
+  document.getElementById('syncDot').className='sync-dot '+state;
+  document.getElementById('syncMsg').textContent=msg;
+  if(state==='ok')setTimeout(()=>bar.classList.remove('visible'),2500);
+}
+
+/* ── Submissions (cloud + local mirror) ── */
+async function dbLoadAll(){
+  try{
+    const sb=getSupa();if(!sb)throw new Error('no client');
+    const{data,error}=await sb.from('submissions').select('*').order('created_at',{ascending:true});
+    if(error)throw error;
+    /* Normalise: Supabase row → internal format */
+    const mapped=data.map(r=>({
+      id:r.id,category:r.category,ts:r.ts||new Date(r.created_at).toLocaleString(),
+      createdAt:r.created_at?new Date(r.created_at).getTime():r.created_at_ms||Date.now(),
+      status:r.status||'draft',reviewerNote:r.reviewer_note||'',reviewedAt:r.reviewed_at||null,
+      data:typeof r.data==='string'?JSON.parse(r.data):r.data||{},
+      photoData:r.photo_data||null,photoName:r.photo_name||null,
+      photos:r.photos?( typeof r.photos==='string'?JSON.parse(r.photos):r.photos ):null
+    }));
+    /* Mirror to localStorage as cache */
+    localStorage.setItem('me_subs',JSON.stringify(mapped));
+    return mapped;
+  }catch(e){
+    console.warn('[DB] Cloud load failed, using local cache:',e.message);
+    showSync('err','Offline — using local data');
+    return JSON.parse(localStorage.getItem('me_subs')||'[]');
+  }
+}
+async function dbSaveSubmission(sub){
+  /* Always write to localStorage immediately */
+  const local=JSON.parse(localStorage.getItem('me_subs')||'[]');
+  const idx=local.findIndex(s=>s.id===sub.id);
+  if(idx>=0)local[idx]=sub;else local.push(sub);
+  localStorage.setItem('me_subs',JSON.stringify(local));
+  /* Cloud sync */
+  showSync('syncing','Saving to cloud…');
+  try{
+    const sb=getSupa();if(!sb)throw new Error('no client');
+    const row={
+      id:sub.id,category:sub.category,ts:sub.ts,
+      created_at:new Date(sub.createdAt||Date.now()).toISOString(),
+      status:sub.status,reviewer_note:sub.reviewerNote||'',
+      reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
+      data:JSON.stringify(sub.data),
+      photo_data:sub.photoData||null,photo_name:sub.photoName||null,
+      photos:sub.photos?JSON.stringify(sub.photos):null
+    };
+    const{error}=await sb.from('submissions').upsert(row,{onConflict:'id'});
+    if(error)throw error;
+    showSync('ok','✓ Saved to cloud');
+  }catch(e){
+    console.warn('[DB] Cloud save failed:',e.message);
+    showSync('err','Saved locally — cloud sync pending');
+  }
+}
+async function dbDeleteSubmission(id){
+  const local=JSON.parse(localStorage.getItem('me_subs')||'[]').filter(s=>s.id!==id);
+  localStorage.setItem('me_subs',JSON.stringify(local));
+  showSync('syncing','Deleting…');
+  try{
+    const sb=getSupa();if(!sb)throw new Error('no client');
+    const{error}=await sb.from('submissions').delete().eq('id',id);
+    if(error)throw error;
+    showSync('ok','✓ Deleted');
+  }catch(e){showSync('err','Deleted locally — cloud sync pending');}
+}
+async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
+  const local=JSON.parse(localStorage.getItem('me_subs')||'[]');
+  const s=local.find(x=>x.id===id);
+  if(s){s.status=status;s.reviewerNote=reviewerNote||'';s.reviewedAt=reviewedAt||null;}
+  localStorage.setItem('me_subs',JSON.stringify(local));
+  showSync('syncing','Updating…');
+  try{
+    const sb=getSupa();if(!sb)throw new Error('no client');
+    const{error}=await sb.from('submissions').update({
+      status,reviewer_note:reviewerNote||'',
+      reviewed_at:reviewedAt?new Date(reviewedAt).toISOString():null
+    }).eq('id',id);
+    if(error)throw error;
+    showSync('ok','✓ Updated');
+  }catch(e){showSync('err','Updated locally — cloud sync pending');}
+}
+
+/* ── Settings (cloud kv store) ── */
+async function dbLoadSettings(key){
+  try{
+    const sb=getSupa();if(!sb)throw new Error('no client');
+    const{data,error}=await sb.from('settings').select('value').eq('key',key).single();
+    if(error&&error.code!=='PGRST116')throw error;
+    if(data?.value){
+      const parsed=typeof data.value==='string'?JSON.parse(data.value):data.value;
+      localStorage.setItem('me_'+key,JSON.stringify(parsed));
+      return parsed;
+    }
+  }catch(e){console.warn('[DB] Settings load:',key,e.message);}
+  try{return JSON.parse(localStorage.getItem('me_'+key)||'null');}catch(e){return null;}
+}
+async function dbSaveSettings(key,value){
+  localStorage.setItem('me_'+key,JSON.stringify(value));
+  try{
+    const sb=getSupa();if(!sb)throw new Error('no client');
+    await sb.from('settings').upsert({key,value:JSON.stringify(value)},{onConflict:'key'});
+  }catch(e){console.warn('[DB] Settings save:',key,e.message);}
+}
+
+/* ── Patched legacy sync functions ── */
+function loadAll(){return JSON.parse(localStorage.getItem('me_subs')||'[]');}
+function saveAll(list){
+  localStorage.setItem('me_subs',JSON.stringify(list));
+  /* Fire-and-forget batch upsert */
+  list.forEach(sub=>{
+    const sb=getSupa();if(!sb)return;
+    const row={id:sub.id,category:sub.category,ts:sub.ts,
+      created_at:new Date(sub.createdAt||Date.now()).toISOString(),
+      status:sub.status,reviewer_note:sub.reviewerNote||'',
+      reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
+      data:JSON.stringify(sub.data),photo_data:sub.photoData||null,photo_name:sub.photoName||null,
+      photos:sub.photos?JSON.stringify(sub.photos):null};
+    sb.from('submissions').upsert(row,{onConflict:'id'}).then(({error})=>{if(error)console.warn('[DB] upsert:',error.message);});
+  });
+}
+
 /* CONFIG */
 function loadCfg(){let c={};try{c=JSON.parse(localStorage.getItem('me_cfg')||'{}')||{};}catch(e){c={};}const isValid=p=>typeof p==='string'&&/^\d{4}$/.test(p);return{adminPin:isValid(c.adminPin)?c.adminPin:'1234',editorPin:isValid(c.editorPin)?c.editorPin:'5678'};}
-function saveCfg(n){cfg=n;localStorage.setItem('me_cfg',JSON.stringify(n));}
+function saveCfg(n){cfg=n;localStorage.setItem('me_cfg',JSON.stringify(n));dbSaveSettings('cfg',n);}
 let cfg=loadCfg();
 
 /* LAYOUT SETTINGS */
 function loadLsSettings(){try{return JSON.parse(localStorage.getItem('me_ls_settings')||'{}')||{};}catch(e){return{};}}
-function saveLsSettingsToStorage(s){localStorage.setItem('me_ls_settings',JSON.stringify(s));}
+function saveLsSettingsToStorage(s){localStorage.setItem('me_ls_settings',JSON.stringify(s));dbSaveSettings('ls_settings',s);}
 let lsSettings=loadLsSettings();
 
 /* LABELS */
 function loadLabels(){try{return JSON.parse(localStorage.getItem('me_labels')||'{}')||{};}catch(e){return{};}}
-function saveLabels(l){localStorage.setItem('me_labels',JSON.stringify(l));}
+function saveLabels(l){localStorage.setItem('me_labels',JSON.stringify(l));dbSaveSettings('labels',l);}
 let labelOverrides=loadLabels();
 function getLabel(key,fallback){return labelOverrides[key]||fallback;}
 
-/* SECTION ORDER */
+/* ── Async init: pull cloud data on page load ── */
+async function initCloudSync(){
+  showSync('syncing','Connecting to cloud…');
+  try{
+    /* Pull settings first */
+    const [cloudCfg,cloudSettings,cloudLabels,cloudSectionOrder]=await Promise.all([
+      dbLoadSettings('cfg'),
+      dbLoadSettings('ls_settings'),
+      dbLoadSettings('labels'),
+      dbLoadSettings('section_order')
+    ]);
+    if(cloudCfg){cfg={...cfg,...cloudCfg};localStorage.setItem('me_cfg',JSON.stringify(cfg));}
+    if(cloudSettings){lsSettings={...lsSettings,...cloudSettings};localStorage.setItem('me_ls_settings',JSON.stringify(lsSettings));applyLsColors(lsSettings);}
+    if(cloudLabels){labelOverrides={...labelOverrides,...cloudLabels};localStorage.setItem('me_labels',JSON.stringify(labelOverrides));}
+    if(cloudSectionOrder&&Array.isArray(cloudSectionOrder)){localStorage.setItem('me_section_order',JSON.stringify(cloudSectionOrder));sectionOrder=cloudSectionOrder;}
+    /* Pull submissions */
+    subs=await dbLoadAll();
+    showSync('ok','✓ Cloud sync complete');
+    /* Refresh any open admin/editor view */
+    if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
+    if(document.getElementById('viewEditor')?.classList.contains('active'))renderEditor();
+  }catch(e){showSync('err','Running offline — data from local cache');}
+}
+
+/* ═══════════════════════════════════════════════════════════
+   OCR ENGINE — Gemini 2.0 Flash via OpenRouter
+   Targets: academic, interviews, speeches, creative, motivational
+═══════════════════════════════════════════════════════════ */
+const OCR_TARGET_CATS=['academic','interviews','speeches','creative','motivational'];
+const OCR_TARGET_FIELDS={
+  academic:'ff-articleBody',
+  interviews:'ff-qaBody',
+  speeches:'ff-speechBody',
+  creative:'ff-contribBody',
+  motivational:'ff-articleBody'
+};
+
+function buildOCRPanel(catKey){
+  if(!OCR_TARGET_CATS.includes(catKey))return'';
+  return`
+  <div class="f-card">
+    <div class="f-card-title">📷 Snap &amp; Transcribe — OCR</div>
+    <div class="ocr-panel">
+      <div class="ocr-panel-title">✦ Scan Handwritten or Printed Text</div>
+      <p style="font-size:12px;color:rgba(255,255,255,.7);margin-bottom:12px;">Take a photo or upload an image of your document. Gemini AI will read and transcribe the text directly into the form field below.</p>
+      <div class="ocr-btn-row">
+        <button class="ocr-btn ocr-btn-cam" onclick="ocrCapture('${catKey}','camera')">📷 Take Photo</button>
+        <button class="ocr-btn ocr-btn-file" onclick="ocrCapture('${catKey}','file')">📁 Upload Image</button>
+      </div>
+      <input type="file" id="ocrInput-${catKey}" accept="image/*" style="display:none;" onchange="ocrProcess(event,'${catKey}')"/>
+      <input type="file" id="ocrCamInput-${catKey}" accept="image/*" capture="environment" style="display:none;" onchange="ocrProcess(event,'${catKey}')"/>
+      <div class="ocr-status" id="ocrStatus-${catKey}">Ready — point camera at any text</div>
+      <img class="ocr-preview-img" id="ocrPreview-${catKey}" alt="Scanned image"/>
+    </div>
+  </div>`;
+}
+
+function ocrCapture(catKey,mode){
+  const inputId=mode==='camera'?`ocrCamInput-${catKey}`:`ocrInput-${catKey}`;
+  document.getElementById(inputId)?.click();
+}
+
+async function ocrProcess(event,catKey){
+  const file=event.target.files?.[0];if(!file)return;
+  const statusEl=document.getElementById(`ocrStatus-${catKey}`);
+  const previewEl=document.getElementById(`ocrPreview-${catKey}`);
+  const s=loadLsSettings();
+  const apiKey=s.apiKey;
+  if(!apiKey){
+    statusEl.className='ocr-status err';
+    statusEl.textContent='⚠ No API key. Go to Design Settings → AI Configuration.';
+    return;
+  }
+  /* Show preview */
+  const previewURL=URL.createObjectURL(file);
+  previewEl.src=previewURL;previewEl.style.display='block';
+  statusEl.className='ocr-status running';
+  statusEl.textContent='🔍 Reading text with Gemini…';
+  /* Convert to base64 */
+  const base64=await new Promise((res,rej)=>{
+    const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);
+    r.onerror=rej;r.readAsDataURL(file);
+  });
+  const mimeType=file.type||'image/jpeg';
+  try{
+    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+        'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor OCR'},
+      body:JSON.stringify({
+        model:'google/gemini-2.0-flash-001',
+        max_tokens:4000,
+        messages:[{
+          role:'user',
+          content:[
+            {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}},
+            {type:'text',text:'You are a precise OCR engine for a school magazine. Transcribe ALL text from this image EXACTLY as written — preserve every word, punctuation, paragraph break, and line break. Do not summarize, paraphrase, or add anything. If the handwriting is unclear, make your best attempt and mark unclear words with [?]. Output only the transcribed text with no preamble.'}
+          ]
+        }]
+      })
+    });
+    const data=await resp.json();
+    const transcribed=data.choices?.[0]?.message?.content||'';
+    if(!transcribed){statusEl.className='ocr-status err';statusEl.textContent='✗ No text found. Try a clearer image.';return;}
+    /* Inject into target field */
+    const fieldId=OCR_TARGET_FIELDS[catKey];
+    const ta=document.getElementById(fieldId);
+    if(ta){
+      const existing=ta.value.trim();
+      ta.value=existing?(existing+'\n\n'+transcribed):transcribed;
+      ta.dispatchEvent(new Event('input'));
+      ta.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+    statusEl.className='ocr-status done';
+    statusEl.textContent=`✓ Transcribed ${transcribed.length} characters — text added to form.`;
+    URL.revokeObjectURL(previewURL);
+  }catch(e){
+    statusEl.className='ocr-status err';
+    statusEl.textContent='✗ Error: '+e.message;
+  }
+  event.target.value='';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GALLERY BULK UPLOAD
+═══════════════════════════════════════════════════════════ */
+let bulkPhotos=[];/* [{dataURL, file, caption}] */
+
+function buildGalleryTabs(){
+  return`
+  <div class="f-card">
+    <div class="gallery-tabs">
+      <button class="gallery-tab active" id="gtab-single" onclick="switchGalleryTab('single')">📷 Single Upload</button>
+      <button class="gallery-tab" id="gtab-bulk" onclick="switchGalleryTab('bulk')">📦 Bulk Upload</button>
+    </div>
+    <!-- Single upload tab (existing photo flow) -->
+    <div class="gallery-tab-pane active" id="gpane-single">
+      <div class="f-card-title">Photo &amp; Caption</div>
+      <div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)">
+        <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/>
+        <div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>Upload gallery photo <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">High quality · Min 600×600px</span></div>
+        <div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><div class="photo-dims" id="photoDims"></div><button class="photo-change" onclick="resetPhoto(event)">Change photo</button></div>
+      </div>
+      <div class="photo-err-msg" id="photoErrMsg"></div>
+      <div class="photo-reqs"><p><strong>For print quality:</strong> minimum 600×600 pixels, JPG or PNG, up to 5 MB.</p></div>
+    </div>
+    <!-- Bulk upload tab -->
+    <div class="gallery-tab-pane" id="gpane-bulk">
+      <div class="f-card-title">Bulk Photo Upload</div>
+      <div class="bulk-drop-zone" onclick="document.getElementById('bulkPhotoInput').click()">
+        <input type="file" id="bulkPhotoInput" accept=".jpg,.jpeg,.png,.webp" multiple style="display:none;" onchange="handleBulkPhotos(event)"/>
+        <span style="font-size:40px;display:block;margin-bottom:10px;">📦</span>
+        <h3>Select Multiple Photos</h3>
+        <p>Click to choose up to 30 photos at once — add captions for each</p>
+      </div>
+      <div id="bulkGrid" class="bulk-grid"></div>
+      <div id="bulkCount" style="margin-top:10px;font-size:13px;color:var(--ink3);"></div>
+      <div id="bulkErrMsg" class="photo-err-msg"></div>
+      <button class="submit-btn" style="margin-top:1.25rem;" onclick="submitBulkGallery()">📦 Submit All Bulk Photos</button>
+    </div>
+  </div>`;
+}
+
+function switchGalleryTab(tab){
+  ['single','bulk'].forEach(t=>{
+    document.getElementById('gtab-'+t)?.classList.toggle('active',t===tab);
+    document.getElementById('gpane-'+t)?.classList.toggle('active',t===tab);
+  });
+}
+
+function handleBulkPhotos(event){
+  const files=Array.from(event.target.files||[]);
+  const errEl=document.getElementById('bulkErrMsg');errEl.style.display='none';
+  const max=30;
+  const rem=max-bulkPhotos.length;
+  if(rem<=0){errEl.textContent=`Maximum ${max} photos reached.`;errEl.style.display='block';return;}
+  const toAdd=files.slice(0,rem);
+  if(files.length>rem){errEl.textContent=`Adding first ${rem} — limit is ${max} total.`;errEl.style.display='block';}
+  toAdd.forEach(f=>processBulkPhoto(f));
+  event.target.value='';
+}
+function processBulkPhoto(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['jpg','jpeg','png','webp'].includes(ext))return;
+  if(file.size>8*1024*1024)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    bulkPhotos.push({dataURL:ev.target.result,file,caption:''});
+    renderBulkGrid();
+  };
+  r.readAsDataURL(file);
+}
+function renderBulkGrid(){
+  const grid=document.getElementById('bulkGrid');
+  const ctr=document.getElementById('bulkCount');
+  if(!grid)return;
+  grid.innerHTML=bulkPhotos.map((p,i)=>`
+    <div class="bulk-thumb">
+      <img src="${p.dataURL}" alt="Photo ${i+1}"/>
+      <button class="bulk-thumb-rm" onclick="removeBulkPhoto(${i})">×</button>
+      <div class="bulk-thumb-cap">
+        <input type="text" placeholder="Caption for photo ${i+1}" value="${esc(p.caption)}" oninput="updateBulkCaption(${i},this.value)"/>
+      </div>
+    </div>`).join('');
+  if(ctr)ctr.textContent=bulkPhotos.length?`${bulkPhotos.length} photo${bulkPhotos.length>1?'s':''} ready to submit`:'';
+}
+function removeBulkPhoto(i){bulkPhotos.splice(i,1);renderBulkGrid();}
+function updateBulkCaption(i,val){if(bulkPhotos[i])bulkPhotos[i].caption=val;}
+
+async function submitBulkGallery(){
+  if(!bulkPhotos.length){alert('Please add at least one photo.');return;}
+  const ts=new Date().toLocaleString();
+  const submitterName=(document.getElementById('ff-submitterName')?.value||'').trim()||'Bulk Upload';
+  const submitterRole=(document.getElementById('ff-submitterRole')?.value||'').trim()||'';
+  let count=0;
+  for(const p of bulkPhotos){
+    const sub={
+      id:Date.now()+Math.floor(Math.random()*9999)+count,
+      category:'gallery',ts,createdAt:Date.now()+count,
+      status:'draft',reviewerNote:'',reviewedAt:null,
+      data:{
+        submitterName:{label:'Submitted by',value:submitterName},
+        submitterRole:{label:'Role',value:submitterRole},
+        photoCaption:{label:'Photo caption',value:p.caption||'Gallery photo'},
+        photoCategory:{label:'Category',value:'Other'},
+        photoDate:{label:'Date',value:''}
+      },
+      photoData:p.dataURL,photoName:p.file.name,photos:null
+    };
+    await dbSaveSubmission(sub);
+    count++;
+  }
+  bulkPhotos=[];renderBulkGrid();
+  alert(`✓ ${count} photos submitted successfully! They will appear in your admin panel.`);
+  document.getElementById('formContainer').style.display='none';
+  document.getElementById('successWrap').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 const DEFAULT_SECTION_ORDER=[
   {key:'cover',label:'Cover Page',icon:'📕',editable:false,visible:true,layout:'cover'},
   {key:'toc',label:'Table of Contents',icon:'📑',editable:false,visible:true,layout:'toc'},
@@ -1061,11 +1481,23 @@ function openForm(k){currentFormCategory=k;resetFormState();const cat=CATEGORIES
 function resetFormState(){photoFile=null;photoDataURL=null;photoFilesMulti=[];photoDataURLsMulti=[];}
 function buildForm(k){
   const cat=CATEGORIES[k];const c=document.getElementById('formContainer');
+  bulkPhotos=[];/* reset bulk state */
   let h=`<div class="f-card"><div class="f-card-title">Your Details</div>`;
   getEffectiveFields(k).forEach(f=>{h+=buildFieldHtml(f);});h+=`</div>`;
-  if(cat.photoRequired&&cat.photoMulti){const max=cat.photoMax||5;h+=`<div class="f-card"><div class="f-card-title">Event Photos (up to ${max})</div><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInputMulti').click()"><input type="file" id="photoInputMulti" accept=".jpg,.jpeg,.png,.webp" multiple onchange="handlePhotoMulti(event,${max})"/><div id="photoPlaceholderMulti"><span class="photo-drop-icon">📸</span><h3>Upload event photos <span class="req">*</span></h3><p>Tap to choose 1–${max} photos</p><span class="photo-pill">Action shots · Group photos</span></div></div><div id="multiPhotoGrid" class="multi-photo-grid"></div><div id="multiPhotoCount" class="multi-photo-count" style="display:none;">0 of ${max}</div><div class="photo-err-msg" id="photoErrMsg"></div><div class="photo-reqs"><p><strong>For print quality:</strong> min 600×600px, JPG/PNG, max 5MB each.</p></div></div>`;}
-  else if(cat.photoRequired){h+=`<div class="f-card"><div class="f-card-title">Profile photo</div><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)"><input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/><div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>Upload your profile photo <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">Passport-style · Clear face · Plain background</span></div><div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><div class="photo-dims" id="photoDims"></div><button class="photo-change" onclick="resetPhoto(event)">Change photo</button></div></div><div class="photo-err-msg" id="photoErrMsg"></div><div class="photo-reqs"><p><strong>For print quality:</strong> minimum 600×600 pixels, JPG or PNG, up to 5 MB.</p></div></div>`;}
-  h+=`<button class="submit-btn" onclick="submitForm()">Submit</button>`;c.innerHTML=h;
+  /* OCR panel — inject for applicable categories */
+  h+=buildOCRPanel(k);
+  /* Gallery: replace standard photo card with tabbed version */
+  if(k==='gallery'){
+    h+=buildGalleryTabs();
+  } else if(cat.photoRequired&&cat.photoMulti){
+    const max=cat.photoMax||5;
+    h+=`<div class="f-card"><div class="f-card-title">Event Photos (up to ${max})</div><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInputMulti').click()"><input type="file" id="photoInputMulti" accept=".jpg,.jpeg,.png,.webp" multiple onchange="handlePhotoMulti(event,${max})"/><div id="photoPlaceholderMulti"><span class="photo-drop-icon">📸</span><h3>Upload event photos <span class="req">*</span></h3><p>Tap to choose 1–${max} photos</p><span class="photo-pill">Action shots · Group photos</span></div></div><div id="multiPhotoGrid" class="multi-photo-grid"></div><div id="multiPhotoCount" class="multi-photo-count" style="display:none;">0 of ${max}</div><div class="photo-err-msg" id="photoErrMsg"></div><div class="photo-reqs"><p><strong>For print quality:</strong> min 600×600px, JPG/PNG, max 5MB each.</p></div></div>`;
+  } else if(cat.photoRequired){
+    h+=`<div class="f-card"><div class="f-card-title">Profile photo</div><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)"><input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/><div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>Upload your profile photo <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">Passport-style · Clear face · Plain background</span></div><div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><div class="photo-dims" id="photoDims"></div><button class="photo-change" onclick="resetPhoto(event)">Change photo</button></div></div><div class="photo-err-msg" id="photoErrMsg"></div><div class="photo-reqs"><p><strong>For print quality:</strong> minimum 600×600 pixels, JPG or PNG, up to 5 MB.</p></div></div>`;
+  }
+  /* Submit button — not shown for gallery (bulk has own button) */
+  h+=`<button class="submit-btn" onclick="submitForm()" id="mainSubmitBtn">Submit</button>`;
+  c.innerHTML=h;
 }
 function buildFieldHtml(f){
   const req=f.required?'<span class="req"> *</span>':'<span class="opt">(optional)</span>';
@@ -1107,11 +1539,23 @@ function removeMultiPhoto(i,max){photoFilesMulti.splice(i,1);photoDataURLsMulti.
 function submitForm(){
   const cat=CATEGORIES[currentFormCategory];let valid=true;const data={};
   getEffectiveFields(currentFormCategory).forEach(f=>{const el=document.getElementById('ff-'+f.id);const w=document.getElementById('fw-'+f.id);if(!el)return;const val=f.type==='checkbox'?el.checked?'Yes':'No':(el.value||'').trim();data[f.id]={label:f.label,value:val,type:f.type};if(f.required&&f.type!=='checkbox'&&!val){if(w)w.classList.add('has-error');valid=false;}else if(w)w.classList.remove('has-error');});
-  if(cat.photoRequired&&cat.photoMulti){if(!photoDataURLsMulti.length){const e=document.getElementById('photoErrMsg');e.textContent='At least one event photo is required.';e.style.display='block';valid=false;}}
-  else if(cat.photoRequired&&!photoDataURL){const e=document.getElementById('photoErrMsg');e.textContent='A profile photo is required.';e.style.display='block';valid=false;}
+  /* Gallery: only validate photo on single-upload tab */
+  if(currentFormCategory==='gallery'){
+    const onBulk=document.getElementById('gpane-bulk')?.classList.contains('active');
+    if(!onBulk&&cat.photoRequired&&!photoDataURL){const e=document.getElementById('photoErrMsg');if(e){e.textContent='A photo is required.';e.style.display='block';}valid=false;}
+    if(onBulk){/* bulk submit handled separately */submitBulkGallery();return;}
+  } else if(cat.photoRequired&&cat.photoMulti){
+    if(!photoDataURLsMulti.length){const e=document.getElementById('photoErrMsg');if(e){e.textContent='At least one event photo is required.';e.style.display='block';}valid=false;}
+  } else if(cat.photoRequired&&!photoDataURL){
+    const e=document.getElementById('photoErrMsg');if(e){e.textContent='A profile photo is required.';e.style.display='block';}valid=false;
+  }
   if(!valid){const fe=document.querySelector('.has-error')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});return;}
   const sub={id:Date.now()+Math.floor(Math.random()*1000),category:currentFormCategory,ts:new Date().toLocaleString(),createdAt:Date.now(),status:'draft',reviewerNote:'',reviewedAt:null,data,photoData:photoDataURL||null,photoName:photoFile?.name||null,photos:cat.photoMulti?photoDataURLsMulti.map((url,i)=>({data:url,name:photoFilesMulti[i]?.name||`photo_${i+1}.jpg`})):null};
-  subs.push(sub);saveAll(subs);document.getElementById('formContainer').style.display='none';document.getElementById('successWrap').style.display='block';window.scrollTo({top:0,behavior:'smooth'});
+  dbSaveSubmission(sub);
+  subs=loadAll();
+  document.getElementById('formContainer').style.display='none';
+  document.getElementById('successWrap').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 /* PIN */
@@ -1174,19 +1618,25 @@ function renderSubCard(s,ctx){
 }
 
 /* ACTIONS */
-function sendForReview(id){if(!confirm('Send to Editor-in-Chief for review?'))return;subs=loadAll();const s=subs.find(x=>x.id===id);if(!s)return;s.status='pending';saveAll(subs);renderAdmin();}
-function finalizeSubmission(id){if(!confirm('Finalize this submission? It will appear in the magazine layout.'))return;subs=loadAll();const s=subs.find(x=>x.id===id);if(!s)return;s.status='finalized';saveAll(subs);renderAdmin();}
-function deleteSubmission(id){if(!confirm('Permanently delete this submission?'))return;subs=loadAll();subs=subs.filter(s=>s.id!==id);saveAll(subs);renderAdmin();}
+function sendForReview(id){if(!confirm('Send to Editor-in-Chief for review?'))return;subs=loadAll();const s=subs.find(x=>x.id===id);if(!s)return;s.status='pending';saveAll(subs);dbUpdateStatus(id,'pending','',null);renderAdmin();}
+function finalizeSubmission(id){if(!confirm('Finalize this submission? It will appear in the magazine layout.'))return;subs=loadAll();const s=subs.find(x=>x.id===id);if(!s)return;s.status='finalized';saveAll(subs);dbUpdateStatus(id,'finalized',s.reviewerNote||'',s.reviewedAt);renderAdmin();}
+function deleteSubmission(id){if(!confirm('Permanently delete this submission?'))return;dbDeleteSubmission(id);subs=loadAll().filter(s=>s.id!==id);localStorage.setItem('me_subs',JSON.stringify(subs));renderAdmin();}
+
+/* ADMIN ENTER — pulls fresh cloud data */
+function enterAdmin(){
+  show('viewAdmin');
+  dbLoadAll().then(list=>{subs=list;renderAdmin();});
+}
 
 /* EDITOR */
-function enterEditor(){subs=loadAll();renderEditor();show('viewEditor');}
+function enterEditor(){show('viewEditor');dbLoadAll().then(list=>{subs=list;renderEditor();});}
 function setEditorCategory(status){currentEditorCat=status;document.querySelectorAll('#viewEditor .admin-tab').forEach(t=>t.classList.remove('active'));const btn=document.getElementById('etab-'+status);if(btn)btn.classList.add('active');if(status==='editorial'){document.getElementById('editorModeList').style.display='none';document.getElementById('editorModeNote').style.display='block';loadEditorialNoteForEditor();}else{document.getElementById('editorModeList').style.display='block';document.getElementById('editorModeNote').style.display='none';renderEditor();}}
 function loadEditorialNoteForEditor(){const all=loadAll();const ex=all.find(s=>s.category==='editorial-note');if(ex){document.getElementById('edNoteTitle').value=ex.data.title?.value||'';document.getElementById('edNoteBody').value=ex.data.body?.value||'';document.getElementById('edNoteStatus').textContent='Last saved: '+ex.ts;}else{document.getElementById('edNoteTitle').value='';document.getElementById('edNoteBody').value='';document.getElementById('edNoteStatus').textContent='Not yet saved';}}
-function saveEditorialNote(){const title=document.getElementById('edNoteTitle').value.trim();const body=document.getElementById('edNoteBody').value.trim();if(!body){alert('Please write the editorial note before saving.');return;}subs=loadAll();let ex=subs.find(s=>s.category==='editorial-note');if(ex){ex.data={title:{label:'Title',value:title},body:{label:'Body',value:body}};ex.ts=new Date().toLocaleString();}else{subs.push({id:Date.now()+Math.floor(Math.random()*1000),category:'editorial-note',ts:new Date().toLocaleString(),createdAt:Date.now(),status:'approved',reviewerNote:'',reviewedAt:Date.now(),data:{title:{label:'Title',value:title},body:{label:'Body',value:body}},photoData:null,photoName:null});}saveAll(subs);document.getElementById('edNoteStatus').textContent='✓ Saved '+new Date().toLocaleTimeString();}
+function saveEditorialNote(){const title=document.getElementById('edNoteTitle').value.trim();const body=document.getElementById('edNoteBody').value.trim();if(!body){alert('Please write the editorial note before saving.');return;}subs=loadAll();let ex=subs.find(s=>s.category==='editorial-note');const sub=ex||{id:Date.now()+Math.floor(Math.random()*1000),category:'editorial-note',ts:new Date().toLocaleString(),createdAt:Date.now(),status:'approved',reviewerNote:'',reviewedAt:Date.now(),photoData:null,photoName:null};sub.data={title:{label:'Title',value:title},body:{label:'Body',value:body}};sub.ts=new Date().toLocaleString();if(!ex)subs.push(sub);saveAll(subs);dbSaveSubmission(sub);document.getElementById('edNoteStatus').textContent='✓ Saved '+new Date().toLocaleTimeString();}
 function renderEditor(){subs=loadAll();document.getElementById('ecount-pending').textContent=subs.filter(s=>s.status==='pending').length;document.getElementById('ecount-approved').textContent=subs.filter(s=>s.status==='approved').length;document.getElementById('ecount-rejected').textContent=subs.filter(s=>s.status==='rejected').length;document.getElementById('ecount-all').textContent=subs.length;let filtered=subs.slice().reverse();if(currentEditorCat!=='all')filtered=filtered.filter(s=>s.status===currentEditorCat);const list=document.getElementById('editorSubList');if(!filtered.length){list.innerHTML=`<div class="empty-state"><div class="empty-state-icon">✎</div><h3>No submissions here</h3><p>${currentEditorCat==='pending'?'Nothing awaiting review.':'Nothing to show.'}</p></div>`;return;}list.innerHTML=filtered.map(s=>renderSubCard(s,'editor')).join('');}
 function editorReview(id,dec){reviewingId=id;reviewingDecision=dec;const s=loadAll().find(x=>x.id===id);const nameField=s?.data.name?.value||s?.data.speakerName?.value||s?.data.contribName?.value||s?.data.authorName?.value||'this submission';document.getElementById('reviewTitle').textContent=dec==='approved'?`Approve "${nameField}"?`:`Reject "${nameField}"?`;document.getElementById('reviewSub').textContent='Add a note (optional).';document.getElementById('reviewNote').value=s?.reviewerNote||'';document.getElementById('reviewConfirm').textContent=dec==='approved'?'Approve':'Reject';document.getElementById('reviewConfirm').className='btn '+(dec==='approved'?'btn-primary':'btn-danger');document.getElementById('reviewConfirm').onclick=confirmReview;document.getElementById('reviewModal').classList.add('active');}
 function closeReviewModal(){document.getElementById('reviewModal').classList.remove('active');reviewingId=null;reviewingDecision=null;}
-function confirmReview(){const note=document.getElementById('reviewNote').value.trim();subs=loadAll();const s=subs.find(x=>x.id===reviewingId);if(s){s.status=reviewingDecision;s.reviewerNote=note;s.reviewedAt=Date.now();saveAll(subs);}closeReviewModal();renderEditor();}
+function confirmReview(){const note=document.getElementById('reviewNote').value.trim();const ts=Date.now();subs=loadAll();const s=subs.find(x=>x.id===reviewingId);if(s){s.status=reviewingDecision;s.reviewerNote=note;s.reviewedAt=ts;saveAll(subs);}dbUpdateStatus(reviewingId,reviewingDecision,note,ts);closeReviewModal();renderEditor();}
 
 /* EDITORIAL ADMIN */
 function renderEditorialMode(){subs=loadAll();const appr=subs.find(s=>s.category==='appreciation');if(appr){document.getElementById('apprTitle').value=appr.data.title?.value||'';document.getElementById('apprBody').value=appr.data.body?.value||'';document.getElementById('apprStatus').textContent='Last saved: '+appr.ts;}else{document.getElementById('apprTitle').value='';document.getElementById('apprBody').value='';document.getElementById('apprStatus').textContent='Not yet saved';}const edNote=subs.find(s=>s.category==='editorial-note');const prev=document.getElementById('edNotePreview');if(edNote){prev.innerHTML=(edNote.data.title?.value?`<strong>${esc(edNote.data.title.value)}</strong>\n\n`:'')+esc(edNote.data.body?.value||'');prev.style.color='var(--ink)';}else{prev.textContent='No editorial note yet.';prev.style.color='var(--ink3)';}const list=document.getElementById('editorialList');const entries=subs.filter(s=>s.category==='editorial-note'||s.category==='appreciation');if(!entries.length){list.innerHTML=`<div class="empty-state"><div class="empty-state-icon">📜</div><h3>No editorial entries yet</h3></div>`;}else{list.innerHTML=entries.map(s=>renderSubCard(s,'admin')).join('');}}
@@ -1553,15 +2003,68 @@ function openPrintView(){
   win.document.close();
 }
 
-/* AI PROOFREAD */
-async function proofreadSubmission(subId){const s=loadAll().find(x=>x.id===subId);if(!s)return;const panel=document.getElementById('proof-result-'+subId);if(!panel)return;const text=s.data.bio?.value||s.data.message?.value||s.data.speechBody?.value||s.data.contribBody?.value||s.data.eventReport?.value||s.data.articleBody?.value||s.data.qaBody?.value||s.data.introParagraph?.value||'';if(!text){panel.innerHTML='<p style="color:var(--ink3);font-size:13px;">No substantial text found to proofread.</p>';panel.style.display='block';return;}await proofreadWithAI(text,panel);}
-async function proofreadText(textareaId){const ta=document.getElementById(textareaId);if(!ta)return;const text=ta.value.trim();if(!text){alert('Please write some text first.');return;}const panelId='proofread-'+textareaId;const panel=document.getElementById(panelId);if(!panel)return;await proofreadWithAI(text,panel);}
+/* AI PROOFREAD — Gemini 2.0 Flash */
+async function proofreadSubmission(subId){
+  const s=loadAll().find(x=>x.id===subId);if(!s)return;
+  const panel=document.getElementById('proof-result-'+subId);if(!panel)return;
+  const text=s.data.bio?.value||s.data.message?.value||s.data.speechBody?.value||
+    s.data.contribBody?.value||s.data.eventReport?.value||s.data.articleBody?.value||
+    s.data.qaBody?.value||s.data.introParagraph?.value||s.data.body?.value||'';
+  if(!text){panel.innerHTML='<p style="color:var(--ink3);font-size:13px;">No substantial text found to proofread.</p>';panel.style.display='block';return;}
+  await proofreadWithAI(text,panel);
+}
+async function proofreadText(textareaId){
+  const ta=document.getElementById(textareaId);if(!ta)return;
+  const text=ta.value.trim();if(!text){alert('Please write some text first.');return;}
+  const panelId='proofread-'+textareaId;const panel=document.getElementById(panelId);if(!panel)return;
+  await proofreadWithAI(text,panel);
+}
 async function proofreadWithAI(text,panelEl){
-  const s=loadLsSettings();const apiKey=s.apiKey;const model=s.proofModel||'google/gemini-flash-1.5';const maxTokens=parseInt(s.maxTokens)||1000;
-  if(!apiKey){panelEl.innerHTML=`<div class="proofread-panel"><p class="proofread-panel-title">✦ AI Proofreading</p><p style="color:var(--red);font-size:13px;"><strong>No API key configured.</strong> Go to Layout Studio → Design Settings → AI Configuration to add your OpenRouter API key.</p></div>`;panelEl.style.display='block';return;}
-  panelEl.innerHTML=`<div class="proofread-panel"><p class="proofread-panel-title">✦ AI Proofreading</p><p class="proofread-loading">Proofreading with AI… please wait.</p></div>`;panelEl.style.display='block';
-  try{const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Proofread'},body:JSON.stringify({model,max_tokens:maxTokens,messages:[{role:'system',content:'You are a professional editorial proofreader for a school graduation magazine in Nigeria. Check the text for grammatical errors, spelling mistakes, punctuation issues, and unclear sentences. DO NOT rewrite the content. List each issue with: the original text, the problem, and your suggested correction. If the text is clean, say so clearly. Be concise and practical.'},{role:'user',content:`Please proofread this text:\n\n${text.substring(0,2000)}`}]})});const data=await resp.json();const result=data.choices?.[0]?.message?.content||'No response from AI.';panelEl.innerHTML=`<div class="proofread-panel"><div class="proofread-panel-title">✦ AI Proofreading Results (${model})</div><div class="proofread-result">${esc(result)}</div><p style="font-size:11px;color:var(--ink3);margin-top:10px;font-style:italic;">⚠️ AI suggestions are advisory only. The editor makes all final decisions. AI does not change your text.</p></div>`;}
-  catch(e){panelEl.innerHTML=`<div class="proofread-panel"><p style="color:var(--red);font-size:13px;"><strong>Error:</strong> ${esc(e.message)}. Check your API key and internet connection.</p></div>`;}
+  const s=loadLsSettings();
+  const apiKey=s.apiKey;
+  /* Force Gemini 2.0 Flash for proofreading */
+  const model='google/gemini-2.0-flash-001';
+  if(!apiKey){
+    panelEl.innerHTML=`<div class="proofread-panel"><p class="proofread-panel-title">✦ AI Proofreading</p><p style="color:var(--red);font-size:13px;"><strong>No API key configured.</strong> Go to Layout Studio → Design Settings → AI Configuration to add your OpenRouter API key.</p></div>`;
+    panelEl.style.display='block';return;
+  }
+  panelEl.innerHTML=`<div class="proofread-panel"><p class="proofread-panel-title">✦ AI Proofreading — Gemini 2.0 Flash</p><p class="proofread-loading">🔍 Proofreading… please wait.</p></div>`;
+  panelEl.style.display='block';
+  try{
+    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+        'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Proofread'},
+      body:JSON.stringify({
+        model,
+        max_tokens:2000,
+        messages:[
+          {role:'system',content:'You are a professional editorial proofreader for a school graduation magazine in Nigeria. Check the text for: grammatical errors, spelling mistakes, punctuation issues, unclear sentences, and awkward phrasing. List each issue clearly with: 1) the original text snippet, 2) the problem, 3) your suggested correction. If the text is clean, say so. Be concise and practical. Do NOT rewrite the full text.'},
+          {role:'user',content:`Please proofread this text:\n\n${text.substring(0,3000)}`}
+        ]
+      })
+    });
+    if(!resp.ok){
+      const errBody=await resp.text();
+      throw new Error(`API error ${resp.status}: ${errBody.substring(0,200)}`);
+    }
+    const data=await resp.json();
+    /* Robust response extraction */
+    let result='';
+    if(data.choices&&data.choices[0]){
+      result=data.choices[0].message?.content||data.choices[0].text||'';
+    }else if(data.error){
+      throw new Error(data.error.message||'API returned an error');
+    }
+    if(!result)result='No response from AI — try again.';
+    panelEl.innerHTML=`<div class="proofread-panel">
+      <div class="proofread-panel-title">✦ AI Proofreading Results — Gemini 2.0 Flash</div>
+      <div class="proofread-result" style="white-space:pre-line;">${esc(result)}</div>
+      <p style="font-size:11px;color:var(--ink3);margin-top:10px;font-style:italic;">⚠️ AI suggestions are advisory only. The editor makes all final decisions. AI does not change your text.</p>
+    </div>`;
+  }catch(e){
+    panelEl.innerHTML=`<div class="proofread-panel"><p style="color:var(--red);font-size:13px;"><strong>Error:</strong> ${esc(e.message)}. Check your API key and internet connection.</p></div>`;
+  }
   panelEl.style.display='block';
 }
 
@@ -1770,6 +2273,8 @@ document.addEventListener('keydown',function(e){if(document.querySelector('.view
 renderLandingCards();
 applyLsColors(lsSettings);
 checkUrlRouting();
+/* Boot cloud sync after page renders */
+setTimeout(()=>initCloudSync(),300);
 </script>
 </body>
 </html>
