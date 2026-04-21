@@ -459,7 +459,10 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
   </div>
   <div class="admin-topbar">
     <div class="admin-topbar-left"><div><span class="admin-logo">MagicEditor</span><h1>Production Dashboard</h1></div></div>
-    <div class="admin-topbar-right"><button class="admin-exit" onclick="goLanding()">← Exit</button></div>
+    <div class="admin-topbar-right">
+      <button class="admin-exit" style="margin-right:6px;border-color:rgba(255,255,255,.3);" onclick="adminRefresh()">↻ Refresh</button>
+      <button class="admin-exit" onclick="goLanding()">← Exit</button>
+    </div>
   </div>
   <div class="admin-tabs">
     <button class="admin-tab active" onclick="setCategory('all')" id="tab-all">All <span class="tab-count" id="count-all">0</span></button>
@@ -828,7 +831,10 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
   </div>
   <div class="admin-topbar" style="background:#2d1b4e;">
     <div class="admin-topbar-left"><div><span class="admin-logo" style="color:#c6a5f0;">MagicEditor</span><h1>Editor-in-Chief</h1></div></div>
-    <div class="admin-topbar-right"><button class="admin-exit" onclick="goLanding()">← Exit</button></div>
+    <div class="admin-topbar-right">
+      <button class="admin-exit" style="margin-right:6px;border-color:rgba(255,255,255,.3);" onclick="editorRefresh()">↻ Refresh</button>
+      <button class="admin-exit" onclick="goLanding()">← Exit</button>
+    </div>
   </div>
   <div class="admin-tabs">
     <button class="admin-tab active" onclick="setEditorCategory('pending')" id="etab-pending">Pending Review <span class="tab-count" id="ecount-pending">0</span></button>
@@ -1058,6 +1064,14 @@ function getSupa(){
   catch(e){console.warn('[DB] Supabase init failed:',e.message);return null;}
 }
 
+/* UUID generator for submission IDs */
+function genId(){
+  if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+    const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);
+  });
+}
+
 /* Sync status bar */
 function showSync(state,msg){
   let bar=document.getElementById('syncBar');
@@ -1120,19 +1134,19 @@ async function dbSaveSubmission(sub){
   }
 }
 async function dbDeleteSubmission(id){
-  const local=JSON.parse(localStorage.getItem('me_subs')||'[]').filter(s=>s.id!==id);
+  const local=JSON.parse(localStorage.getItem('me_subs')||'[]').filter(s=>String(s.id)!==String(id));
   localStorage.setItem('me_subs',JSON.stringify(local));
   showSync('syncing','Deleting…');
   try{
     const sb=getSupa();if(!sb)throw new Error('no client');
-    const{error}=await sb.from('submissions').delete().eq('id',id);
+    const{error}=await sb.from('submissions').delete().eq('id',String(id));
     if(error)throw error;
     showSync('ok','✓ Deleted');
   }catch(e){showSync('err','Deleted locally — cloud sync pending');}
 }
 async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
   const local=JSON.parse(localStorage.getItem('me_subs')||'[]');
-  const s=local.find(x=>x.id===id);
+  const s=local.find(x=>String(x.id)===String(id));
   if(s){s.status=status;s.reviewerNote=reviewerNote||'';s.reviewedAt=reviewedAt||null;}
   localStorage.setItem('me_subs',JSON.stringify(local));
   showSync('syncing','Updating…');
@@ -1141,7 +1155,7 @@ async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
     const{error}=await sb.from('submissions').update({
       status,reviewer_note:reviewerNote||'',
       reviewed_at:reviewedAt?new Date(reviewedAt).toISOString():null
-    }).eq('id',id);
+    }).eq('id',String(id));
     if(error)throw error;
     showSync('ok','✓ Updated');
   }catch(e){showSync('err','Updated locally — cloud sync pending');}
@@ -1430,7 +1444,7 @@ async function submitBulkGallery(){
   let count=0;
   for(const p of bulkPhotos){
     const sub={
-      id:Date.now()+Math.floor(Math.random()*9999)+count,
+      id:genId(),
       category:'gallery',ts,createdAt:Date.now()+count,
       status:'draft',reviewerNote:'',reviewedAt:null,
       data:{
@@ -1483,8 +1497,7 @@ function saveFormConfig(c){
 let formConfig=loadFormConfig();
 function getEffectiveFields(catKey){const cat=CATEGORIES[catKey];if(!cat)return[];const ov=(formConfig[catKey]&&formConfig[catKey].overrides)||{};const cf=(formConfig[catKey]&&formConfig[catKey].customFields)||[];const bi=cat.fields.map((f,i)=>{const o=ov[f.id]||{};return{...f,_isBuiltIn:true,required:o.required!==undefined?!!o.required:!!f.required,hidden:!!o.hidden,order:o.order!==undefined?Number(o.order):i};});const cu=cf.map((c,i)=>({...c,_isBuiltIn:false,order:c.order!==undefined?Number(c.order):(1000+i)}));return[...bi,...cu].filter(f=>!f.hidden).sort((a,b)=>(a.order||0)-(b.order||0));}
 function getAllFieldsForEditing(catKey){const cat=CATEGORIES[catKey];if(!cat)return[];const ov=(formConfig[catKey]&&formConfig[catKey].overrides)||{};const cf=(formConfig[catKey]&&formConfig[catKey].customFields)||[];const bi=cat.fields.map((f,i)=>{const o=ov[f.id]||{};return{...f,_isBuiltIn:true,required:o.required!==undefined?!!o.required:!!f.required,hidden:!!o.hidden,order:o.order!==undefined?Number(o.order):i};});const cu=cf.map((c,i)=>({...c,_isBuiltIn:false,hidden:!!c.hidden,order:c.order!==undefined?Number(c.order):(1000+i)}));return[...bi,...cu].sort((a,b)=>(a.order||0)-(b.order||0));}
-function loadAll(){return JSON.parse(localStorage.getItem('me_subs')||'[]');}
-function saveAll(list){localStorage.setItem('me_subs',JSON.stringify(list));}
+/* loadAll/saveAll defined above — no duplicate */
 let subs=loadAll();
 
 /* STATE */
@@ -1582,7 +1595,7 @@ async function submitForm(){
   if(!valid){const fe=document.querySelector('.has-error')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});return;}
 
   /* FIX 5: submissions start as 'pending' so they appear in Editor inbox first */
-  const sub={id:Date.now()+Math.floor(Math.random()*1000),category:currentFormCategory,
+  const sub={id:genId(),category:currentFormCategory,
     ts:new Date().toLocaleString(),createdAt:Date.now(),
     status:'pending',/* goes straight to Editor-in-Chief queue */
     reviewerNote:'',reviewedAt:null,data,
@@ -1642,6 +1655,15 @@ function updatePinDots(){for(let i=0;i<4;i++){const dot=document.getElementById(
 function checkPIN(){const exp=pinMode==='admin'?cfg.adminPin:cfg.editorPin;if(pinBuf===exp){const m=pinMode;closePIN();m==='admin'?enterAdmin():enterEditor();}else{for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.add('error');document.getElementById('pinErr').textContent='Incorrect PIN';setTimeout(()=>{pinBuf='';updatePinDots();},500);}}
 
 /* ADMIN */
+function adminRefresh(){
+  dbLoadAll().then(cloudList=>{
+    subs=cloudList;
+    localStorage.setItem('me_subs',JSON.stringify(subs));
+    renderAdmin();
+    const btn=document.getElementById('tab-all');
+    if(btn){btn.style.background='var(--school-mint2)';setTimeout(()=>btn.style.background='',800);}
+  }).catch(()=>{subs=loadAll();renderAdmin();});
+}
 function enterAdmin(){subs=loadAll();renderAdmin();show('viewAdmin');}
 function hideAllAdminModes(){['adminModeSubs','adminModeEditorial','adminModeLayout','adminModeShareLinks','adminModeSettings'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 function setCategory(cat){currentAdminCat=cat;document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));const btn=document.getElementById('tab-'+cat);if(btn)btn.classList.add('active');hideAllAdminModes();if(cat==='editorial'){document.getElementById('adminModeEditorial').style.display='block';renderEditorialMode();}else{document.getElementById('adminModeSubs').style.display='block';renderAdmin();}}
@@ -1691,12 +1713,12 @@ function renderSubCard(s,ctx){
   let acts='';
   if(ctx==='admin'){
     /* Fix 5: Production Admin — can only Finalize approved, or Delete. Cannot approve (that's editor's job) */
-    acts+=`<button class="sub-action-btn" onclick="exportOneSubmission(${s.id})">⬇ ZIP</button>`;
+    acts+=`<button class="sub-action-btn" onclick="exportOneSubmission('${s.id}')">⬇ ZIP</button>`;
     if(s.status==='pending'){
       acts+=`<span style="font-size:11px;color:var(--amber);font-weight:700;padding:4px 10px;background:var(--amber2);border-radius:999px;">⏳ Awaiting Editor review</span>`;
     }
     if(s.status==='approved'){
-      acts+=`<button class="sub-action-btn sub-action-finalize" style="background:var(--green);color:#fff;border-color:var(--green);" onclick="finalizeSubmission(${s.id})">✓ Finalize for Print</button>`;
+      acts+=`<button class="sub-action-btn sub-action-finalize" style="background:var(--green);color:#fff;border-color:var(--green);" onclick="finalizeSubmission('${s.id}')">✓ Finalize for Print</button>`;
     }
     if(s.status==='finalized'){
       acts+=`<span style="font-size:11px;color:var(--green);font-weight:700;padding:4px 10px;background:var(--green2);border-radius:999px;">✓ Finalized</span>`;
@@ -1704,23 +1726,23 @@ function renderSubCard(s,ctx){
     if(s.status==='rejected'){
       acts+=`<span style="font-size:11px;color:var(--red);font-weight:700;padding:4px 10px;background:var(--red2);border-radius:999px;">✗ Rejected by Editor</span>`;
     }
-    acts+=`<button class="sub-action-btn sub-action-delete" onclick="deleteSubmission(${s.id})">Delete</button>`;
+    acts+=`<button class="sub-action-btn sub-action-delete" onclick="deleteSubmission('${s.id}')">Delete</button>`;
   } else {
     /* Fix 5: Editor — sees all text fields, can Approve/Reject/Proofread */
     if(s.status==='pending'){
-      acts+=`<button class="sub-action-btn sub-action-finalize" style="color:var(--green);border-color:var(--green2);" onclick="editorReview(${s.id},'approved')">✓ Approve</button>`;
-      acts+=`<button class="sub-action-btn sub-action-delete" onclick="editorReview(${s.id},'rejected')">✗ Reject</button>`;
+      acts+=`<button class="sub-action-btn sub-action-finalize" style="color:var(--green);border-color:var(--green2);" onclick="editorReview('${s.id}','approved')">✓ Approve</button>`;
+      acts+=`<button class="sub-action-btn sub-action-delete" onclick="editorReview('${s.id}','rejected')">✗ Reject</button>`;
     } else if(s.status==='approved'){
       acts+=`<span class="status-badge status-approved">✓ Approved</span>`;
-      acts+=`<button class="sub-action-btn" onclick="editorReview(${s.id},'rejected')">Change to Rejected</button>`;
+      acts+=`<button class="sub-action-btn" onclick="editorReview('${s.id}','rejected')">Change to Rejected</button>`;
     } else if(s.status==='rejected'){
       acts+=`<span class="status-badge status-rejected">✗ Rejected</span>`;
-      acts+=`<button class="sub-action-btn" onclick="editorReview(${s.id},'approved')">Re-approve</button>`;
+      acts+=`<button class="sub-action-btn" onclick="editorReview('${s.id}','approved')">Re-approve</button>`;
     } else {
       acts+=`<span class="status-badge status-${s.status}">${s.status}</span>`;
     }
     /* AI Proofread always available for editor on ALL submissions */
-    acts+=`<button class="sub-action-btn btn-ai" style="color:#fff;background:linear-gradient(135deg,#5b3a8a,#7b52a8);border:none;padding:7px 14px;" onclick="proofreadSubmission(${s.id})">✦ AI Proofread</button>`;
+    acts+=`<button class="sub-action-btn btn-ai" style="color:#fff;background:linear-gradient(135deg,#5b3a8a,#7b52a8);border:none;padding:7px 14px;" onclick="proofreadSubmission('${s.id}')">✦ AI Proofread</button>`;
   }
   return`<div class="sub-card cat-${s.category}">
     <div class="sub-top">${avatar}
@@ -1739,8 +1761,8 @@ function renderSubCard(s,ctx){
 
 /* ACTIONS */
 function sendForReview(id){if(!confirm('Send to Editor-in-Chief for review?'))return;subs=loadAll();const s=subs.find(x=>x.id===id);if(!s)return;s.status='pending';saveAll(subs);dbUpdateStatus(id,'pending','',null);renderAdmin();}
-function finalizeSubmission(id){if(!confirm('Finalize this submission? It will appear in the magazine layout.'))return;subs=loadAll();const s=subs.find(x=>x.id===id);if(!s)return;s.status='finalized';saveAll(subs);dbUpdateStatus(id,'finalized',s.reviewerNote||'',s.reviewedAt);renderAdmin();}
-function deleteSubmission(id){if(!confirm('Permanently delete this submission?'))return;dbDeleteSubmission(id);subs=loadAll().filter(s=>s.id!==id);localStorage.setItem('me_subs',JSON.stringify(subs));renderAdmin();}
+function finalizeSubmission(id){if(!confirm('Finalize this submission? It will appear in the magazine layout.'))return;subs=loadAll();const s=subs.find(x=>String(x.id)===String(id));if(!s)return;s.status='finalized';saveAll(subs);dbUpdateStatus(id,'finalized',s.reviewerNote||'',s.reviewedAt);renderAdmin();}
+function deleteSubmission(id){if(!confirm('Permanently delete this submission?'))return;dbDeleteSubmission(id);subs=loadAll().filter(s=>String(s.id)!==String(id));localStorage.setItem('me_subs',JSON.stringify(subs));renderAdmin();}
 
 /* ADMIN ENTER — pulls fresh cloud data */
 function enterAdmin(){
@@ -1756,9 +1778,27 @@ function enterEditor(){
   const pendingTab=document.getElementById('etab-pending');if(pendingTab)pendingTab.classList.add('active');
   document.getElementById('editorModeList').style.display='block';
   document.getElementById('editorModeNote').style.display='none';
-  dbLoadAll().then(list=>{subs=list;renderEditor();});
+  const list=document.getElementById('editorSubList');
+  if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">⏳</div><h3>Loading submissions…</h3><p>Fetching latest from cloud.</p></div>';
+  dbLoadAll().then(cloudList=>{
+    subs=cloudList;
+    localStorage.setItem('me_subs',JSON.stringify(subs));
+    renderEditor();
+  }).catch(()=>{subs=loadAll();renderEditor();});
 }
 
+function editorRefresh(){
+  const list=document.getElementById('editorSubList');
+  if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">↻</div><h3>Refreshing…</h3><p>Fetching latest submissions from cloud.</p></div>';
+  dbLoadAll().then(cloudList=>{
+    subs=cloudList;
+    localStorage.setItem('me_subs',JSON.stringify(subs));
+    renderEditor();
+    /* Flash the tab counts to signal fresh data */
+    const btn=document.getElementById('etab-pending');
+    if(btn){btn.style.background='var(--school-mint2)';setTimeout(()=>btn.style.background='',800);}
+  }).catch(()=>{subs=loadAll();renderEditor();});
+}
 function setEditorCategory(cat){
   currentEditorCat=cat;
   document.querySelectorAll('#viewEditor .admin-tab').forEach(t=>t.classList.remove('active'));
@@ -1770,11 +1810,16 @@ function setEditorCategory(cat){
   } else {
     document.getElementById('editorModeList').style.display='block';
     document.getElementById('editorModeNote').style.display='none';
-    renderEditor();
+    /* Always re-pull cloud on tab switch so new submissions appear immediately */
+    dbLoadAll().then(cloudList=>{
+      subs=cloudList;
+      localStorage.setItem('me_subs',JSON.stringify(subs));
+      renderEditor();
+    }).catch(()=>{subs=loadAll();renderEditor();});
   }
 }
 function renderEditorNote(){
-  subs=loadAll();
+  if(!subs||!subs.length)subs=loadAll();
   const edNote=subs.find(s=>s.category==='editorial-note');
   if(edNote){
     document.getElementById('edNoteTitle').value=edNote.data.title?.value||'';
@@ -1783,7 +1828,9 @@ function renderEditorNote(){
   }
 }
 function renderEditor(){
-  subs=loadAll();
+  /* Use already-loaded subs (set by enterEditor/setEditorCategory from cloud).
+     Only fall back to localStorage if subs is somehow empty. */
+  if(!subs||!subs.length)subs=loadAll();
   const pendingCount=subs.filter(s=>s.status==='pending').length;
   const approvedCount=subs.filter(s=>s.status==='approved').length;
   document.getElementById('ecount-pending').textContent=pendingCount;
@@ -1804,13 +1851,49 @@ function renderEditor(){
   if(!filtered.length){list.innerHTML=inboxBanner+`<div class="empty-state"><div class="empty-state-icon">✎</div><h3>No submissions here</h3><p>${currentEditorCat==='pending'?'No new submissions yet. Check back soon.':'Nothing to show in this filter.'}</p></div>`;return;}
   list.innerHTML=inboxBanner+filtered.map(s=>renderSubCard(s,'editor')).join('');
 }
-function editorReview(id,dec){reviewingId=id;reviewingDecision=dec;const s=loadAll().find(x=>x.id===id);const nameField=s?.data.name?.value||s?.data.speakerName?.value||s?.data.contribName?.value||s?.data.authorName?.value||'this submission';document.getElementById('reviewTitle').textContent=dec==='approved'?`Approve "${nameField}"?`:`Reject "${nameField}"?`;document.getElementById('reviewSub').textContent='Add a note (optional).';document.getElementById('reviewNote').value=s?.reviewerNote||'';document.getElementById('reviewConfirm').textContent=dec==='approved'?'Approve':'Reject';document.getElementById('reviewConfirm').className='btn '+(dec==='approved'?'btn-primary':'btn-danger');document.getElementById('reviewConfirm').onclick=confirmReview;document.getElementById('reviewModal').classList.add('active');}
+function editorReview(id,dec){reviewingId=String(id);reviewingDecision=dec;const s=loadAll().find(x=>String(x.id)===String(id));const nameField=s?.data.name?.value||s?.data.speakerName?.value||s?.data.contribName?.value||s?.data.authorName?.value||'this submission';document.getElementById('reviewTitle').textContent=dec==='approved'?`Approve "${nameField}"?`:`Reject "${nameField}"?`;document.getElementById('reviewSub').textContent='Add a note (optional).';document.getElementById('reviewNote').value=s?.reviewerNote||'';document.getElementById('reviewConfirm').textContent=dec==='approved'?'Approve':'Reject';document.getElementById('reviewConfirm').className='btn '+(dec==='approved'?'btn-primary':'btn-danger');document.getElementById('reviewConfirm').onclick=confirmReview;document.getElementById('reviewModal').classList.add('active');}
 function closeReviewModal(){document.getElementById('reviewModal').classList.remove('active');reviewingId=null;reviewingDecision=null;}
-function confirmReview(){const note=document.getElementById('reviewNote').value.trim();const ts=Date.now();subs=loadAll();const s=subs.find(x=>x.id===reviewingId);if(s){s.status=reviewingDecision;s.reviewerNote=note;s.reviewedAt=ts;saveAll(subs);}dbUpdateStatus(reviewingId,reviewingDecision,note,ts);closeReviewModal();renderEditor();}
+function confirmReview(){const note=document.getElementById('reviewNote').value.trim();const ts=Date.now();const localSubs=loadAll();const s=localSubs.find(x=>String(x.id)===String(reviewingId));if(s){s.status=reviewingDecision;s.reviewerNote=note;s.reviewedAt=ts;saveAll(localSubs);subs=localSubs;}dbUpdateStatus(reviewingId,reviewingDecision,note,ts);closeReviewModal();/* Re-pull cloud so list refreshes with latest state */dbLoadAll().then(cl=>{subs=cl;localStorage.setItem('me_subs',JSON.stringify(subs));renderEditor();}).catch(()=>renderEditor());}
+
+/* SAVE EDITORIAL NOTE — called from Editor-in-Chief view */
+async function saveEditorialNote(){
+  const title=(document.getElementById('edNoteTitle')?.value||'').trim();
+  const body=(document.getElementById('edNoteBody')?.value||'').trim();
+  const statusEl=document.getElementById('edNoteStatus');
+  if(!body){alert('Please write your editorial note before saving.');return;}
+  if(statusEl)statusEl.textContent='Saving…';
+  subs=loadAll();
+  let ex=subs.find(s=>s.category==='editorial-note');
+  const now=new Date().toLocaleString();
+  if(ex){
+    ex.data={title:{label:'Title',value:title},body:{label:'Body',value:body}};
+    ex.ts=now;
+    saveAll(subs);
+    await dbSaveSubmission(ex);
+  } else {
+    const sub={id:genId(),category:'editorial-note',ts:now,createdAt:Date.now(),
+      status:'approved',reviewerNote:'',reviewedAt:Date.now(),
+      data:{title:{label:'Title',value:title},body:{label:'Body',value:body}},
+      photoData:null,photoName:null,photos:null};
+    subs.push(sub);saveAll(subs);
+    await dbSaveSubmission(sub);
+  }
+  if(statusEl)statusEl.textContent='✓ Saved '+new Date().toLocaleTimeString();
+}
+
+/* PROOFREAD TEXT — for standalone textareas (editorial note etc) */
+async function proofreadText(textareaId){
+  const ta=document.getElementById(textareaId);
+  const panelEl=document.getElementById('proofread-'+textareaId);
+  if(!ta||!panelEl){return;}
+  const text=ta.value.trim();
+  if(!text){alert('Nothing to proofread yet.');return;}
+  await proofreadWithAI(text,panelEl,null,[{key:textareaId,label:'Text',value:text}]);
+}
 
 /* EDITORIAL ADMIN */
 function renderEditorialMode(){subs=loadAll();const appr=subs.find(s=>s.category==='appreciation');if(appr){document.getElementById('apprTitle').value=appr.data.title?.value||'';document.getElementById('apprBody').value=appr.data.body?.value||'';document.getElementById('apprStatus').textContent='Last saved: '+appr.ts;}else{document.getElementById('apprTitle').value='';document.getElementById('apprBody').value='';document.getElementById('apprStatus').textContent='Not yet saved';}const edNote=subs.find(s=>s.category==='editorial-note');const prev=document.getElementById('edNotePreview');if(edNote){prev.innerHTML=(edNote.data.title?.value?`<strong>${esc(edNote.data.title.value)}</strong>\n\n`:'')+esc(edNote.data.body?.value||'');prev.style.color='var(--ink)';}else{prev.textContent='No editorial note yet.';prev.style.color='var(--ink3)';}const list=document.getElementById('editorialList');const entries=subs.filter(s=>s.category==='editorial-note'||s.category==='appreciation');if(!entries.length){list.innerHTML=`<div class="empty-state"><div class="empty-state-icon">📜</div><h3>No editorial entries yet</h3></div>`;}else{list.innerHTML=entries.map(s=>renderSubCard(s,'admin')).join('');}}
-function saveAppreciation(){const title=document.getElementById('apprTitle').value.trim();const body=document.getElementById('apprBody').value.trim();if(!body){alert('Please write the appreciation content before saving.');return;}subs=loadAll();let ex=subs.find(s=>s.category==='appreciation');if(ex){ex.data={title:{label:'Title',value:title},body:{label:'Body',value:body}};ex.ts=new Date().toLocaleString();}else{subs.push({id:Date.now()+Math.floor(Math.random()*1000),category:'appreciation',ts:new Date().toLocaleString(),createdAt:Date.now(),status:'approved',reviewerNote:'',reviewedAt:Date.now(),data:{title:{label:'Title',value:title},body:{label:'Body',value:body}},photoData:null,photoName:null});}saveAll(subs);document.getElementById('apprStatus').textContent='✓ Saved '+new Date().toLocaleTimeString();setTimeout(()=>renderEditorialMode(),1500);}
+function saveAppreciation(){const title=document.getElementById('apprTitle').value.trim();const body=document.getElementById('apprBody').value.trim();if(!body){alert('Please write the appreciation content before saving.');return;}subs=loadAll();let ex=subs.find(s=>s.category==='appreciation');if(ex){ex.data={title:{label:'Title',value:title},body:{label:'Body',value:body}};ex.ts=new Date().toLocaleString();}else{subs.push({id:genId(),category:'appreciation',ts:new Date().toLocaleString(),createdAt:Date.now(),status:'approved',reviewerNote:'',reviewedAt:Date.now(),data:{title:{label:'Title',value:title},body:{label:'Body',value:body}},photoData:null,photoName:null});}saveAll(subs);document.getElementById('apprStatus').textContent='✓ Saved '+new Date().toLocaleTimeString();setTimeout(()=>renderEditorialMode(),1500);}
 
 /* SETTINGS */
 function savePins(){const a=document.getElementById('setAdminPin').value.trim();const e=document.getElementById('setEditorPin').value.trim();if(!/^\d{4}$/.test(a)||!/^\d{4}$/.test(e)){document.getElementById('pinSaveStatus').textContent='✗ PINs must be exactly 4 digits.';document.getElementById('pinSaveStatus').style.color='var(--red)';return;}if(a===e){document.getElementById('pinSaveStatus').textContent='✗ Admin and Editor PINs must differ.';document.getElementById('pinSaveStatus').style.color='var(--red)';return;}saveCfg({adminPin:a,editorPin:e});document.getElementById('pinSaveStatus').textContent='✓ PINs saved.';document.getElementById('pinSaveStatus').style.color='var(--green)';refreshDiag();}
@@ -1838,7 +1921,15 @@ function lsTab(tab){currentLsTab=tab;document.querySelectorAll('.ls-tab').forEac
 function loadLsSettingsToUI(){const s=lsSettings;const set=(id,val)=>{const el=document.getElementById(id);if(el&&val!==undefined)el.value=val;};set('ls-magTitle',s.magTitle||'The Torch');set('ls-schoolName',s.schoolName||'Way To Success Standard Schools');set('ls-location',s.location||'Ejigbo, Osun State');set('ls-edition',s.edition||'1st Edition');set('ls-year',s.year||'2025/2026');set('ls-theme',s.theme||'');set('ls-color1',s.color1||'#1a2744');set('ls-color2',s.color2||'#7dd4a8');set('ls-color3',s.color3||'#8b1a1a');set('ls-pageBg',s.pageBg||'#ffffff');set('ls-textColor',s.textColor||'#1c1c1e');set('ls-headingFont',s.headingFont||"'Playfair Display',serif");set('ls-bodyFont',s.bodyFont||"'Crimson Text',serif");set('ls-fontSize',s.fontSize||'11px');set('ls-pageSize',s.pageSize||'a4');set('ls-orientation',s.orientation||'portrait');set('ls-pageNums',s.pageNums||'yes');set('ls-apiKey',s.apiKey||'');set('ls-layoutModel',s.layoutModel||'anthropic/claude-3-haiku');set('ls-proofModel',s.proofModel||'google/gemini-flash-1.5');set('ls-maxTokens',s.maxTokens||'1000');set('ls-teachersPerPage',String(s.teachersPerPage||9));set('ls-studentsPerPage',String(s.studentsPerPage||2));set('ls-speechesPerPage',String(s.speechesPerPage||1));set('ls-galleryPerPage',String(s.galleryPerPage||4));set('ls-creativePerPage',String(s.creativePerPage||2));set('ls-autoTrim',s.autoTrim||'yes');updatePageSizeUI();}
 function updatePageSizeUI(){const ps=document.getElementById('ls-pageSize');const row=document.getElementById('ls-customSizeRow');if(ps&&row)row.style.display=ps.value==='custom'?'block':'none';}
 function saveLsSettings(){const get=id=>{const el=document.getElementById(id);return el?el.value:undefined;};const s={magTitle:get('ls-magTitle'),schoolName:get('ls-schoolName'),location:get('ls-location'),edition:get('ls-edition'),year:get('ls-year'),theme:get('ls-theme'),color1:get('ls-color1'),color2:get('ls-color2'),color3:get('ls-color3'),pageBg:get('ls-pageBg'),textColor:get('ls-textColor'),headingFont:get('ls-headingFont'),bodyFont:get('ls-bodyFont'),fontSize:get('ls-fontSize'),pageSize:get('ls-pageSize'),orientation:get('ls-orientation'),pageNums:get('ls-pageNums'),apiKey:get('ls-apiKey'),layoutModel:get('ls-layoutModel'),proofModel:get('ls-proofModel'),maxTokens:get('ls-maxTokens'),teachersPerPage:parseInt(get('ls-teachersPerPage'))||9,studentsPerPage:parseInt(get('ls-studentsPerPage'))||2,speechesPerPage:parseInt(get('ls-speechesPerPage'))||1,galleryPerPage:parseInt(get('ls-galleryPerPage'))||4,creativePerPage:parseInt(get('ls-creativePerPage'))||2,autoTrim:get('ls-autoTrim')};lsSettings=s;saveLsSettingsToStorage(s);applyLsColors(s);alert('Settings saved!');}
-function applyLsColors(s){if(!s)s=lsSettings;const r=document.documentElement;if(s.color1)r.style.setProperty('--school-navy',s.color1);if(s.color2)r.style.setProperty('--school-mint',s.color2);if(s.color3)r.style.setProperty('--school-red',s.color3);}
+function applyLsColors(s){
+  if(!s)s=lsSettings;
+  const r=document.documentElement;
+  if(s.color1){r.style.setProperty('--school-navy',s.color1);r.style.setProperty('--school-navy2',s.color1+'cc');r.style.setProperty('--admin',s.color1);}
+  if(s.color2){r.style.setProperty('--school-mint',s.color2);r.style.setProperty('--school-mint3',s.color2);}
+  if(s.color3)r.style.setProperty('--school-red',s.color3);
+  if(s.pageBg)r.style.setProperty('--surface',s.pageBg);
+  if(s.textColor)r.style.setProperty('--ink',s.textColor);
+}
 
 /* SECTION MANAGER */
 function renderSectionManager(){const list=document.getElementById('sectionList');subs=loadAll();list.innerHTML=sectionOrder.map((sec,i)=>{const count=subs.filter(s=>s.category===sec.key&&(s.status==='approved'||s.status==='finalized')).length;const lbl=getLabel('section_'+sec.key,sec.label);return`<div class="section-row" draggable="true" data-idx="${i}" ondragstart="sectionDragStart(event,${i})" ondragover="sectionDragOver(event,${i})" ondrop="sectionDrop(event,${i})" ondragleave="sectionDragLeave(event)"><span class="section-handle">⠿</span><span class="section-row-num">${i+1}</span><div class="section-row-info"><div class="section-row-name">${sec.icon} ${esc(lbl)}</div><div class="section-row-meta">${count} approved · Layout: ${sec.layout}</div></div><div class="section-row-controls"><button class="section-toggle ${sec.visible?'on':''}" onclick="toggleSection(${i})">${sec.visible?'Visible':'Hidden'}</button><select class="section-layout-select" onchange="changeSectionLayout(${i},this.value)"><option value="single" ${sec.layout==='single'?'selected':''}>Single</option><option value="double" ${sec.layout==='double'?'selected':''}>Double</option><option value="grid" ${sec.layout==='grid'?'selected':''}>Grid</option><option value="teacher-grid" ${sec.layout==='teacher-grid'?'selected':''}>Teacher Grid</option><option value="gallery" ${sec.layout==='gallery'?'selected':''}>Gallery</option><option value="events" ${sec.layout==='events'?'selected':''}>Events</option><option value="cover" ${sec.layout==='cover'?'selected':''}>Cover</option><option value="toc" ${sec.layout==='toc'?'selected':''}>TOC</option></select>${sec.editable!==false?`<button class="section-rename-btn" onclick="openRenameModal('${sec.key}','${esc(lbl)}')">✎ Rename</button>`:''}</div></div>`;}).join('');}
@@ -2192,7 +2283,9 @@ function extractAllText(s){
 }
 
 async function proofreadSubmission(subId){
-  const s=loadAll().find(x=>x.id===subId);if(!s)return;
+  /* Use string comparison to handle both uuid and numeric ids */
+  const allSubs=loadAll();
+  const s=allSubs.find(x=>String(x.id)===String(subId));if(!s)return;
   const panel=document.getElementById('proof-result-'+subId);if(!panel)return;
   const fields=extractAllText(s);
   const combinedText=fields.map(f=>`[${f.label}]\n${f.value}`).join('\n\n---\n\n');
@@ -2256,7 +2349,7 @@ async function proofreadWithAI(text,panelEl,subId,fields){
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;">${esc(f.label)}</div>
           <textarea id="edit-${subId}-${f.key}" style="width:100%;min-height:80px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Lato',sans-serif;resize:vertical;background:#fafaf8;">${esc(f.value)}</textarea>
         </div>`).join('')}
-      <button onclick="saveProofreadEdits(${subId})" style="background:var(--school-navy);color:#fff;border:none;padding:10px 22px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;">💾 Save Corrections</button>
+      <button onclick="saveProofreadEdits('${subId}')" style="background:var(--school-navy);color:#fff;border:none;padding:10px 22px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;">💾 Save Corrections</button>
       <span id="saveProofStatus-${subId}" style="font-size:12px;color:var(--green);margin-left:10px;"></span>
     </div>`;
   }
@@ -2273,7 +2366,7 @@ async function proofreadWithAI(text,panelEl,subId,fields){
 async function saveProofreadEdits(subId){
   const statusEl=document.getElementById(`saveProofStatus-${subId}`);
   const allSubs=loadAll();
-  const sub=allSubs.find(x=>x.id===subId);
+  const sub=allSubs.find(x=>String(x.id)===String(subId));
   if(!sub){if(statusEl)statusEl.textContent='Error: submission not found.';return;}
   /* Find all edit boxes for this submission and update data */
   Object.keys(sub.data).forEach(k=>{
@@ -2304,32 +2397,49 @@ async function runLayoutAI(){
   resultEl.innerHTML='<em>✦ Thinking about your layout…</em>';resultEl.style.display='block';
   subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');
   const counts=CATEGORY_KEYS.map(k=>`  ${CATEGORIES[k].label}: ${approved.filter(x=>x.category===k).length} approved`).join('\n');
-  const ctx=`MAGAZINE: ${s.magTitle||'The Torch'} | ${s.schoolName||'Way To Success Standard Schools'} | ${s.edition||'1st Edition'} ${s.year||'2025/2026'}
+  const ctx=`MAGAZINE: ${s.magTitle||'The Torch'} | ${s.schoolName||'Way To Success Standard Schools'} | ${s.edition||'1st Edition'} ${s.year||'2025/2026'} | Theme: ${s.theme||'—'}
 APPROVED CONTENT:\n${counts}
-CURRENT SETTINGS: Page: ${s.pageSize||'A4'} ${s.orientation||'portrait'} | Teachers/page: ${s.teachersPerPage||9} | Students/page: ${s.studentsPerPage||2} | Gallery/page: ${s.galleryPerPage||4} | Speeches/page: ${s.speechesPerPage||1} | Creative/page: ${s.creativePerPage||2}`;
+LAYOUT: Page: ${s.pageSize||'A4'} ${s.orientation||'portrait'} | Teachers/page: ${s.teachersPerPage||9} | Students/page: ${s.studentsPerPage||2} | Gallery/page: ${s.galleryPerPage||4} | Speeches/page: ${s.speechesPerPage||1} | Creative/page: ${s.creativePerPage||2}
+COLOURS: Primary: ${s.color1||'#1a2744'} | Accent: ${s.color2||'#7dd4a8'} | Contrast: ${s.color3||'#8b1a1a'} | Page BG: ${s.pageBg||'#ffffff'} | Text: ${s.textColor||'#1c1c1e'}
+TYPOGRAPHY: Heading: ${s.headingFont||'Playfair Display'} | Body: ${s.bodyFont||'Crimson Text'} | Size: ${s.fontSize||'11px'}`;
 
   try{
     const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
         'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Layout AI'},
       body:JSON.stringify({model,max_tokens:maxTokens,messages:[
-        {role:'system',content:`You are a magazine layout engine for a Nigerian school graduation magazine. When given any layout question or goal, you MUST end your response with a JSON block of recommended settings changes like this (include ONLY settings you want to change):
+        {role:'system',content:`You are a professional magazine designer and layout engine for a Nigerian school graduation magazine. You handle ALL aspects of design: layout, structure, colours, typography, branding, and page settings. When given ANY design goal or question, you MUST end your response with a JSON block of recommended settings (include ONLY settings you want to change):
 
 \`\`\`settings
 {
-  "teachersPerPage": 12,
+  "teachersPerPage": 9,
   "studentsPerPage": 2,
-  "galleryPerPage": 6,
+  "galleryPerPage": 4,
   "speechesPerPage": 1,
   "creativePerPage": 2,
   "orientation": "portrait",
   "pageSize": "a4",
   "pageNums": "yes",
-  "autoTrim": "no"
+  "autoTrim": "no",
+  "color1": "#1a2744",
+  "color2": "#7dd4a8",
+  "color3": "#8b1a1a",
+  "pageBg": "#ffffff",
+  "textColor": "#1c1c1e",
+  "headingFont": "'Playfair Display',serif",
+  "bodyFont": "'Crimson Text',serif",
+  "fontSize": "11px",
+  "magTitle": "The Torch",
+  "schoolName": "Way To Success Standard Schools",
+  "edition": "1st Edition",
+  "year": "2025/2026",
+  "theme": "Lighting the Path"
 }
 \`\`\`
 
-Only include settings relevant to the user's question. Give your advice first, then the settings block. Context:\n${ctx}`},
+colour1 is the primary/header colour, color2 is the accent/highlight, color3 is a contrast colour. headingFont options: "'Playfair Display',serif" | "Georgia,serif" | "'Times New Roman',serif" | "'Lato',sans-serif". bodyFont options: "'Crimson Text',serif" | "'Lato',sans-serif" | "Georgia,serif". fontSize options: "10px"|"11px"|"12px"|"13px". pageSize options: "a4"|"a5"|"letter".
+
+When the user asks about colours, themes, branding, or visual style — suggest hex colour codes that fit the school's identity and explain your design choices. Always give your design advice first, then end with the settings block. Only include settings relevant to the user's request. Context:\n${ctx}`},
         {role:'user',content:query}
       ]})});
     const data=await resp.json();
@@ -2363,11 +2473,13 @@ function applyLayoutFromObject(obj,logEl){
       changes.push(`✅ ${uiId.replace('ls-','')} → ${snapped}`);
     }
   };
+  /* Pagination */
   if(obj.teachersPerPage!=null)setIfChanged('teachersPerPage','ls-teachersPerPage',[6,9,12,15],obj.teachersPerPage);
   if(obj.studentsPerPage!=null)setIfChanged('studentsPerPage','ls-studentsPerPage',[1,2,3,4],obj.studentsPerPage);
   if(obj.galleryPerPage!=null)setIfChanged('galleryPerPage','ls-galleryPerPage',[2,4,6,9],obj.galleryPerPage);
   if(obj.speechesPerPage!=null)setIfChanged('speechesPerPage','ls-speechesPerPage',[1,2],obj.speechesPerPage);
   if(obj.creativePerPage!=null)setIfChanged('creativePerPage','ls-creativePerPage',[1,2,3],obj.creativePerPage);
+  /* Page format */
   if(obj.orientation&&['portrait','landscape'].includes(obj.orientation)&&obj.orientation!==s.orientation){
     s.orientation=obj.orientation;const el=document.getElementById('ls-orientation');if(el)el.value=obj.orientation;
     changes.push(`✅ Orientation → ${obj.orientation}`);
@@ -2384,11 +2496,44 @@ function applyLayoutFromObject(obj,logEl){
     s.autoTrim=obj.autoTrim;const el=document.getElementById('ls-autoTrim');if(el)el.value=obj.autoTrim;
     changes.push(`✅ Auto-trim → ${obj.autoTrim}`);
   }
+  /* ── COLOURS ── */
+  const colorMap={color1:'ls-color1',color2:'ls-color2',color3:'ls-color3',pageBg:'ls-pageBg',textColor:'ls-textColor'};
+  Object.entries(colorMap).forEach(([key,uiId])=>{
+    if(obj[key]&&/^#[0-9a-fA-F]{3,8}$/.test(obj[key])&&obj[key]!==s[key]){
+      s[key]=obj[key];const el=document.getElementById(uiId);if(el)el.value=obj[key];
+      changes.push(`✅ ${key} → ${obj[key]}`);
+    }
+  });
+  /* ── TYPOGRAPHY ── */
+  const fontOpts=["'Playfair Display',serif","Georgia,serif","'Times New Roman',serif","'Lato',sans-serif"];
+  const bodyFontOpts=["'Crimson Text',serif","'Lato',sans-serif","Georgia,serif"];
+  const fontSizeOpts=["10px","11px","12px","13px"];
+  if(obj.headingFont&&fontOpts.includes(obj.headingFont)&&obj.headingFont!==s.headingFont){
+    s.headingFont=obj.headingFont;const el=document.getElementById('ls-headingFont');if(el)el.value=obj.headingFont;
+    changes.push(`✅ Heading font → ${obj.headingFont}`);
+  }
+  if(obj.bodyFont&&bodyFontOpts.includes(obj.bodyFont)&&obj.bodyFont!==s.bodyFont){
+    s.bodyFont=obj.bodyFont;const el=document.getElementById('ls-bodyFont');if(el)el.value=obj.bodyFont;
+    changes.push(`✅ Body font → ${obj.bodyFont}`);
+  }
+  if(obj.fontSize&&fontSizeOpts.includes(obj.fontSize)&&obj.fontSize!==s.fontSize){
+    s.fontSize=obj.fontSize;const el=document.getElementById('ls-fontSize');if(el)el.value=obj.fontSize;
+    changes.push(`✅ Font size → ${obj.fontSize}`);
+  }
+  /* ── IDENTITY ── */
+  const identityMap={magTitle:'ls-magTitle',schoolName:'ls-schoolName',location:'ls-location',edition:'ls-edition',year:'ls-year',theme:'ls-theme'};
+  Object.entries(identityMap).forEach(([key,uiId])=>{
+    if(obj[key]&&String(obj[key]).trim()&&String(obj[key])!==String(s[key]||'')){
+      s[key]=String(obj[key]);const el=document.getElementById(uiId);if(el)el.value=String(obj[key]);
+      changes.push(`✅ ${key} → ${obj[key]}`);
+    }
+  });
   if(!changes.length){
     if(logEl){logEl.innerHTML='ℹ️ Settings already match AI recommendation — no changes needed.';logEl.style.display='block';}
     return;
   }
   saveLsSettingsToStorage(s);lsSettings=s;
+  applyLsColors(s);/* Apply colour changes to UI immediately */
   if(logEl){
     logEl.innerHTML=`<strong>⚡ Auto-applied ${changes.length} setting${changes.length>1?'s':''}:</strong><br><br>${changes.join('<br>')}<br><br>🔄 Regenerating preview…`;
     logEl.style.display='block';
@@ -2551,7 +2696,7 @@ function renderAIContentSummary(){const el=document.getElementById('aiContentSum
 function slugify(s){return(s||'unknown').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').substring(0,40)||'unknown';}
 function submissionToText(s,num){const cat=CATEGORIES[s.category]||EDITORIAL_META[s.category]||{label:s.category};let txt=`SUBMISSION${num?' #'+num:''}\nCategory: ${cat.label}\nStatus: ${s.status.toUpperCase()}\nSubmitted: ${s.ts}\n`;if(s.reviewerNote)txt+=`Editor's Note: ${s.reviewerNote}\n`;txt+='\n';Object.entries(s.data).forEach(([,fc])=>{txt+=`${fc.label}: ${fc.value||'Not provided'}\n`;});return txt;}
 function extractAllPhotos(s,prefix){const results=[];const nameSlug=slugify(s.data.name?.value||s.data.eventName?.value||s.data.submitterName?.value||'unknown');if(s.photoData&&!s.photos){const m=/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/.exec(s.photoData);if(m){const ext=m[1].toLowerCase()==='jpeg'?'jpg':m[1].toLowerCase();results.push({filename:`${prefix}_${nameSlug}.${ext}`,base64:m[2]});}}if(Array.isArray(s.photos)&&s.photos.length){s.photos.forEach((p,i)=>{const m=/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/.exec(p.data||'');if(m){const ext=m[1].toLowerCase()==='jpeg'?'jpg':m[1].toLowerCase();results.push({filename:`${prefix}_${nameSlug}_photo${String(i+1).padStart(2,'0')}.${ext}`,base64:m[2]});}});}return results;}
-function exportOneSubmission(id){const s=loadAll().find(x=>x.id===id);if(!s)return;if(typeof JSZip==='undefined'){alert('ZIP library not loaded.');return;}const zip=new JSZip();const nameField=s.data.name?.value||s.data.speakerName?.value||s.data.contribName?.value||s.data.reporterName?.value||s.data.authorName?.value||s.data.intervieweeName?.value||s.data.submitterName?.value||s.data.eventName?.value||s.data.title?.value||'unknown';const slug=slugify(nameField);const allPhotos=extractAllPhotos(s,'01');const catLabel=CATEGORIES[s.category]?.label||EDITORIAL_META[s.category]?.label||s.category;let txt=`${catLabel.toUpperCase()} — SINGLE EXPORT\nExported: ${new Date().toLocaleString()}\n\n${'='.repeat(55)}\n\n`;txt+=submissionToText(s);let photoList='(no photo provided)';if(allPhotos.length){photoList=allPhotos.map(p=>p.filename).join(', ');const pf=zip.folder('photos');allPhotos.forEach(p=>pf.file(p.filename,p.base64,{base64:true}));}txt+=`PHOTO FILE(S): ${photoList}\n`;zip.file('submission.txt',txt);zip.generateAsync({type:'blob'}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${s.category}_${slug}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}).catch(err=>alert('Export failed: '+err.message));}
+function exportOneSubmission(id){const s=loadAll().find(x=>String(x.id)===String(id));if(!s)return;if(typeof JSZip==='undefined'){alert('ZIP library not loaded.');return;}const zip=new JSZip();const nameField=s.data.name?.value||s.data.speakerName?.value||s.data.contribName?.value||s.data.reporterName?.value||s.data.authorName?.value||s.data.intervieweeName?.value||s.data.submitterName?.value||s.data.eventName?.value||s.data.title?.value||'unknown';const slug=slugify(nameField);const allPhotos=extractAllPhotos(s,'01');const catLabel=CATEGORIES[s.category]?.label||EDITORIAL_META[s.category]?.label||s.category;let txt=`${catLabel.toUpperCase()} — SINGLE EXPORT\nExported: ${new Date().toLocaleString()}\n\n${'='.repeat(55)}\n\n`;txt+=submissionToText(s);let photoList='(no photo provided)';if(allPhotos.length){photoList=allPhotos.map(p=>p.filename).join(', ');const pf=zip.folder('photos');allPhotos.forEach(p=>pf.file(p.filename,p.base64,{base64:true}));}txt+=`PHOTO FILE(S): ${photoList}\n`;zip.file('submission.txt',txt);zip.generateAsync({type:'blob'}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${s.category}_${slug}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}).catch(err=>alert('Export failed: '+err.message));}
 function exportCurrentCategory(){subs=loadAll();const cat=currentAdminCat==='all'?null:currentAdminCat;let list;if(cat==='editorial')list=subs.filter(s=>s.category==='editorial-note'||s.category==='appreciation');else list=cat?subs.filter(s=>s.category===cat):subs;if(!list.length){alert('Nothing to export.');return;}const catLabel=cat==='editorial'?'EDITORIAL PIECES':cat?(CATEGORIES[cat]?.label||cat).toUpperCase()+' — CATEGORY EXPORT':'ALL SUBMISSIONS EXPORT';exportZip(list,cat?`${cat}_export`:'all_submissions',catLabel);}
 function exportMasterMagazine(){subs=loadAll();const list=subs.filter(s=>s.status==='approved'||s.status==='finalized');if(!list.length){alert('No approved or finalized content yet.');return;}exportZipByCategory(list,'master_magazine','MASTER MAGAZINE EXPORT — Approved & Finalized Content Only');}
 function exportZip(list,filename,heading){if(typeof JSZip==='undefined'){alert('ZIP library not loaded.');return;}const zip=new JSZip();const pf=zip.folder('photos');let txt=`${heading}\nExported: ${new Date().toLocaleString()}\nTotal: ${list.length}\n\n${'='.repeat(55)}\n\n`;let manifest=`MANIFEST — ${heading}\n\n`;list.forEach((s,i)=>{const num=String(i+1).padStart(2,'0');const photos=extractAllPhotos(s,num);let pl='(no photo provided)';if(photos.length){pl=photos.map(p=>p.filename).join(', ');photos.forEach(p=>pf.file(p.filename,p.base64,{base64:true}));}txt+=submissionToText(s,i+1);txt+=`PHOTO FILE(S): ${pl}\n\n${'-'.repeat(40)}\n\n`;manifest+=`#${i+1}  [${s.category}]  →  ${pl}\n`;});zip.file('submissions.txt',txt);zip.file('manifest.txt',manifest);zip.generateAsync({type:'blob'}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${filename}_${new Date().toISOString().slice(0,10)}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}).catch(err=>alert('Export failed: '+err.message));}
