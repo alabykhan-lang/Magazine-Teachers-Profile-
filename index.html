@@ -1660,6 +1660,8 @@ function renderAdmin(){
   document.getElementById('statFinalized').textContent=subs.filter(s=>s.status==='finalized').length;
   const sf=document.getElementById('filterStatus').value;
   let filtered=subs.slice().reverse();
+  /* WORKFLOW: Production Admin only sees approved/finalized — pending stays with Editor */
+  filtered=filtered.filter(s=>s.status==='approved'||s.status==='finalized'||s.status==='rejected');
   if(currentAdminCat!=='all')filtered=filtered.filter(s=>s.category===currentAdminCat);
   if(sf!=='all')filtered=filtered.filter(s=>s.status===sf);
   const list=document.getElementById('adminSubList');
@@ -1670,7 +1672,7 @@ function renderAdmin(){
     <span style="font-size:20px;">📋</span>
     <div style="flex:1;font-size:13px;color:var(--school-navy);">
       <strong>Workflow:</strong> Submissions → <span style="color:var(--amber);font-weight:700;">Editor reviews &amp; proofreads</span> → <span style="color:var(--green);font-weight:700;">Approved here for layout</span> → Finalize
-      <br><span style="font-size:12px;color:var(--ink3);">${pendingCount} pending editor review · ${approvedCount} ready for you to finalize</span>
+      <br><span style="font-size:12px;color:var(--ink3);">Showing only Editor-approved content · ${pendingCount} still pending with Editor · ${approvedCount} ready to finalize</span>
     </div>
   </div>`;
   if(!filtered.length){list.innerHTML=workflowBanner+`<div class="empty-state"><div class="empty-state-icon">📭</div><h3>No submissions to show</h3><p>${subs.length?'Try changing the filter.':'Share the submission links with contributors.'}</p></div>`;return;}
@@ -1757,6 +1759,29 @@ function enterEditor(){
   dbLoadAll().then(list=>{subs=list;renderEditor();});
 }
 
+function setEditorCategory(cat){
+  currentEditorCat=cat;
+  document.querySelectorAll('#viewEditor .admin-tab').forEach(t=>t.classList.remove('active'));
+  const btn=document.getElementById('etab-'+cat);if(btn)btn.classList.add('active');
+  if(cat==='editorial'){
+    document.getElementById('editorModeList').style.display='none';
+    document.getElementById('editorModeNote').style.display='block';
+    renderEditorNote();
+  } else {
+    document.getElementById('editorModeList').style.display='block';
+    document.getElementById('editorModeNote').style.display='none';
+    renderEditor();
+  }
+}
+function renderEditorNote(){
+  subs=loadAll();
+  const edNote=subs.find(s=>s.category==='editorial-note');
+  if(edNote){
+    document.getElementById('edNoteTitle').value=edNote.data.title?.value||'';
+    document.getElementById('edNoteBody').value=edNote.data.body?.value||'';
+    document.getElementById('edNoteStatus').textContent='Last saved: '+edNote.ts;
+  }
+}
 function renderEditor(){
   subs=loadAll();
   const pendingCount=subs.filter(s=>s.status==='pending').length;
@@ -2541,7 +2566,7 @@ function renderShareLinks(){const c=document.getElementById('shareLinksContainer
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* URL ROUTING — Admin access via ?admin or ?editor in URL */
-function checkUrlRouting(){try{const params=new URLSearchParams(window.location.search);const fp=params.get('form');const ap=params.get('admin');const ep=params.get('editor');if(ap!==null){openPIN('admin');return true;}if(ep!==null){openPIN('editor');return true;}if(fp&&CATEGORIES[fp]){openForm(fp);return true;}}catch(e){console.warn('[MagicEditor] URL routing:',e.message);}return false;}
+function checkUrlRouting(){try{const params=new URLSearchParams(window.location.search);const fp=params.get('form');const ap=params.get('admin');const ep=params.get('editor');if(ap!==null){openPIN('admin');return true;}if(ep!==null){openPIN('editor');return true;}if(fp&&CATEGORIES[fp]){return fp;}/* return form key, not open yet */}catch(e){console.warn('[MagicEditor] URL routing:',e.message);}return false;}
 
 /* KEYBOARD SHORTCUT — type "admin" or "editor" on landing page */
 let keyBuffer='';
@@ -2550,9 +2575,14 @@ document.addEventListener('keydown',function(e){if(document.querySelector('.view
 /* INIT */
 renderLandingCards();
 applyLsColors(lsSettings);
-checkUrlRouting();
-/* Boot cloud sync after page renders */
-setTimeout(()=>initCloudSync(),300);
+const _pendingFormKey=checkUrlRouting();
+/* Boot cloud sync — forms from external links open AFTER settings are fetched */
+setTimeout(()=>initCloudSync().then(()=>{
+  /* If a ?form= link was shared externally, open it now with up-to-date cloud settings */
+  if(_pendingFormKey&&typeof _pendingFormKey==='string'&&CATEGORIES[_pendingFormKey]){
+    openForm(_pendingFormKey);
+  }
+}),300);
 </script>
 </body>
 </html>
