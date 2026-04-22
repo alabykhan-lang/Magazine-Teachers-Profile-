@@ -656,17 +656,25 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
               <div class="ls-field"><label>OpenRouter API Key</label><input type="password" id="ls-apiKey" placeholder="sk-or-v1-…"/></div>
               <div class="ls-field"><label>Layout AI Model</label>
                 <select id="ls-layoutModel">
-                  <option value="anthropic/claude-3-haiku">Claude 3 Haiku (Recommended ✓)</option>
-                  <option value="google/gemini-flash-1.5">Gemini Flash 1.5 (Fast)</option>
-                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Best)</option>
+                  <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash ✓ (Fast/Cheap)</option>
+                  <option value="google/gemini-2.0-flash-lite-001">Gemini 2.0 Flash Lite (Cheapest)</option>
+                  <option value="google/gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro (Best Quality)</option>
+                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Premium)</option>
+                  <option value="anthropic/claude-3-haiku">Claude 3 Haiku (Reliable)</option>
+                  <option value="deepseek/deepseek-chat">DeepSeek V3 (Cheap/Smart)</option>
+                  <option value="openai/gpt-4o-mini">GPT-4o Mini (Fast)</option>
                   <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B (Free)</option>
                 </select>
               </div>
               <div class="ls-field"><label>Proofread AI Model</label>
                 <select id="ls-proofModel">
-                  <option value="google/gemini-flash-1.5">Gemini Flash 1.5 (Recommended ✓)</option>
-                  <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
-                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Best)</option>
+                  <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash ✓ (Fast/Cheap)</option>
+                  <option value="google/gemini-2.0-flash-lite-001">Gemini 2.0 Flash Lite (Cheapest)</option>
+                  <option value="google/gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro (Best Quality)</option>
+                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Premium)</option>
+                  <option value="anthropic/claude-3-haiku">Claude 3 Haiku (Reliable)</option>
+                  <option value="deepseek/deepseek-chat">DeepSeek V3 (Cheap/Smart)</option>
+                  <option value="openai/gpt-4o-mini">GPT-4o Mini (Fast)</option>
                   <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B (Free)</option>
                 </select>
               </div>
@@ -745,14 +753,30 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
         <!-- AI Assistant -->
         <div id="lspanel-aiassist" style="display:none;">
           <div class="ls-ai-panel">
-            <h4>✦ Layout AI Assistant</h4>
-            <p style="font-size:12.5px;color:var(--school-navy);margin-bottom:12px;">The AI assists with design decisions and layout suggestions. It <strong>never edits your content text</strong> — only helps with arrangement and design. Use <strong>✦ Apply to Preview</strong> to automatically implement the AI's recommendations.</p>
-            <label style="font-size:12px;font-weight:700;color:var(--ink2);display:block;margin-bottom:6px;">Ask the AI about your magazine layout:</label>
-            <textarea id="aiAssistQuery" style="width:100%;padding:12px;border:2px solid var(--school-mint3);border-radius:10px;font-size:14px;font-family:'Lato',sans-serif;min-height:100px;resize:vertical;margin-bottom:10px;background:#fff;display:block;" placeholder="Type your layout question here...&#10;&#10;Examples:&#10;• We have 30 teachers — best layout?&#10;• How should I design the cover page?&#10;• Gallery section feels crowded — suggestions?"></textarea>
+            <h4>✦ AI Layout Designer — Conversational</h4>
+            <p style="font-size:12.5px;color:var(--school-navy);margin-bottom:12px;">Chat with the AI about your magazine design. Ask about layout, colours, typography, headers, styles — the AI can suggest changes and you can review before applying. Use <strong>Gemini 2.0 Flash</strong> for best speed/cost balance.</p>
+
+            <!-- Chat history -->
+            <div id="aiChatHistory" style="max-height:420px;overflow-y:auto;margin-bottom:14px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;"></div>
+
+            <!-- Input area -->
+            <textarea id="aiAssistQuery" style="width:100%;padding:12px;border:2px solid var(--school-mint3);border-radius:10px;font-size:14px;font-family:'Lato',sans-serif;min-height:80px;resize:vertical;margin-bottom:10px;background:#fff;display:block;" placeholder="Ask the AI about layout, colours, bold headers, styles, etc..."></textarea>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-              <button class="btn btn-ai" onclick="runLayoutAI()">✦ Ask AI</button>
-              <button class="btn btn-primary" id="btnApplyLayout" onclick="applyLayoutSuggestions()" style="display:none;background:var(--school-mint3);color:#fff;border:none;">⚡ Apply to Preview</button>
+              <button class="btn btn-ai" onclick="runLayoutAI()">✦ Send Message</button>
+              <button class="btn btn-primary" id="btnApplyLayout" onclick="applyLayoutSuggestions()" style="display:none;background:var(--school-mint3);color:#fff;border:none;">⚡ Apply Suggestions</button>
+              <button class="btn" onclick="clearAIChat()" style="font-size:12px;">Clear Chat</button>
             </div>
+
+            <!-- Pending suggestion review box -->
+            <div id="aiReviewBox" style="display:none;margin-top:14px;background:linear-gradient(135deg,#fdf8ee,#faf4e4);border:2px solid #e8d090;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:12px;font-weight:700;color:#4a3408;margin-bottom:8px;">📋 AI Suggestion Ready for Review</div>
+              <div id="aiReviewText" style="font-size:13px;color:#4a3408;margin-bottom:12px;max-height:200px;overflow-y:auto;"></div>
+              <div style="display:flex;gap:10px;">
+                <button class="btn btn-primary" onclick="approveAISuggestion()" style="background:var(--green);color:#fff;border:none;">✓ Apply This</button>
+                <button class="btn" onclick="rejectAISuggestion()" style="color:var(--red);border-color:var(--red2);">✗ Reject</button>
+              </div>
+            </div>
+
             <div class="ls-ai-result" id="aiAssistResult"></div>
             <div id="aiApplyLog" style="display:none;margin-top:12px;background:#f0fdf6;border:1px solid var(--school-mint2);border-radius:9px;padding:12px 14px;font-size:13px;color:var(--green);"></div>
           </div>
@@ -1063,6 +1087,25 @@ function getSupa(){
   try{_supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);return _supa;}
   catch(e){console.warn('[DB] Supabase init failed:',e.message);return null;}
 }
+/* Retry helper for resilient cloud operations */
+async function withRetry(operation,label,retries=3){
+  let lastErr;
+  for(let i=0;i<retries;i++){
+    try{
+      const result=await operation();
+      return result;
+    }catch(e){
+      lastErr=e;
+      const delay=Math.min(1000*Math.pow(2,i),8000);
+      const msg=`${label} failed (try ${i+1}/${retries}): ${e.message||e}. Retrying in ${delay/1000}s…`;
+      console.warn('[DB]',msg);
+      showSync('syncing',msg);
+      await new Promise(r=>setTimeout(r,delay));
+    }
+  }
+  throw lastErr;
+}
+
 
 /* UUID generator for submission IDs */
 function genId(){
@@ -1084,11 +1127,14 @@ function showSync(state,msg){
 
 /* ── Submissions (cloud + local mirror) ── */
 async function dbLoadAll(){
+  const localCache=JSON.parse(localStorage.getItem('me_subs')||'[]');
   try{
-    const sb=getSupa();if(!sb)throw new Error('no client');
-    const{data,error}=await sb.from('submissions').select('*').order('created_at',{ascending:true});
-    if(error)throw error;
-    const cloudRows=data||[];
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
+    const cloudRows=await withRetry(async()=>{
+      const{data,error}=await sb.from('submissions').select('*').order('created_at',{ascending:true});
+      if(error)throw error;
+      return data||[];
+    },'Loading submissions');
     /* Normalise: Supabase row → internal format */
     const mapped=cloudRows.map(r=>({
       id:r.id,category:r.category,ts:r.ts||new Date(r.created_at).toLocaleString(),
@@ -1098,23 +1144,20 @@ async function dbLoadAll(){
       photoData:r.photo_data||null,photoName:r.photo_name||null,
       photos:r.photos?( typeof r.photos==='string'?JSON.parse(r.photos):r.photos ):null
     }));
-    /* FIX: Don't let an empty cloud response wipe local data.
-       Supabase RLS silently returns [] when access is denied. */
-    if(!mapped.length){
-      const localCache=JSON.parse(localStorage.getItem('me_subs')||'[]');
-      if(localCache.length){
-        console.warn('[DB] Cloud returned 0 rows but local has '+localCache.length+' items — possible RLS block, keeping local');
-        showSync('err','Cloud data empty — check Supabase RLS policies');
-        return localCache;
-      }
+    /* Guard: empty cloud response with local data = possible RLS block */
+    if(!mapped.length&&localCache.length){
+      console.warn('[DB] Cloud returned 0 rows but local has '+localCache.length+' — possible RLS block, keeping local');
+      showSync('err','Cloud empty — check RLS. Using local data.');
+      return localCache;
     }
-    /* Mirror to localStorage as cache */
+    /* Success — mirror to localStorage as cache */
     localStorage.setItem('me_subs',JSON.stringify(mapped));
+    showSync('ok','✓ Cloud synced '+mapped.length+' submissions');
     return mapped;
   }catch(e){
-    console.warn('[DB] Cloud load failed, using local cache:',e.message);
-    showSync('err','Offline — using local data');
-    return JSON.parse(localStorage.getItem('me_subs')||'[]');
+    console.warn('[DB] Cloud load failed after retries:',e.message);
+    showSync('err','Cloud unreachable — using '+localCache.length+' local items');
+    return localCache;
   }
 }
 async function dbSaveSubmission(sub){
@@ -1123,10 +1166,10 @@ async function dbSaveSubmission(sub){
   const idx=local.findIndex(s=>s.id===sub.id);
   if(idx>=0)local[idx]=sub;else local.push(sub);
   localStorage.setItem('me_subs',JSON.stringify(local));
-  /* Cloud sync */
+  /* Cloud sync with retry */
   showSync('syncing','Saving to cloud…');
   try{
-    const sb=getSupa();if(!sb)throw new Error('no client');
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
     const row={
       id:sub.id,category:sub.category,ts:sub.ts,
       created_at:new Date(sub.createdAt||Date.now()).toISOString(),
@@ -1136,18 +1179,20 @@ async function dbSaveSubmission(sub){
       photo_data:sub.photoData||null,photo_name:sub.photoName||null,
       photos:sub.photos?JSON.stringify(sub.photos):null
     };
-    /* FIX: Use .select() so we can detect if RLS silently dropped the write */
-    const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
-    if(error)throw error;
-    if(!data||data.length===0){
-      console.warn('[DB] Upsert returned empty — possible RLS block on insert');
-      showSync('err','Saved locally — cloud may be blocked. Check Supabase RLS policies.');
+    const result=await withRetry(async()=>{
+      const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
+      if(error)throw error;
+      return data;
+    },'Saving submission');
+    if(!result||result.length===0){
+      console.warn('[DB] Upsert returned empty after retries');
+      showSync('err','Cloud may be blocked — saved locally');
       return;
     }
     showSync('ok','✓ Saved to cloud');
   }catch(e){
-    console.warn('[DB] Cloud save failed:',e.message);
-    showSync('err','Saved locally — cloud sync pending');
+    console.warn('[DB] Cloud save failed after retries:',e.message);
+    showSync('err','Cloud unreachable — saved locally, will retry');
   }
 }
 async function dbDeleteSubmission(id){
@@ -1155,11 +1200,16 @@ async function dbDeleteSubmission(id){
   localStorage.setItem('me_subs',JSON.stringify(local));
   showSync('syncing','Deleting…');
   try{
-    const sb=getSupa();if(!sb)throw new Error('no client');
-    const{error}=await sb.from('submissions').delete().eq('id',String(id));
-    if(error)throw error;
-    showSync('ok','✓ Deleted');
-  }catch(e){showSync('err','Deleted locally — cloud sync pending');}
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
+    await withRetry(async()=>{
+      const{error}=await sb.from('submissions').delete().eq('id',String(id));
+      if(error)throw error;
+    },'Deleting submission');
+    showSync('ok','✓ Deleted from cloud');
+  }catch(e){
+    console.warn('[DB] Cloud delete failed after retries:',e.message);
+    showSync('err','Deleted locally — cloud will sync later');
+  }
 }
 async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
   const local=JSON.parse(localStorage.getItem('me_subs')||'[]');
@@ -1168,36 +1218,47 @@ async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
   localStorage.setItem('me_subs',JSON.stringify(local));
   showSync('syncing','Updating…');
   try{
-    const sb=getSupa();if(!sb)throw new Error('no client');
-    const{error}=await sb.from('submissions').update({
-      status,reviewer_note:reviewerNote||'',
-      reviewed_at:reviewedAt?new Date(reviewedAt).toISOString():null
-    }).eq('id',String(id));
-    if(error)throw error;
-    showSync('ok','✓ Updated');
-  }catch(e){showSync('err','Updated locally — cloud sync pending');}
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
+    await withRetry(async()=>{
+      const{error}=await sb.from('submissions').update({
+        status,reviewer_note:reviewerNote||'',
+        reviewed_at:reviewedAt?new Date(reviewedAt).toISOString():null
+      }).eq('id',String(id));
+      if(error)throw error;
+    },'Updating status');
+    showSync('ok','✓ Updated in cloud');
+  }catch(e){
+    console.warn('[DB] Cloud update failed after retries:',e.message);
+    showSync('err','Updated locally — cloud will sync later');
+  }
 }
 
 /* ── Settings (cloud kv store) ── */
 async function dbLoadSettings(key){
   try{
-    const sb=getSupa();if(!sb)throw new Error('no client');
-    const{data,error}=await sb.from('settings').select('value').eq('key',key).single();
-    if(error&&error.code!=='PGRST116')throw error;
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
+    const data=await withRetry(async()=>{
+      const{data,error}=await sb.from('settings').select('value').eq('key',key).single();
+      if(error&&error.code!=='PGRST116')throw error;
+      return data;
+    },'Loading settings '+key);
     if(data?.value){
       const parsed=typeof data.value==='string'?JSON.parse(data.value):data.value;
       localStorage.setItem('me_'+key,JSON.stringify(parsed));
       return parsed;
     }
-  }catch(e){console.warn('[DB] Settings load:',key,e.message);}
+  }catch(e){console.warn('[DB] Settings load failed:',key,e.message);}
   try{return JSON.parse(localStorage.getItem('me_'+key)||'null');}catch(e){return null;}
 }
 async function dbSaveSettings(key,value){
   localStorage.setItem('me_'+key,JSON.stringify(value));
   try{
-    const sb=getSupa();if(!sb)throw new Error('no client');
-    await sb.from('settings').upsert({key,value:JSON.stringify(value)},{onConflict:'key'});
-  }catch(e){console.warn('[DB] Settings save:',key,e.message);}
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
+    await withRetry(async()=>{
+      const{error}=await sb.from('settings').upsert({key,value:JSON.stringify(value)},{onConflict:'key'});
+      if(error)throw error;
+    },'Saving settings '+key);
+  }catch(e){console.warn('[DB] Settings save failed:',key,e.message);}
 }
 
 /* ── Patched legacy sync functions ── */
@@ -1523,6 +1584,9 @@ let pinBuf='',pinMode=null,currentAdminCat='all',currentEditorCat='pending';
 let reviewingId=null,reviewingDecision=null,currentLsTab='preview';
 let magPages=[],currentPageIdx=0,renamingKey=null,dragSrcIdx=null;
 let currentCustCat=null,editingCustomFieldId=null;
+/* AI Chat history for conversational layout assistant */
+let aiChatHistory=[];
+let aiPendingSuggestion=null;
 
 /* VIEW */
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);}
@@ -1933,9 +1997,9 @@ function saveCustomField(){if(!currentCustCat)return;const label=document.getEle
 function deleteCustomField(fieldId){if(!currentCustCat)return;const entry=formConfig[currentCustCat];if(!entry)return;const cf=entry.customFields.find(x=>x.id===fieldId);if(!cf)return;if(!confirm(`Delete custom field "${cf.label}"?`))return;entry.customFields=entry.customFields.filter(x=>x.id!==fieldId);saveFormConfig(formConfig);renderFieldCustomizer();}
 
 /* LAYOUT STUDIO */
-function lsTab(tab){currentLsTab=tab;document.querySelectorAll('.ls-tab').forEach(t=>t.classList.remove('active'));document.getElementById('lstab-'+tab).classList.add('active');['preview','sections','design','toc','aiassist'].forEach(t=>{const el=document.getElementById('lspanel-'+t);if(el)el.style.display=t===tab?'block':'none';});if(tab==='sections')renderSectionManager();if(tab==='toc')renderTOC();if(tab==='aiassist')renderAIContentSummary();if(tab==='design'){loadLsSettingsToUI();renderLabelRenameList();}}
+function lsTab(tab){currentLsTab=tab;document.querySelectorAll('.ls-tab').forEach(t=>t.classList.remove('active'));document.getElementById('lstab-'+tab).classList.add('active');['preview','sections','design','toc','aiassist'].forEach(t=>{const el=document.getElementById('lspanel-'+t);if(el)el.style.display=t===tab?'block':'none';});if(tab==='sections')renderSectionManager();if(tab==='toc')renderTOC();if(tab==='aiassist'){renderAIContentSummary();renderAIChatHistory();}if(tab==='design'){loadLsSettingsToUI();renderLabelRenameList();}}
 
-function loadLsSettingsToUI(){const s=lsSettings;const set=(id,val)=>{const el=document.getElementById(id);if(el&&val!==undefined)el.value=val;};set('ls-magTitle',s.magTitle||'The Torch');set('ls-schoolName',s.schoolName||'Way To Success Standard Schools');set('ls-location',s.location||'Ejigbo, Osun State');set('ls-edition',s.edition||'1st Edition');set('ls-year',s.year||'2025/2026');set('ls-theme',s.theme||'');set('ls-color1',s.color1||'#1a2744');set('ls-color2',s.color2||'#7dd4a8');set('ls-color3',s.color3||'#8b1a1a');set('ls-pageBg',s.pageBg||'#ffffff');set('ls-textColor',s.textColor||'#1c1c1e');set('ls-headingFont',s.headingFont||"'Playfair Display',serif");set('ls-bodyFont',s.bodyFont||"'Crimson Text',serif");set('ls-fontSize',s.fontSize||'11px');set('ls-pageSize',s.pageSize||'a4');set('ls-orientation',s.orientation||'portrait');set('ls-pageNums',s.pageNums||'yes');set('ls-apiKey',s.apiKey||'');set('ls-layoutModel',s.layoutModel||'anthropic/claude-3-haiku');set('ls-proofModel',s.proofModel||'google/gemini-flash-1.5');set('ls-maxTokens',s.maxTokens||'1000');set('ls-teachersPerPage',String(s.teachersPerPage||9));set('ls-studentsPerPage',String(s.studentsPerPage||2));set('ls-speechesPerPage',String(s.speechesPerPage||1));set('ls-galleryPerPage',String(s.galleryPerPage||4));set('ls-creativePerPage',String(s.creativePerPage||2));set('ls-autoTrim',s.autoTrim||'yes');updatePageSizeUI();}
+function loadLsSettingsToUI(){const s=lsSettings;const set=(id,val)=>{const el=document.getElementById(id);if(el&&val!==undefined)el.value=val;};set('ls-magTitle',s.magTitle||'The Torch');set('ls-schoolName',s.schoolName||'Way To Success Standard Schools');set('ls-location',s.location||'Ejigbo, Osun State');set('ls-edition',s.edition||'1st Edition');set('ls-year',s.year||'2025/2026');set('ls-theme',s.theme||'');set('ls-color1',s.color1||'#1a2744');set('ls-color2',s.color2||'#7dd4a8');set('ls-color3',s.color3||'#8b1a1a');set('ls-pageBg',s.pageBg||'#ffffff');set('ls-textColor',s.textColor||'#1c1c1e');set('ls-headingFont',s.headingFont||"'Playfair Display',serif");set('ls-bodyFont',s.bodyFont||"'Crimson Text',serif");set('ls-fontSize',s.fontSize||'11px');set('ls-pageSize',s.pageSize||'a4');set('ls-orientation',s.orientation||'portrait');set('ls-pageNums',s.pageNums||'yes');set('ls-apiKey',s.apiKey||'');set('ls-layoutModel',s.layoutModel||'google/gemini-2.0-flash-001');set('ls-proofModel',s.proofModel||'google/gemini-flash-1.5');set('ls-maxTokens',s.maxTokens||'1000');set('ls-teachersPerPage',String(s.teachersPerPage||9));set('ls-studentsPerPage',String(s.studentsPerPage||2));set('ls-speechesPerPage',String(s.speechesPerPage||1));set('ls-galleryPerPage',String(s.galleryPerPage||4));set('ls-creativePerPage',String(s.creativePerPage||2));set('ls-autoTrim',s.autoTrim||'yes');updatePageSizeUI();}
 function updatePageSizeUI(){const ps=document.getElementById('ls-pageSize');const row=document.getElementById('ls-customSizeRow');if(ps&&row)row.style.display=ps.value==='custom'?'block':'none';}
 function saveLsSettings(){const get=id=>{const el=document.getElementById(id);return el?el.value:undefined;};const s={magTitle:get('ls-magTitle'),schoolName:get('ls-schoolName'),location:get('ls-location'),edition:get('ls-edition'),year:get('ls-year'),theme:get('ls-theme'),color1:get('ls-color1'),color2:get('ls-color2'),color3:get('ls-color3'),pageBg:get('ls-pageBg'),textColor:get('ls-textColor'),headingFont:get('ls-headingFont'),bodyFont:get('ls-bodyFont'),fontSize:get('ls-fontSize'),pageSize:get('ls-pageSize'),orientation:get('ls-orientation'),pageNums:get('ls-pageNums'),apiKey:get('ls-apiKey'),layoutModel:get('ls-layoutModel'),proofModel:get('ls-proofModel'),maxTokens:get('ls-maxTokens'),teachersPerPage:parseInt(get('ls-teachersPerPage'))||9,studentsPerPage:parseInt(get('ls-studentsPerPage'))||2,speechesPerPage:parseInt(get('ls-speechesPerPage'))||1,galleryPerPage:parseInt(get('ls-galleryPerPage'))||4,creativePerPage:parseInt(get('ls-creativePerPage'))||2,autoTrim:get('ls-autoTrim')};lsSettings=s;saveLsSettingsToStorage(s);applyLsColors(s);alert('Settings saved!');}
 function applyLsColors(s){
@@ -2320,11 +2384,11 @@ async function proofreadWithAI(text,panelEl,subId,fields){
     panelEl.innerHTML=`<div class="proofread-panel"><p class="proofread-panel-title">✦ AI Proofreading</p><p style="color:var(--red);font-size:13px;"><strong>No API key.</strong> Go to Layout Studio → Design Settings → AI Configuration.</p></div>`;
     panelEl.style.display='block';return;
   }
-  panelEl.innerHTML=`<div class="proofread-panel"><p class="proofread-panel-title">✦ AI Proofreading — Gemini 2.0 Flash</p><div style="display:flex;align-items:center;gap:8px;"><div style="width:16px;height:16px;border:2px solid var(--purple);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></div><p class="proofread-loading">Reading all fields…</p></div></div>`;
+  panelEl.innerHTML=`<div class="proofread-panel"><p class="proofread-panel-title">✦ AI Proofreading</p><div style="display:flex;align-items:center;gap:8px;"><div style="width:16px;height:16px;border:2px solid var(--purple);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></div><p class="proofread-loading">Reading all fields…</p></div></div>`;
   panelEl.style.display='block';
 
   /* Try Gemini 2.0 first, fall back to Claude Haiku on 504 */
-  const models=['google/gemini-2.0-flash-001','anthropic/claude-3-haiku'];
+  const models=['google/gemini-2.0-flash-001','google/gemini-2.0-flash-lite-001','anthropic/claude-3-haiku'];
   let result='';
   for(const model of models){
     try{
@@ -2400,84 +2464,176 @@ async function saveProofreadEdits(subId){
   if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
 }
 
-/* LAYOUT AI — Fix 3: always auto-applies after every response */
+
+/* AI CHAT HELPERS */
+function addAIChatMessage(role,text,html){
+  aiChatHistory.push({role,text,html,time:new Date().toLocaleTimeString()});
+  renderAIChatHistory();
+}
+function renderAIChatHistory(){
+  const box=document.getElementById('aiChatHistory');if(!box)return;
+  if(!aiChatHistory.length){box.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:2rem 1rem;">Start a conversation with the AI about your magazine design.</div>';return;}
+  box.innerHTML=aiChatHistory.map((m,i)=>{
+    if(m.role==='user')return`<div style="margin-bottom:10px;text-align:right;"><div style="display:inline-block;background:var(--school-navy);color:#fff;padding:8px 12px;border-radius:12px 12px 2px 12px;font-size:13px;max-width:85%;text-align:left;">${m.html||esc(m.text)}</div><div style="font-size:10px;color:var(--ink3);margin-top:2px;">${esc(m.time)}</div></div>`;
+    return`<div style="margin-bottom:10px;"><div style="display:inline-block;background:#f0fdf6;border:1px solid var(--school-mint2);padding:10px 14px;border-radius:12px 12px 12px 2px;font-size:13px;max-width:90%;color:var(--ink);">${m.html||esc(m.text)}</div><div style="font-size:10px;color:var(--ink3);margin-top:2px;">${esc(m.time)}</div></div>`;
+  }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+function clearAIChat(){aiChatHistory=[];aiPendingSuggestion=null;renderAIChatHistory();document.getElementById('aiReviewBox').style.display='none';document.getElementById('aiAssistResult').style.display='none';document.getElementById('btnApplyLayout').style.display='none';}
+function approveAISuggestion(){
+  if(aiPendingSuggestion){applyLayoutFromObject(aiPendingSuggestion,document.getElementById('aiApplyLog'));aiPendingSuggestion=null;document.getElementById('aiReviewBox').style.display='none';}
+}
+function rejectAISuggestion(){aiPendingSuggestion=null;document.getElementById('aiReviewBox').style.display='none';addAIChatMessage('assistant','Suggestion rejected. What would you like to change?');}
+
+/* LAYOUT AI — enhanced conversational with formatting control */
 async function runLayoutAI(){
   const queryEl=document.getElementById('aiAssistQuery');const resultEl=document.getElementById('aiAssistResult');
   const applyBtn=document.getElementById('btnApplyLayout');const applyLog=document.getElementById('aiApplyLog');
+  const reviewBox=document.getElementById('aiReviewBox');const reviewText=document.getElementById('aiReviewText');
   if(!queryEl||!resultEl)return;
-  const query=queryEl?queryEl.value.trim():'';
-  if(!query){alert('Please type a question or describe what you need.');return;}
-  const s=loadLsSettings();const apiKey=s.apiKey;const model=s.layoutModel||'anthropic/claude-3-haiku';const maxTokens=parseInt(s.maxTokens)||1500;
-  if(!apiKey){resultEl.innerHTML='<strong style="color:var(--red);">No API key configured.</strong> Go to Design Settings → AI Configuration.';resultEl.style.display='block';return;}
-  if(applyBtn)applyBtn.style.display='none';
+  const query=queryEl.value.trim();
+  if(!query){alert('Please type a message first.');return;}
+  queryEl.value='';
+  const s=loadLsSettings();const apiKey=s.apiKey;const model=s.layoutModel||'google/gemini-2.0-flash-001';const maxTokens=parseInt(s.maxTokens)||2000;
+  if(!apiKey){addAIChatMessage('assistant','<strong style="color:var(--red);">No API key configured.</strong> Go to Design Settings → AI Configuration.');renderAIChatHistory();return;}
+
+  /* Add user message to chat */
+  addAIChatMessage('user',query);
   if(applyLog){applyLog.style.display='none';applyLog.innerHTML='';}
-  resultEl.innerHTML='<em>✦ Thinking about your layout…</em>';resultEl.style.display='block';
+
+  /* Show thinking indicator */
+  const thinkingIdx=aiChatHistory.length;
+  aiChatHistory.push({role:'assistant',text:'',html:'<em style="color:var(--ink3);">✦ Thinking…</em>',time:''});
+  renderAIChatHistory();
+
   subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');
   const counts=CATEGORY_KEYS.map(k=>`  ${CATEGORIES[k].label}: ${approved.filter(x=>x.category===k).length} approved`).join('\n');
   const ctx=`MAGAZINE: ${s.magTitle||'The Torch'} | ${s.schoolName||'Way To Success Standard Schools'} | ${s.edition||'1st Edition'} ${s.year||'2025/2026'} | Theme: ${s.theme||'—'}
 APPROVED CONTENT:\n${counts}
 LAYOUT: Page: ${s.pageSize||'A4'} ${s.orientation||'portrait'} | Teachers/page: ${s.teachersPerPage||9} | Students/page: ${s.studentsPerPage||2} | Gallery/page: ${s.galleryPerPage||4} | Speeches/page: ${s.speechesPerPage||1} | Creative/page: ${s.creativePerPage||2}
 COLOURS: Primary: ${s.color1||'#1a2744'} | Accent: ${s.color2||'#7dd4a8'} | Contrast: ${s.color3||'#8b1a1a'} | Page BG: ${s.pageBg||'#ffffff'} | Text: ${s.textColor||'#1c1c1e'}
-TYPOGRAPHY: Heading: ${s.headingFont||'Playfair Display'} | Body: ${s.bodyFont||'Crimson Text'} | Size: ${s.fontSize||'11px'}`;
+TYPOGRAPHY: Heading: ${s.headingFont||'Playfair Display'} | Body: ${s.bodyFont||'Crimson Text'} | Size: ${s.fontSize||'11px'}
+CURRENT STYLES: Headers use heading font. Body uses body font. No special formatting like bold headers or all-caps is currently applied unless you set it.`;
+
+  /* Build messages array with chat history for context */
+  const messages=[];
+  messages.push({role:'system',content:`You are a professional magazine designer and layout AI assistant for a Nigerian school graduation magazine. You have a CONVERSATIONAL style — chat naturally, ask clarifying questions, and build on previous messages.
+
+YOUR CAPABILITIES:
+1. Layout & pagination (items per page, orientation, page size)
+2. Colour scheme design (suggest hex codes for primary, accent, contrast, background, text)
+3. Typography (heading font, body font, size)
+4. FORMATTING CONTROL — IMPORTANT: You can now control text styling:
+   • Make section headers BOLD and UPPERCASE
+   • Change header colour
+   • Make body text bold or italic
+   • Add underline to headers
+   • Change spacing between elements
+   Use the formatting commands below.
+5. Magazine identity (title, school name, edition, theme)
+6. Review submissions and suggest section ordering
+
+FORMATTING COMMANDS (include in your response when user asks for style changes):
+Use these exact commands anywhere in your response:
+• [FORMAT:headerBold:true] — makes section headers bold
+• [FORMAT:headerCaps:true] — makes section headers ALL CAPS
+• [FORMAT:headerColor:#1a2744] — changes header colour
+• [FORMAT:bodyBold:false] — toggles body text bold
+• [FORMAT:bodySize:11px] — changes body font size
+• [FORMAT:headerSpacing:10px] — changes spacing below headers
+• [FORMAT:headerUnderline:true] — adds underline to headers
+
+SETTINGS JSON: When you recommend specific layout/colour/type changes, end your response with:
+\`\`\`settings
+{"teachersPerPage":9,"color1":"#1a2744","color2":"#7dd4a8",...}
+\`\`\`
+Include ONLY settings you want to change. All available keys: teachersPerPage, studentsPerPage, galleryPerPage, speechesPerPage, creativePerPage, orientation, pageSize, pageNums, autoTrim, color1, color2, color3, pageBg, textColor, headingFont, bodyFont, fontSize, magTitle, schoolName, edition, year, theme.
+
+fontSize options: "10px"|"11px"|"12px"|"13px". pageSize options: "a4"|"a5"|"letter". headingFont options: "'Playfair Display',serif"|"Georgia,serif"|"'Times New Roman',serif"|"'Lato',sans-serif". bodyFont options: "'Crimson Text',serif"|"'Lato',sans-serif"|"Georgia,serif".
+
+BE CONVERSATIONAL: If the user says "make headers bold and uppercase", respond with the formatting commands AND explain what you changed. If they ask a follow-up like "what about red headers?", build on the previous conversation. Do NOT auto-apply — wait for user confirmation.
+
+Context:
+${ctx}`});
+
+  /* Add previous chat history (last 6 exchanges for context) */
+  const recentHistory=aiChatHistory.slice(-12,-1).filter(m=>m.text);
+  recentHistory.forEach(m=>{
+    if(m.role==='user')messages.push({role:'user',content:m.text});
+    else messages.push({role:'assistant',content:m.text});
+  });
+
+  messages.push({role:'user',content:query});
 
   try{
-    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
-        'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Layout AI'},
-      body:JSON.stringify({model,max_tokens:maxTokens,messages:[
-        {role:'system',content:`You are a professional magazine designer and layout engine for a Nigerian school graduation magazine. You handle ALL aspects of design: layout, structure, colours, typography, branding, and page settings. When given ANY design goal or question, you MUST end your response with a JSON block of recommended settings (include ONLY settings you want to change):
+    /* Try the selected model first */
+    const models=[model,'google/gemini-2.0-flash-001','anthropic/claude-3-haiku'];
+    let result='';
+    let lastErr;
+    for(const tryModel of models){
+      try{
+        const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+            'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Layout AI'},
+          body:JSON.stringify({model:tryModel,max_tokens:maxTokens,messages})});
+        if(!resp.ok){const txt=await resp.text();throw new Error(`HTTP ${resp.status}: ${txt.substring(0,100)}`);}
+        const data=await resp.json();
+        if(data.error)throw new Error(data.error.message||'API error');
+        result=data.choices?.[0]?.message?.content||'';
+        if(result)break;
+      }catch(e){lastErr=e;if(tryModel===models[models.length-1])throw e;}
+    }
 
-\`\`\`settings
-{
-  "teachersPerPage": 9,
-  "studentsPerPage": 2,
-  "galleryPerPage": 4,
-  "speechesPerPage": 1,
-  "creativePerPage": 2,
-  "orientation": "portrait",
-  "pageSize": "a4",
-  "pageNums": "yes",
-  "autoTrim": "no",
-  "color1": "#1a2744",
-  "color2": "#7dd4a8",
-  "color3": "#8b1a1a",
-  "pageBg": "#ffffff",
-  "textColor": "#1c1c1e",
-  "headingFont": "'Playfair Display',serif",
-  "bodyFont": "'Crimson Text',serif",
-  "fontSize": "11px",
-  "magTitle": "The Torch",
-  "schoolName": "Way To Success Standard Schools",
-  "edition": "1st Edition",
-  "year": "2025/2026",
-  "theme": "Lighting the Path"
-}
-\`\`\`
+    /* Remove thinking indicator */
+    aiChatHistory.splice(thinkingIdx,1);
 
-colour1 is the primary/header colour, color2 is the accent/highlight, color3 is a contrast colour. headingFont options: "'Playfair Display',serif" | "Georgia,serif" | "'Times New Roman',serif" | "'Lato',sans-serif". bodyFont options: "'Crimson Text',serif" | "'Lato',sans-serif" | "Georgia,serif". fontSize options: "10px"|"11px"|"12px"|"13px". pageSize options: "a4"|"a5"|"letter".
+    /* Parse formatting commands from response */
+    let displayText=result;
+    const formatCommands={};
+    const fmtRegex=/\[FORMAT:(\w+):(.*?)\]/g;
+    let fmtMatch;
+    while((fmtMatch=fmtRegex.exec(result))!==null){formatCommands[fmtMatch[1]]=fmtMatch[2];}
+    displayText=displayText.replace(/\[FORMAT:.*?\]/g,'').trim();
 
-When the user asks about colours, themes, branding, or visual style — suggest hex colour codes that fit the school's identity and explain your design choices. Always give your design advice first, then end with the settings block. Only include settings relevant to the user's request. Context:\n${ctx}`},
-        {role:'user',content:query}
-      ]})});
-    const data=await resp.json();
-    const result=data.choices?.[0]?.message?.content||'No response.';
     /* Extract settings JSON block */
-    const settingsMatch=result.match(/```settings\s*([\s\S]*?)```/i);
-    const adviceText=result.replace(/```settings[\s\S]*?```/gi,'').trim();
-    resultEl.innerHTML=esc(adviceText).replace(/\n/g,'<br>');
-    if(applyBtn)applyBtn.style.display='inline-flex';
-    window._lastAILayoutResponse=result;
-    /* Fix 3: Auto-apply immediately if settings block found */
+    const settingsMatch=displayText.match(/\`\`\`settings\s*([\s\S]*?)\`\`\`/i);
+    const adviceText=displayText.replace(/\`\`\`settings[\s\S]*?\`\`\`/gi,'').trim();
+
+    /* Store suggestion for review */
     if(settingsMatch){
       try{
-        const parsed=JSON.parse(settingsMatch[1].trim());
-        applyLayoutFromObject(parsed,applyLog);
-      }catch(e){/* fallback to regex apply */applyLayoutSuggestions();}
-    }
-  }catch(e){resultEl.innerHTML=`<strong style="color:var(--red);">Error:</strong> ${esc(e.message)}`;}
-  resultEl.style.display='block';
-}
+        aiPendingSuggestion=JSON.parse(settingsMatch[1].trim());
+        if(reviewBox&&reviewText){
+          reviewText.innerHTML=esc(adviceText).replace(/\n/g,'<br>');
+          reviewBox.style.display='block';
+        }
+        if(applyBtn)applyBtn.style.display='inline-flex';
+      }catch(e){aiPendingSuggestion=null;}
+    }else{aiPendingSuggestion=null;if(reviewBox)reviewBox.style.display='none';}
 
+    /* Apply formatting commands immediately (these are safe styling changes) */
+    const fmtChanges=[];
+    if(Object.keys(formatCommands).length){
+      const s2=loadLsSettings();
+      if(formatCommands.headerColor&&/^#[0-9a-fA-F]{3,8}$/.test(formatCommands.headerColor)){s2.color1=formatCommands.headerColor;document.getElementById('ls-color1').value=formatCommands.headerColor;fmtChanges.push('Header colour → '+formatCommands.headerColor);}
+      if(formatCommands.bodySize&&['10px','11px','12px','13px'].includes(formatCommands.bodySize)){s2.fontSize=formatCommands.bodySize;document.getElementById('ls-fontSize').value=formatCommands.bodySize;fmtChanges.push('Body size → '+formatCommands.bodySize);}
+      if(fmtChanges.length){
+        saveLsSettingsToStorage(s2);lsSettings=s2;applyLsColors(s2);
+        if(applyLog){applyLog.innerHTML='✅ Applied formatting: '+fmtChanges.join(', ');applyLog.style.display='block';}
+      }
+    }
+
+    window._lastAILayoutResponse=displayText;
+    const htmlResponse=esc(adviceText).replace(/\n/g,'<br>')+(fmtChanges.length?`<br><br><em style="color:var(--green);">✓ Formatting applied: ${fmtChanges.join(', ')}</em>`:'')+(settingsMatch?'<br><br><strong style="color:var(--amber);">⚡ Layout suggestion ready — review below before applying.</strong>':'');
+    addAIChatMessage('assistant',adviceText||result,htmlResponse);
+    renderAIChatHistory();
+
+  }catch(e){
+    aiChatHistory.splice(thinkingIdx,1);
+    addAIChatMessage('assistant','<strong style="color:var(--red);">Error:</strong> '+esc(e.message));
+    renderAIChatHistory();
+  }
+}
 /* Apply directly from a parsed settings object */
 function applyLayoutFromObject(obj,logEl){
   const s=loadLsSettings();
@@ -2567,6 +2723,8 @@ function applyLayoutFromObject(obj,logEl){
    UI dropdowns, and regenerates the preview automatically.
 ─────────────────────────────────────────────────────────────────────────────── */
 function applyLayoutSuggestions(){
+  /* If there's a pending parsed suggestion, apply it directly */
+  if(aiPendingSuggestion){applyLayoutFromObject(aiPendingSuggestion,document.getElementById('aiApplyLog'));aiPendingSuggestion=null;document.getElementById('aiReviewBox').style.display='none';return;}
   const text=window._lastAILayoutResponse||'';
   if(!text){alert('No AI response to apply. Ask the AI a question first.');return;}
   const logEl=document.getElementById('aiApplyLog');
@@ -2707,7 +2865,7 @@ function applyLayoutSuggestions(){
     }
   },600);
 }
-function renderAIContentSummary(){const el=document.getElementById('aiContentSummary');if(!el)return;subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');el.textContent=CATEGORY_KEYS.map(k=>`${CATEGORIES[k].label}: ${approved.filter(x=>x.category===k).length} approved`).join('\n')+`\n\nTotal approved: ${approved.length} | Total submitted: ${subs.length}`;}
+function renderAIContentSummary(){const el=document.getElementById('aiContentSummary');if(!el)return;subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');el.textContent=CATEGORY_KEYS.map(k=>`${CATEGORIES[k].label}: ${approved.filter(x=>x.category===k).length} approved`).join('\n')+`\n\nTotal approved: ${approved.length} | Total submitted: ${subs.length}`;renderAIChatHistory();}
 
 /* EXPORTS */
 function slugify(s){return(s||'unknown').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').substring(0,40)||'unknown';}
