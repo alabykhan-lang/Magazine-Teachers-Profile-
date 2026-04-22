@@ -1088,8 +1088,9 @@ async function dbLoadAll(){
     const sb=getSupa();if(!sb)throw new Error('no client');
     const{data,error}=await sb.from('submissions').select('*').order('created_at',{ascending:true});
     if(error)throw error;
+    const cloudRows=data||[];
     /* Normalise: Supabase row → internal format */
-    const mapped=data.map(r=>({
+    const mapped=cloudRows.map(r=>({
       id:r.id,category:r.category,ts:r.ts||new Date(r.created_at).toLocaleString(),
       createdAt:r.created_at?new Date(r.created_at).getTime():r.created_at_ms||Date.now(),
       status:r.status||'draft',reviewerNote:r.reviewer_note||'',reviewedAt:r.reviewed_at||null,
@@ -1097,6 +1098,16 @@ async function dbLoadAll(){
       photoData:r.photo_data||null,photoName:r.photo_name||null,
       photos:r.photos?( typeof r.photos==='string'?JSON.parse(r.photos):r.photos ):null
     }));
+    /* FIX: Don't let an empty cloud response wipe local data.
+       Supabase RLS silently returns [] when access is denied. */
+    if(!mapped.length){
+      const localCache=JSON.parse(localStorage.getItem('me_subs')||'[]');
+      if(localCache.length){
+        console.warn('[DB] Cloud returned 0 rows but local has '+localCache.length+' items — possible RLS block, keeping local');
+        showSync('err','Cloud data empty — check Supabase RLS policies');
+        return localCache;
+      }
+    }
     /* Mirror to localStorage as cache */
     localStorage.setItem('me_subs',JSON.stringify(mapped));
     return mapped;
@@ -1125,8 +1136,14 @@ async function dbSaveSubmission(sub){
       photo_data:sub.photoData||null,photo_name:sub.photoName||null,
       photos:sub.photos?JSON.stringify(sub.photos):null
     };
-    const{error}=await sb.from('submissions').upsert(row,{onConflict:'id'});
+    /* FIX: Use .select() so we can detect if RLS silently dropped the write */
+    const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
     if(error)throw error;
+    if(!data||data.length===0){
+      console.warn('[DB] Upsert returned empty — possible RLS block on insert');
+      showSync('err','Saved locally — cloud may be blocked. Check Supabase RLS policies.');
+      return;
+    }
     showSync('ok','✓ Saved to cloud');
   }catch(e){
     console.warn('[DB] Cloud save failed:',e.message);
@@ -1244,7 +1261,7 @@ async function initCloudSync(){
     }
     /* Pull submissions */
     subs=await dbLoadAll();
-    showSync('ok','✓ Cloud sync complete');
+    if(subs.length)showSync('ok','✓ Cloud sync complete');
     /* Refresh any open admin/editor view */
     if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
     if(document.getElementById('viewEditor')?.classList.contains('active'))renderEditor();
