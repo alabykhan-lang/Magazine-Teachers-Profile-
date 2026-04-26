@@ -270,11 +270,17 @@ async function dbLoadAll(){
   const localCache=JSON.parse(localStorage.getItem('me_subs')||'[]');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const cloudRows=await withRetry(async()=>{
-      const{data,error}=await sb.from('submissions').select('*').order('created_at',{ascending:true});
-      if(error)throw error;
-      return data||[];
-    },'Loading submissions');
+    
+    // Explicitly check for RLS or connection issues
+    const {data,error}=await sb.from('submissions').select('*').order('created_at',{ascending:true});
+    
+    if(error) {
+      console.error('[DB] Supabase Fetch Error:', error);
+      throw error;
+    }
+    
+    const cloudRows = data || [];
+
     /* Normalise: Supabase row → internal format */
     const mapped=cloudRows.map(r=>({
       id:r.id,category:r.category,ts:r.ts||new Date(r.created_at).toLocaleString(),
@@ -284,22 +290,25 @@ async function dbLoadAll(){
       photoData:r.photo_data||null,photoName:r.photo_name||null,
       photos:r.photos?( typeof r.photos==='string'?JSON.parse(r.photos):r.photos ):null
     }));
+
     /* Guard: empty cloud response with local data = possible RLS block */
-    if(!mapped.length&&localCache.length){
-      console.warn('[DB] Cloud returned 0 rows but local has '+localCache.length+' — possible RLS block, keeping local');
-      showSync('err','Cloud empty — check RLS. Using local data.');
+    if(!mapped.length && localCache.length){
+      console.warn('[DB] Cloud returned 0 rows but local has '+localCache.length+' — possible RLS block or fresh database');
+      showSync('err','Cloud returned no data. Check Supabase RLS policies.');
       return localCache;
     }
+    
     /* Success — mirror to localStorage as cache */
     localStorage.setItem('me_subs',JSON.stringify(mapped));
-    showSync('ok','✓ Cloud synced '+mapped.length+' submissions');
+    showSync('ok','✓ Cloud synced '+mapped.length+' items');
     return mapped;
   }catch(e){
-    console.warn('[DB] Cloud load failed after retries:',e.message);
-    showSync('err','Cloud unreachable — using '+localCache.length+' local items');
+    console.warn('[DB] Cloud load failed:',e.message);
+    showSync('err','Cloud unreachable — using local data');
     return localCache;
   }
 }
+
 async function dbSaveSubmission(sub){
   /* Always write to localStorage immediately (Optimistic UI) */
   const local=JSON.parse(localStorage.getItem('me_subs')||'[]');
@@ -708,7 +717,8 @@ async function submitBulkGallery(){
     const sub={
       id:genId(),
       category:'gallery',ts,createdAt:Date.now()+count,
-      status:'draft',reviewerNote:'',reviewedAt:null,
+      status:'pending',/* FIXED: Gallery items now go to Editor review inbox */
+      reviewerNote:'',reviewedAt:null,
       data:{
         submitterName:{label:'Submitted by',value:submitterName},
         submitterRole:{label:'Role',value:submitterRole},
@@ -722,7 +732,8 @@ async function submitBulkGallery(){
     count++;
   }
   bulkPhotos=[];renderBulkGrid();
-  alert(`✓ ${count} photos submitted successfully! They will appear in your admin panel.`);
+  alert(`✓ ${count} photos submitted successfully! They are now awaiting Editor review.`);
+
   document.getElementById('formContainer').style.display='none';
   document.getElementById('successWrap').style.display='block';
   window.scrollTo({top:0,behavior:'smooth'});
