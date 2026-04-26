@@ -299,19 +299,35 @@ async function dbSaveSettings(key,value){
 
 /* ── Patched legacy sync functions ── */
 function loadAll(){return JSON.parse(localStorage.getItem('me_subs')||'[]');}
-function saveAll(list){
-  localStorage.setItem('me_subs',JSON.stringify(list));
-  /* Fire-and-forget batch upsert */
-  list.forEach(sub=>{
-    const sb=getSupa();if(!sb)return;
-    const row={id:sub.id,category:sub.category,ts:sub.ts,
+
+async function dbSaveAllToCloud(list){
+  if(!list||!list.length)return;
+  showSync('syncing','Saving all to cloud…');
+  try{
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
+    const rows = list.map(sub=>({
+      id:sub.id,category:sub.category,ts:sub.ts,
       created_at:new Date(sub.createdAt||Date.now()).toISOString(),
       status:sub.status,reviewer_note:sub.reviewerNote||'',
       reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
       data:JSON.stringify(sub.data),photo_data:sub.photoData||null,photo_name:sub.photoName||null,
-      photos:sub.photos?JSON.stringify(sub.photos):null};
-    sb.from('submissions').upsert(row,{onConflict:'id'}).then(({error})=>{if(error)console.warn('[DB] upsert:',error.message);});
-  });
+      photos:sub.photos?JSON.stringify(sub.photos):null
+    }));
+    await withRetry(async()=>{
+      const {error}=await sb.from('submissions').upsert(rows,{onConflict:'id'});
+      if(error)throw error;
+    },'Bulk saving submissions');
+    showSync('ok','✓ Synced all to cloud');
+  }catch(e){
+    console.warn('[DB] Bulk upsert failed:',e.message);
+    showSync('err','Cloud unreachable — saved locally');
+  }
+}
+
+function saveAll(list){
+  localStorage.setItem('me_subs',JSON.stringify(list));
+  /* Fire-and-forget bulk upsert */
+  dbSaveAllToCloud(list);
 }
 
 /* CONFIG */
@@ -1920,6 +1936,465 @@ function exportZipByCategory(list,filename,heading){if(typeof JSZip==='undefined
 function getBaseUrl(){try{return window.location.origin+window.location.pathname;}catch(e){return'';}}
 function copyShareLink(formKey){const base=getBaseUrl();const url=formKey===''?base:`${base}?form=${formKey}`;try{navigator.clipboard.writeText(url);const btn=document.getElementById('copy-'+(formKey||'landing'));if(btn){const orig=btn.textContent;btn.textContent='✓ Copied!';btn.style.background='var(--green)';btn.style.color='#fff';setTimeout(()=>{btn.textContent=orig;btn.style.background='';btn.style.color='';},1600);}}catch(e){alert('URL: '+url);}}
 function renderShareLinks(){const c=document.getElementById('shareLinksContainer');if(!c)return;const base=getBaseUrl();const entries=[{key:'',label:'Landing Page (all forms)',icon:'🏠',desc:'Full homepage with all category cards'},...CATEGORY_KEYS.map(k=>({key:k,label:getLabel('cat_label_'+k,CATEGORIES[k].label),icon:CATEGORIES[k].icon,desc:`Submission form for ${CATEGORIES[k].label}`}))];c.innerHTML=entries.map(e=>{const url=e.key===''?base:`${base}?form=${e.key}`;return`<div class="share-link-row"><div class="share-link-icon">${e.icon}</div><div class="share-link-body"><div class="share-link-label">${esc(e.label)}</div><div class="share-link-desc">${esc(e.desc)}</div><div class="share-link-url">${esc(url)}</div></div><button class="btn btn-primary" id="copy-${e.key||'landing'}" onclick="copyShareLink('${e.key}')">Copy</button></div>`;}).join('');}
+
+/* ═══════════════════════════════════════════════════════════
+   WORKSPACE ENGINE — VS Code-style Design Studio
+   Only finalized submissions enter the workspace.
+═══════════════════════════════════════════════════════════ */
+let wsPages=[],wsPageIdx=0,wsZoom=100,wsShowGuides=true,wsSpreadMode=false;
+let wsAIChatHistory=[],wsAISampleBase64=null,wsAISampleMime=null;
+let wsUndoStack=[],wsRedoStack=[],wsAutoSaveTimer=null;
+
+/* ── Open / Close ── */
+function openWorkspace(){
+  subs=loadAll();
+  const finalized=subs.filter(s=>s.status==='finalized');
+  const s=lsSettings;
+  document.getElementById('wsProjectTitle').textContent=(s.magTitle||'The Torch')+' — Design Workspace';
+  show('viewWorkspace');
+  wsRenderColorPanel();
+  wsRenderFontPanel();
+  wsRenderAssets();
+  wsGeneratePreview();
+  wsStartAutoSave();
+  document.getElementById('wsStatusFinalized').textContent=finalized.length+' finalized';
+}
+function closeWorkspace(){
+  wsClearAutoSave();
+  show('viewAdmin');
+  renderAdmin();
+}
+
+/* ── Generate Preview (finalized only) ── */
+function wsGeneratePreview(){
+  subs=loadAll();
+  wsPages=[];wsPageIdx=0;
+  const s=lsSettings;
+  const finalized=subs.filter(sub=>sub.status==='finalized');
+  document.getElementById('wsStatusFinalized').textContent=finalized.length+' finalized';
+
+  sectionOrder.filter(sec=>sec.visible).forEach(sec=>{
+    if(sec.key==='cover'){wsPages.push({type:'cover',sec,label:'Cover Page'});return;}
+    if(sec.key==='toc'){wsPages.push({type:'toc',sec,label:'Table of Contents'});return;}
+    const catSubs=finalized.filter(sub=>sub.category===sec.key);
+    if(sec.key==='editorial-note'){const sub=finalized.find(sub=>sub.category==='editorial-note');if(sub)wsPages.push({type:'editorial-note',sub,sec,label:'Editorial Note'});return;}
+    if(sec.key==='appreciation'){const sub=finalized.find(sub=>sub.category==='appreciation');if(sub)wsPages.push({type:'appreciation',sub,sec,label:'Appreciation'});return;}
+    if(!catSubs.length)return;
+    let perPage=1;
+    if(sec.key==='teachers')perPage=parseInt(s.teachersPerPage)||9;
+    else if(['primary5','jss3','ss3'].includes(sec.key))perPage=parseInt(s.studentsPerPage)||2;
+    else if(sec.key==='speeches')perPage=parseInt(s.speechesPerPage)||1;
+    else if(sec.key==='gallery')perPage=parseInt(s.galleryPerPage)||4;
+    else if(sec.key==='creative')perPage=parseInt(s.creativePerPage)||2;
+    for(let i=0;i<catSubs.length;i+=perPage){
+      wsPages.push({type:'section-content',sec,items:catSubs.slice(i,i+perPage),isFirst:i===0,pageInSection:Math.floor(i/perPage)+1,label:getLabel('section_'+sec.key,sec.label)+(i>0?' (p'+(Math.floor(i/perPage)+1)+')':'')});
+    }
+  });
+
+  wsRenderPageList();
+  wsRenderCurrentPage();
+  wsUpdateNavUI();
+  document.getElementById('wsStatusPages').textContent=wsPages.length+' pages';
+}
+
+/* ── Page List (Left Sidebar) ── */
+function wsRenderPageList(){
+  const c=document.getElementById('wsPageList');if(!c)return;
+  if(!wsPages.length){c.innerHTML='<div style="font-size:11px;color:var(--ws-text3);text-align:center;padding:16px;">No finalized content yet.<br>Finalize submissions from the admin panel.</div>';return;}
+  c.innerHTML=wsPages.map((p,i)=>{
+    const icon=p.type==='cover'?'📕':p.type==='toc'?'📑':p.sec?.icon||'📄';
+    return `<div class="ws-page-item${i===wsPageIdx?' active':''}" onclick="wsSelectPage(${i})">
+      <div class="ws-page-thumb">${icon}</div>
+      <div class="ws-page-info">
+        <div class="ws-page-info-name">${esc(p.label||p.type)}</div>
+        <div class="ws-page-info-meta">Page ${i+1}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Page Navigation ── */
+function wsSelectPage(idx){if(idx<0||idx>=wsPages.length)return;wsPageIdx=idx;wsRenderCurrentPage();wsRenderPageList();wsUpdateNavUI();}
+function wsPrevPage(){if(wsPageIdx>0)wsSelectPage(wsPageIdx-1);}
+function wsNextPage(){if(wsPageIdx<wsPages.length-1)wsSelectPage(wsPageIdx+1);}
+function wsUpdateNavUI(){
+  document.getElementById('wsPageNavInfo').textContent=wsPages.length?`${wsPageIdx+1} / ${wsPages.length}`:'— / —';
+  document.getElementById('wsBtnPrev').disabled=wsPageIdx<=0;
+  document.getElementById('wsBtnNext').disabled=wsPageIdx>=wsPages.length-1;
+}
+
+/* ── Render Current Page in Canvas ── */
+function wsRenderCurrentPage(){
+  const container=document.getElementById('wsPageContainer');
+  if(!wsPages.length){
+    container.innerHTML='<div class="ws-empty"><div class="ws-empty-icon">🛠</div><h3>No pages yet</h3><p>Finalize submissions in the Production Admin, then click <strong>Generate</strong> to build your magazine preview.</p></div>';
+    return;
+  }
+  /* Reuse existing page renderer from the Layout Studio */
+  const origIdx=currentPageIdx;const origPages=magPages;
+  magPages=wsPages;currentPageIdx=wsPageIdx;
+
+  const page=wsPages[wsPageIdx];const{w,h}=getPageDimensions();
+  const scale=(wsZoom/100);
+
+  /* Build page HTML using existing renderCurrentPage logic */
+  const tempCanvas=document.createElement('div');
+  tempCanvas.id='magCanvas';tempCanvas.style.display='none';
+  document.body.appendChild(tempCanvas);
+  renderCurrentPage();
+  const pageHtml=tempCanvas.innerHTML;
+  document.body.removeChild(tempCanvas);
+
+  /* Restore original state */
+  magPages=origPages;currentPageIdx=origIdx;
+
+  /* Build workspace page with guides */
+  const guidesHtml=wsShowGuides?`
+    <div class="ws-bleed"></div>
+    <div class="ws-safe"></div>
+    <div class="ws-crop-tl"></div><div class="ws-crop-tr"></div>
+    <div class="ws-crop-bl"></div><div class="ws-crop-br"></div>
+    <div class="ws-guide-label bleed-label">BLEED 3mm</div>
+    <div class="ws-guide-label safe-label">SAFE AREA</div>
+  `:'';
+
+  container.innerHTML=`
+    <div class="ws-mag-page ${wsShowGuides?'ws-guides':''}" style="width:${w}px;height:${h}px;transform:scale(${scale});">
+      ${guidesHtml}
+      <div class="ws-mag-page-inner">${pageHtml}</div>
+    </div>
+  `;
+}
+
+/* ── Zoom ── */
+function wsSetZoom(level){
+  wsZoom=Math.max(25,Math.min(200,level));
+  document.getElementById('wsZoomLevel').textContent=wsZoom+'%';
+  document.getElementById('wsStatusZoom').textContent=wsZoom+'%';
+  wsRenderCurrentPage();
+}
+
+/* ── Guides Toggle ── */
+function wsToggleGuides(){
+  wsShowGuides=!wsShowGuides;
+  document.getElementById('wsGuidesBtn').textContent=wsShowGuides?'☑ Guides':'☐ Guides';
+  wsRenderCurrentPage();
+}
+
+/* ── Spread View ── */
+function wsToggleSpread(){
+  wsSpreadMode=!wsSpreadMode;
+  document.getElementById('wsSpreadBtn').textContent=wsSpreadMode?'⊞ Single':'⊞ Spread';
+  wsRenderCurrentPage();
+}
+
+/* ── Sidebar Panel Toggle ── */
+function wsTogglePanel(id){document.getElementById(id)?.classList.toggle('collapsed');}
+
+/* ── Assets Panel ── */
+function wsRenderAssets(){
+  const grid=document.getElementById('wsAssetGrid');
+  const empty=document.getElementById('wsAssetEmpty');
+  const finalized=loadAll().filter(s=>s.status==='finalized');
+  const photos=[];
+  finalized.forEach(s=>{
+    if(s.photoData)photos.push(s.photoData);
+    if(Array.isArray(s.photos))s.photos.forEach(p=>{if(p.data)photos.push(p.data);});
+  });
+  if(!photos.length){grid.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  grid.innerHTML=photos.slice(0,30).map((url,i)=>`<div class="ws-asset-thumb" title="Asset ${i+1}"><img src="${url}" alt="Asset ${i+1}"/></div>`).join('');
+}
+
+/* ── Color Panel ── */
+function wsRenderColorPanel(){
+  const c=document.getElementById('wsColorPanel');if(!c)return;
+  const s=lsSettings;
+  const colors=[
+    {key:'color1',label:'Primary',val:s.color1||'#1a2744'},
+    {key:'color2',label:'Accent',val:s.color2||'#7dd4a8'},
+    {key:'color3',label:'Highlight',val:s.color3||'#8b1a1a'},
+    {key:'pageBg',label:'Page Background',val:s.pageBg||'#ffffff'},
+    {key:'textColor',label:'Text Color',val:s.textColor||'#1c1c1e'}
+  ];
+  c.innerHTML=colors.map(cl=>`<div class="ws-color-row">
+    <input type="color" class="ws-color-swatch" value="${cl.val}" onchange="wsUpdateColor('${cl.key}',this.value)" style="background:${cl.val};"/>
+    <span class="ws-color-label">${cl.label}</span>
+    <span class="ws-color-val">${cl.val}</span>
+  </div>`).join('');
+}
+function wsUpdateColor(key,val){
+  wsUndoPush();
+  lsSettings[key]=val;
+  saveLsSettingsToStorage(lsSettings);
+  applyLsColors(lsSettings);
+  wsRenderColorPanel();
+  wsRenderCurrentPage();
+  wsMarkDirty();
+}
+
+/* ── Font Panel ── */
+function wsRenderFontPanel(){
+  const s=lsSettings;
+  const hf=document.getElementById('wsHeadingFont');if(hf)hf.value=s.headingFont||"'Playfair Display',serif";
+  const bf=document.getElementById('wsBodyFont');if(bf)bf.value=s.bodyFont||"'Crimson Text',serif";
+  const fs=document.getElementById('wsFontSize');if(fs)fs.value=s.fontSize||'11px';
+}
+function wsUpdateFont(key,val){
+  wsUndoPush();
+  lsSettings[key]=val;
+  saveLsSettingsToStorage(lsSettings);
+  wsRenderCurrentPage();
+  wsMarkDirty();
+}
+
+/* ── Undo / Redo ── */
+function wsUndoPush(){wsUndoStack.push(JSON.stringify(lsSettings));if(wsUndoStack.length>30)wsUndoStack.shift();wsRedoStack=[];}
+function wsUndo(){
+  if(!wsUndoStack.length)return;
+  wsRedoStack.push(JSON.stringify(lsSettings));
+  lsSettings=JSON.parse(wsUndoStack.pop());
+  saveLsSettingsToStorage(lsSettings);
+  applyLsColors(lsSettings);
+  wsRenderColorPanel();wsRenderFontPanel();wsRenderCurrentPage();
+}
+function wsRedo(){
+  if(!wsRedoStack.length)return;
+  wsUndoStack.push(JSON.stringify(lsSettings));
+  lsSettings=JSON.parse(wsRedoStack.pop());
+  saveLsSettingsToStorage(lsSettings);
+  applyLsColors(lsSettings);
+  wsRenderColorPanel();wsRenderFontPanel();wsRenderCurrentPage();
+}
+
+/* ── Autosave ── */
+function wsStartAutoSave(){wsClearAutoSave();wsAutoSaveTimer=setInterval(()=>{wsAutoSave();},30000);}
+function wsClearAutoSave(){if(wsAutoSaveTimer){clearInterval(wsAutoSaveTimer);wsAutoSaveTimer=null;}}
+function wsAutoSave(){
+  saveLsSettingsToStorage(lsSettings);
+  dbSaveSettings('ls_settings',lsSettings);
+  const ind=document.getElementById('wsSaveIndicator');
+  if(ind){ind.textContent='● Saved';ind.style.color='var(--ws-green)';ind.style.animation='none';setTimeout(()=>{ind.style.animation='';},100);}
+}
+function wsMarkDirty(){
+  const ind=document.getElementById('wsSaveIndicator');
+  if(ind){ind.textContent='○ Unsaved';ind.style.color='var(--ws-yellow)';}
+}
+
+/* ── AI Terminal ── */
+function wsAIAddMsg(role,text,html){
+  wsAIChatHistory.push({role,text:text||'',html:html||'',time:new Date().toLocaleTimeString()});
+  wsAIRenderChat();
+}
+function wsAIRenderChat(){
+  const box=document.getElementById('wsAIChat');if(!box)return;
+  if(!wsAIChatHistory.length){box.innerHTML='<div class="ws-ai-msg system">Start a conversation — describe what you want to change.</div>';return;}
+  box.innerHTML=wsAIChatHistory.map(m=>{
+    const content=m.html||esc(m.text);
+    if(m.role==='system')return `<div class="ws-ai-msg system">${content}</div>`;
+    return `<div class="ws-ai-msg ${m.role}">${content}<div class="ws-ai-msg-time">${m.time}</div></div>`;
+  }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+function wsAIQuick(cmd){document.getElementById('wsAIInput').value=cmd;wsAISend();}
+
+/* ── AI Sample Upload ── */
+function wsAIUploadSample(event){
+  const file=event.target.files?.[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    wsAISampleBase64=e.target.result.split(',')[1];
+    wsAISampleMime=file.type||'image/jpeg';
+    document.getElementById('wsAISampleImg').src=e.target.result;
+    document.getElementById('wsAISamplePreview').style.display='block';
+    wsAIAddMsg('system','📎 Design sample uploaded — reference it with "Match the uploaded sample style"');
+  };
+  reader.readAsDataURL(file);
+  event.target.value='';
+}
+
+/* ── AI Send Message ── */
+async function wsAISend(){
+  const input=document.getElementById('wsAIInput');
+  const query=(input?.value||'').trim();if(!query)return;
+  input.value='';
+  const s=lsSettings;
+  const apiKey=s.apiKey;
+  const model=document.getElementById('wsAIModel')?.value||'google/gemini-2.0-flash-001';
+  const task=document.getElementById('wsAITask')?.value||'design';
+
+  if(!apiKey){wsAIAddMsg('assistant','','<strong style="color:var(--ws-red);">No API key.</strong> Configure it in Production Admin → Settings → Layout Studio → AI Configuration.');return;}
+
+  wsAIAddMsg('user',query);
+
+  /* Thinking indicator */
+  const thinkIdx=wsAIChatHistory.length;
+  wsAIChatHistory.push({role:'assistant',text:'',html:'<em style="color:var(--ws-text3);">✦ Thinking…</em>',time:''});
+  wsAIRenderChat();
+
+  /* Build context */
+  const finalized=loadAll().filter(x=>x.status==='finalized');
+  const counts=CATEGORY_KEYS.map(k=>`  ${CATEGORIES[k].label}: ${finalized.filter(x=>x.category===k).length}`).join('\n');
+  const ctx=`MAGAZINE: ${s.magTitle||'The Torch'} | ${s.schoolName||'Way To Success Standard Schools'} | ${s.edition||'1st Edition'} ${s.year||'2025/2026'}
+FINALIZED CONTENT:\n${counts}
+TOTAL FINALIZED: ${finalized.length}
+COLOURS: Primary:${s.color1||'#1a2744'} Accent:${s.color2||'#7dd4a8'} Highlight:${s.color3||'#8b1a1a'} PageBG:${s.pageBg||'#fff'} Text:${s.textColor||'#1c1c1e'}
+TYPOGRAPHY: Heading:${s.headingFont||'Playfair Display'} Body:${s.bodyFont||'Crimson Text'} Size:${s.fontSize||'11px'}
+CURRENT PAGE: ${wsPageIdx+1} of ${wsPages.length} — ${wsPages[wsPageIdx]?.label||'none'}`;
+
+  const taskPrompts={
+    design:'You are a world-class magazine designer. Analyze the layout and suggest improvements to typography, spacing, colour, alignment, and visual hierarchy. Provide CSS injection commands using [FORMAT:customCSS:...] and settings JSON blocks.',
+    reasoning:'You are a production strategist. Analyze the magazine structure, content balance, page count, and help optimize the overall layout for cost-effective printing.',
+    proofread:'You are a professional proofreader for a Nigerian school graduation magazine. Check grammar, spelling, punctuation across all finalized content.',
+    image:'You are a design analyst. Analyze the uploaded design sample image and describe its typography, colours, spacing, layout structure, and visual hierarchy. Then suggest how to replicate that style.'
+  };
+
+  const messages=[{role:'system',content:`${taskPrompts[task]||taskPrompts.design}
+
+FORMATTING COMMANDS (include in your response for instant application):
+• [FORMAT:customCSS:...css...] — inject CSS to restyle the magazine preview
+• Target sections: .mag-page[data-category="teachers"], .mag-page[data-category="creative"], etc.
+• Classes: .mag-item, .mag-item-name, .mag-item-subtitle, .mag-item-photo, .mag-item-fields, .mag-item-body
+
+SETTINGS JSON: End your response with a settings block to change layout settings:
+\`\`\`settings
+{"color1":"#hex","teachersPerPage":9,...}
+\`\`\`
+Available keys: teachersPerPage, studentsPerPage, galleryPerPage, speechesPerPage, creativePerPage, orientation, pageSize, pageNums, autoTrim, color1, color2, color3, pageBg, textColor, headingFont, bodyFont, fontSize, magTitle, schoolName, edition, year, theme.
+
+BE CONVERSATIONAL. Explain your suggestions clearly.
+
+Context:\n${ctx}`}];
+
+  /* Add recent chat history */
+  wsAIChatHistory.slice(-10,-1).filter(m=>m.text&&m.role!=='system').forEach(m=>{
+    messages.push({role:m.role,content:m.text});
+  });
+
+  /* Build user message — include image if available and task is image analysis */
+  if(wsAISampleBase64&&(task==='image'||query.toLowerCase().includes('sample')||query.toLowerCase().includes('match'))){
+    messages.push({role:'user',content:[
+      {type:'image_url',image_url:{url:`data:${wsAISampleMime};base64,${wsAISampleBase64}`}},
+      {type:'text',text:query}
+    ]});
+  } else {
+    messages.push({role:'user',content:query});
+  }
+
+  try{
+    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+        'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Workspace AI'},
+      body:JSON.stringify({model,max_tokens:2500,messages})
+    });
+    if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.substring(0,120)}`);}
+    const data=await resp.json();
+    if(data.error)throw new Error(data.error.message||'API error');
+    let result=data.choices?.[0]?.message?.content||'No response.';
+
+    /* Remove thinking indicator */
+    wsAIChatHistory.splice(thinkIdx,1);
+
+    /* Parse formatting commands */
+    const fmtCommands={};
+    const fmtRegex=/\[FORMAT:(\w+):([\s\S]*?)\]/g;
+    let fmtMatch;
+    while((fmtMatch=fmtRegex.exec(result))!==null)fmtCommands[fmtMatch[1]]=fmtMatch[2];
+    let displayText=result.replace(/\[FORMAT:.*?\]/gs,'').trim();
+
+    /* Extract settings JSON */
+    const settingsMatch=displayText.match(/```settings\s*([\s\S]*?)```/i);
+    const adviceText=displayText.replace(/```settings[\s\S]*?```/gi,'').trim();
+
+    /* Apply formatting commands */
+    const fmtChanges=[];
+    if(fmtCommands.customCSS){
+      const aiStyle=document.getElementById('ai-custom-css');
+      if(aiStyle)aiStyle.textContent=fmtCommands.customCSS;
+      fmtChanges.push('Injected CSS');
+    }
+
+    /* Apply settings if present */
+    if(settingsMatch){
+      try{
+        const obj=JSON.parse(settingsMatch[1].trim());
+        wsUndoPush();
+        applyLayoutFromObject(obj,null);
+        wsRenderColorPanel();wsRenderFontPanel();
+        fmtChanges.push('Applied '+Object.keys(obj).length+' settings');
+      }catch(e){}
+    }
+
+    if(fmtChanges.length)wsRenderCurrentPage();
+
+    const htmlResp=esc(adviceText).replace(/\n/g,'<br>')+(fmtChanges.length?`<br><br><em style="color:var(--ws-green);">✓ ${fmtChanges.join(', ')}</em>`:'');
+    wsAIAddMsg('assistant',adviceText,htmlResp);
+
+  }catch(e){
+    wsAIChatHistory.splice(thinkIdx,1);
+    wsAIAddMsg('assistant','','<strong style="color:var(--ws-red);">Error:</strong> '+esc(e.message));
+  }
+}
+
+/* ── Export: Print-Ready PDF ── */
+function wsExportPrintPDF(){
+  /* Temporarily set magPages to workspace pages and use existing openPrintView */
+  const origPages=magPages;const origIdx=currentPageIdx;
+  magPages=wsPages;currentPageIdx=0;
+  openPrintView();
+  magPages=origPages;currentPageIdx=origIdx;
+}
+
+/* ── Export: Editable Package (SVG + JSON) ── */
+function wsExportEditable(){
+  if(typeof JSZip==='undefined'){alert('ZIP library not loaded.');return;}
+  const zip=new JSZip();
+  const s=lsSettings;
+
+  /* Project JSON */
+  const project={
+    version:'1.0',
+    title:s.magTitle||'The Torch',
+    school:s.schoolName||'Way To Success Standard Schools',
+    edition:s.edition||'1st Edition',
+    year:s.year||'2025/2026',
+    settings:s,
+    sectionOrder:sectionOrder,
+    pageCount:wsPages.length,
+    exportedAt:new Date().toISOString()
+  };
+  zip.file('project.json',JSON.stringify(project,null,2));
+
+  /* Page data */
+  const pagesFolder=zip.folder('pages');
+  wsPages.forEach((p,i)=>{
+    const num=String(i+1).padStart(3,'0');
+    pagesFolder.file(`page_${num}.json`,JSON.stringify({
+      index:i,type:p.type,label:p.label||'',
+      section:p.sec?.key||'',
+      items:p.items?.map(it=>({id:it.id,category:it.category,data:it.data}))||[]
+    },null,2));
+  });
+
+  /* Finalized submissions */
+  const subsFolder=zip.folder('submissions');
+  const finalized=loadAll().filter(x=>x.status==='finalized');
+  finalized.forEach(sub=>{
+    subsFolder.file(`${sub.category}_${slugify(sub.data.name?.value||sub.id)}.json`,JSON.stringify(sub,null,2));
+  });
+
+  /* Labels & config */
+  zip.file('labels.json',JSON.stringify(labelOverrides,null,2));
+  zip.file('README.txt',`MagicEditor Editable Package\n${project.title} — ${project.school}\n${project.edition} ${project.year}\nExported: ${project.exportedAt}\n\nThis package contains:\n- project.json: Full project settings\n- pages/: Individual page data\n- submissions/: All finalized submissions\n- labels.json: Custom label overrides\n\nRe-import this package or edit submissions for manual press adjustments.`);
+
+  zip.generateAsync({type:'blob'}).then(blob=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`${slugify(s.magTitle||'magazine')}_editable_${new Date().toISOString().slice(0,10)}.zip`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  }).catch(err=>alert('Export failed: '+err.message));
+}
 
 /* UTILITY */
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
