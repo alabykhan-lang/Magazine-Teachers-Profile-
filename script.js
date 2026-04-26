@@ -115,8 +115,8 @@ const EDITORIAL_META={'editorial-note':{label:'Editorial Note',tag:'Editorial No
    Primary store: Supabase (cloud, multi-device)
    Fallback: localStorage (offline resilience)
 ═══════════════════════════════════════════════════════════ */
-const SUPA_URL='https://wdirtvusotsvorocwspk.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkaXJ0dnVzb3Rzdm9yb2N3c3BrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MjE4NDksImV4cCI6MjA5MjI5Nzg0OX0.0XjJu7yAABv9mHf5bqW19MRJmUX38lzYq_-UYT_9lNQ';
+const SUPA_URL='https://srkgolzstppnyntrkemk.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNya2dvbHpzdHBwbnludHJrZW1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjg4MTAsImV4cCI6MjA5MjgwNDgxMH0.M1uVsgraBxXGDrLSqBgz9e3QFRmSjaZBgz7xoGlOo3c';
 let _supa=null;
 function getSupa(){
   if(_supa)return _supa;
@@ -283,42 +283,70 @@ async function withRetry(fn, desc='Operation', retries=3) {
 /* ── Submissions (cloud + local mirror) ── */
 async function dbLoadAll(){
   const localCache=JSON.parse(localStorage.getItem('me_subs')||'[]');
+  showSync('syncing','Connecting to cloud…');
   try{
-    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    
-    // Explicitly check for RLS or connection issues using robust retry logic
-    const {data,error} = await withRetry(async()=>{
-      const res = await sb.from('submissions').select('*').order('created_at',{ascending:true});
-      if(res.error) throw res.error;
-      return res;
-    }, 'Fetching all submissions');
-    
-    const cloudRows = data || [];
+    const sb=getSupa();
+    if(!sb) throw new Error('Supabase client not available — check internet');
+
+    const res = await sb.from('submissions').select('*').order('created_at',{ascending:true});
+
+    if(res.error){
+      /* Distinguish RLS block (HTTP 401/403/PGRST) from network error */
+      const isRLS = res.error.code==='42501'||res.error.message?.includes('permission')||res.error.message?.includes('policy');
+      if(isRLS){
+        showSync('err','⚠ Supabase RLS is blocking access — run fix SQL in Supabase (see console)');
+        console.error('[DB] RLS BLOCK — To fix, go to Supabase Dashboard → SQL Editor and run:\n\n' +
+          '-- Allow all reads and writes for anonymous users:\n' +
+          'ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;\n' +
+          'DROP POLICY IF EXISTS "public_access" ON public.submissions;\n' +
+          'CREATE POLICY "public_access" ON public.submissions FOR ALL TO anon USING (true) WITH CHECK (true);\n\n' +
+          'ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;\n' +
+          'DROP POLICY IF EXISTS "public_access" ON public.settings;\n' +
+          'CREATE POLICY "public_access" ON public.settings FOR ALL TO anon USING (true) WITH CHECK (true);\n');
+      } else {
+        showSync('err','Cloud error: '+(res.error.message||'unknown'));
+      }
+      throw res.error;
+    }
+
+    const cloudRows = res.data || [];
 
     /* Normalise: Supabase row → internal format */
     const mapped=cloudRows.map(r=>({
       id:r.id,category:r.category,ts:r.ts||new Date(r.created_at).toLocaleString(),
       createdAt:r.created_at?new Date(r.created_at).getTime():r.created_at_ms||Date.now(),
-      status:r.status||'draft',reviewerNote:r.reviewer_note||'',reviewedAt:r.reviewed_at||null,
+      status:r.status||'pending',reviewerNote:r.reviewer_note||'',reviewedAt:r.reviewed_at||null,
       data:typeof r.data==='string'?JSON.parse(r.data):r.data||{},
       photoData:r.photo_data||null,photoName:r.photo_name||null,
-      photos:r.photos?( typeof r.photos==='string'?JSON.parse(r.photos):r.photos ):null
+      photos:r.photos?(typeof r.photos==='string'?JSON.parse(r.photos):r.photos):null
     }));
 
-    /* Guard: empty cloud response with local data = possible RLS block */
-    if(!mapped.length && localCache.length){
-      console.warn('[DB] Cloud returned 0 rows but local has '+localCache.length+' — possible RLS block or fresh database');
-      showSync('err','Cloud returned no data. Check Supabase RLS policies.');
+    /* If cloud returned ZERO rows but local has data, it is definitely RLS */
+    if(mapped.length===0 && localCache.length>0){
+      showSync('err','⚠ RLS blocking reads — '+localCache.length+' items in local cache only (check console)');
+      console.error('[DB] CRITICAL: Cloud returned 0 rows but localStorage has '+localCache.length+
+        '. This means Supabase RLS is blocking SELECT for anon role.\n\n' +
+        'Fix: Supabase Dashboard → Table Editor → submissions → RLS → Add Policy:\n' +
+        '  Name: Allow all\n  Operation: ALL\n  Target roles: anon\n  Using expression: true\n  With check: true\n\n' +
+        'OR run in SQL Editor:\n' +
+        'CREATE POLICY "public_access" ON public.submissions FOR ALL TO anon USING (true) WITH CHECK (true);\n' +
+        'CREATE POLICY "public_access" ON public.settings FOR ALL TO anon USING (true) WITH CHECK (true);\n');
+      /* Merge local into cloud — surface local data so editor can still work */
       return localCache;
     }
-    
-    /* Success — mirror to localStorage as cache */
-    localStorage.setItem('me_subs',JSON.stringify(mapped));
-    showSync('ok','✓ Cloud synced '+mapped.length+' items');
-    return mapped;
+
+    /* Merge: keep any local-only items that aren't in cloud yet (e.g. pending upload) */
+    const cloudIds = new Set(mapped.map(m=>String(m.id)));
+    const localOnly = localCache.filter(l=>!cloudIds.has(String(l.id)));
+    const merged = [...mapped, ...localOnly];
+
+    /* Mirror to localStorage */
+    localStorage.setItem('me_subs',JSON.stringify(merged));
+    showSync('ok','✓ Cloud synced — '+merged.length+' submissions');
+    return merged;
   }catch(e){
     console.warn('[DB] Cloud load failed:',e.message);
-    showSync('err','Cloud unreachable — using local data');
+    showSync('err','⚠ Cloud unreachable — showing '+localCache.length+' local items');
     return localCache;
   }
 }
@@ -1064,7 +1092,7 @@ function enterAdmin(){
 function enterEditor(){
   show('viewEditor');
   currentEditorCat='pending';
-  document.querySelectorAll('#viewEditor .admin-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#viewEditor .editor-tab').forEach(t=>t.classList.remove('active'));
   const pendingTab=document.getElementById('etab-pending');if(pendingTab)pendingTab.classList.add('active');
   document.getElementById('editorModeList').style.display='block';
   document.getElementById('editorModeNote').style.display='none';
@@ -1091,7 +1119,7 @@ function editorRefresh(){
 }
 function setEditorCategory(cat){
   currentEditorCat=cat;
-  document.querySelectorAll('#viewEditor .admin-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#viewEditor .editor-tab').forEach(t=>t.classList.remove('active'));
   const btn=document.getElementById('etab-'+cat);if(btn)btn.classList.add('active');
   if(cat==='editorial'){
     document.getElementById('editorModeList').style.display='none';
