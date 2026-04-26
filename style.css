@@ -127,6 +127,8 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .sync-bar.visible{transform:translateY(0);}
 .sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .sync-dot.ok{background:var(--school-mint3);}
+.sync-dot.live{background:var(--school-mint);box-shadow:0 0 10px var(--school-mint);animation:pulse 1.5s infinite;}
+
 .sync-dot.syncing{background:var(--gold);animation:pulse .8s infinite;}
 .sync-dot.err{background:var(--red);}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
