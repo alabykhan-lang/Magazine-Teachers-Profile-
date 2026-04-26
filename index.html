@@ -521,13 +521,12 @@
       <div class="admin-topbar" style="background:#2d1b4e;">
         <div class="admin-topbar-left"><div><span class="admin-logo" style="color:#c6a5f0;">MagicEditor</span><h1 style="color:#fff;">Editor-in-Chief</h1></div></div>
       </div>
-      <div class="admin-tabs">
-        <button class="admin-tab active" onclick="setEditorCategory('pending')" id="etab-pending">Inbox <span class="tab-count" id="ecount-pending" style="background:#4a2d7a;color:#fff;">0</span></button>
-        <button class="admin-tab" onclick="setEditorCategory('approved')" id="etab-approved">Approved <span class="tab-count" id="ecount-approved">0</span></button>
-        <button class="admin-tab" onclick="setEditorCategory('rejected')" id="etab-rejected">Rejected <span class="tab-count" id="ecount-rejected">0</span></button>
-        <button class="admin-tab" onclick="setEditorCategory('all')" id="etab-all">All History <span class="tab-count" id="ecount-all">0</span></button>
-        <div style="margin-top:1.5rem;padding:0 14px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:700;">Special Sections</div>
-        <button class="admin-tab" onclick="setEditorCategory('editorial')" id="etab-editorial" style="color:var(--purple);font-style:italic;">✎ Editorial Note</button>
+      <div class="admin-tabs" style="padding-top:1.5rem; gap:8px;">
+        <button class="editor-tab active" onclick="setEditorCategory('pending')" id="etab-pending">Pending Review <span class="tab-count" id="ecount-pending">0</span></button>
+        <button class="editor-tab" onclick="setEditorCategory('approved')" id="etab-approved">Approved <span class="tab-count" id="ecount-approved">0</span></button>
+        <button class="editor-tab" onclick="setEditorCategory('rejected')" id="etab-rejected">Rejected <span class="tab-count" id="ecount-rejected">0</span></button>
+        <button class="editor-tab" onclick="setEditorCategory('all')" id="etab-all" style="margin-bottom:1rem;">All <span class="tab-count" id="ecount-all">0</span></button>
+        <button class="editor-tab" onclick="setEditorCategory('editorial')" id="etab-editorial" style="color:#a683d6;font-style:italic;">✎ My Editorial Note</button>
       </div>
       <div class="admin-topbar-right">
         <button class="admin-exit" onclick="editorRefresh()">↻ Refresh Data</button>
@@ -536,11 +535,16 @@
     </aside>
     <main class="admin-main" style="background:#f7f3ff;">
       <div style="background:#2d1b4e;color:#fff;padding:14px 20px;text-align:center;font-family:'Lato',sans-serif;border-bottom:4px solid #c6a5f0;">
-        <div style="font-size:11px;letter-spacing:3px;color:#c6a5f0;font-weight:700;margin-bottom:4px;">EDITOR-IN-CHIEF INBOX</div>
-        <div style="font-size:22px;font-weight:700;letter-spacing:1px;">✎ REVIEW &amp; PROOFREAD</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:3px;">Verify content · AI Proofread · Approve for Production Admin</div>
+        <div style="font-size:11px;letter-spacing:3px;color:#c6a5f0;font-weight:700;margin-bottom:4px;">CURRENTLY VIEWING</div>
+        <div style="font-size:22px;font-weight:700;letter-spacing:1px;">✎ EDITOR-IN-CHIEF</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:3px;">Review · Approve · Reject · AI Proofread · Editorial Note</div>
       </div>
-      <div class="admin-body">
+      <div class="admin-body" style="max-width:960px;margin:0 auto;padding-top:2rem;">
+        <!-- Welcome Banner -->
+        <div id="editorWelcomeBanner" style="background:#eaf8f0;border:1px solid #c8f0dc;border-radius:12px;padding:20px 24px;margin-bottom:2rem;">
+          <h2 style="color:#1e6b45;font-family:'Lato',sans-serif;font-size:20px;margin-bottom:8px;">Welcome, Editor-in-Chief</h2>
+          <p style="color:#1e6b45;font-size:14px;line-height:1.6;">Review submissions sent by Production. Use ✦ AI Proofread to check grammar before approving. Your decisions shape the maiden edition of Way To Success Standard Schools.</p>
+        </div>
         <!-- List Mode -->
         <div id="editorModeList">
           <div id="editorSubList" class="sub-list"></div>
@@ -833,7 +837,7 @@
 
 <div class="sync-bar" id="syncBar">
   <div class="sync-dot ok" id="syncDot"></div>
-  <span id="syncText">Cloud Sync Active</span>
+  <span id="syncMsg">Cloud Sync Active</span>
 </div>
 
 <script src="script.js"></script>
