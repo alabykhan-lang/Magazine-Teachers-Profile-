@@ -154,12 +154,116 @@ function genId(){
 /* Sync status bar */
 function showSync(state,msg){
   let bar=document.getElementById('syncBar');
-  if(!bar){bar=document.createElement('div');bar.id='syncBar';bar.className='sync-bar';bar.innerHTML='<div class="sync-dot" id="syncDot"></div><span id="syncMsg"></span>';document.body.appendChild(bar);}
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='syncBar';
+    bar.className='sync-bar';
+    bar.innerHTML='<div class="sync-dot" id="syncDot"></div><span id="syncMsg"></span>';
+    document.body.appendChild(bar);
+  }
   bar.classList.add('visible');
-  document.getElementById('syncDot').className='sync-dot '+state;
+  const dot = document.getElementById('syncDot');
+  dot.className='sync-dot '+state;
   document.getElementById('syncMsg').textContent=msg;
-  if(state==='ok')setTimeout(()=>bar.classList.remove('visible'),2500);
+  
+  if(state==='ok'||state==='live') {
+    if(state==='ok') setTimeout(()=>bar.classList.remove('visible'),2500);
+  }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   SUPABASE REALTIME LAYER
+   Keeps all devices in sync without refreshes
+═══════════════════════════════════════════════════════════ */
+let _subChannel = null;
+
+function initRealtime() {
+  const sb = getSupa();
+  if (!sb || _subChannel) return;
+
+  console.log('[DB] Initializing Realtime listeners…');
+  
+  _subChannel = sb.channel('db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, payload => {
+      console.log('[DB] Realtime Submission:', payload.eventType);
+      handleRealtimeSubmission(payload);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
+      console.log('[DB] Realtime Setting:', payload.eventType);
+      handleRealtimeSetting(payload);
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        showSync('live', '✦ Connected Live');
+        console.log('[DB] Realtime Subscribed');
+      } else {
+        console.warn('[DB] Realtime Status:', status);
+      }
+    });
+}
+
+function handleRealtimeSubmission(payload) {
+  const { eventType, new: newRow, old: oldRow } = payload;
+  let local = JSON.parse(localStorage.getItem('me_subs') || '[]');
+  
+  if (eventType === 'INSERT' || eventType === 'UPDATE') {
+    const sub = {
+      id: newRow.id, category: newRow.category, ts: newRow.ts || new Date(newRow.created_at).toLocaleString(),
+      createdAt: newRow.created_at ? new Date(newRow.created_at).getTime() : newRow.created_at_ms || Date.now(),
+      status: newRow.status || 'draft', reviewerNote: newRow.reviewer_note || '', reviewedAt: newRow.reviewed_at || null,
+      data: typeof newRow.data === 'string' ? JSON.parse(newRow.data) : newRow.data || {},
+      photoData: newRow.photo_data || null, photoName: newRow.photo_name || null,
+      photos: newRow.photos ? (typeof newRow.photos === 'string' ? JSON.parse(newRow.photos) : newRow.photos) : null
+    };
+    
+    const idx = local.findIndex(s => String(s.id) === String(sub.id));
+    if (idx >= 0) {
+      local[idx] = sub;
+    } else {
+      local.push(sub);
+    }
+    showSync('live', '✦ New data received');
+  } else if (eventType === 'DELETE') {
+    local = local.filter(s => String(s.id) !== String(oldRow.id));
+    showSync('live', '✦ Data removed');
+  }
+  
+  localStorage.setItem('me_subs', JSON.stringify(local));
+  subs = local;
+
+  // Refresh active views
+  if (document.getElementById('viewAdmin')?.classList.contains('active')) renderAdmin();
+  if (document.getElementById('viewEditor')?.classList.contains('active')) renderEditor();
+  if (document.getElementById('viewWorkspace')?.classList.contains('active')) wsGeneratePreview();
+}
+
+function handleRealtimeSetting(payload) {
+  const { eventType, new: newRow } = payload;
+  if (eventType === 'DELETE') return;
+  
+  const key = newRow.key;
+  const val = typeof newRow.value === 'string' ? JSON.parse(newRow.value) : newRow.value;
+  
+  localStorage.setItem('me_' + key, JSON.stringify(val));
+  
+  if (key === 'cfg') cfg = val;
+  if (key === 'ls_settings') {
+    lsSettings = val;
+    applyLsColors(val);
+  }
+  if (key === 'labels') labelOverrides = val;
+  if (key === 'section_order') sectionOrder = val;
+  if (key === 'form_config') formConfig = val;
+  
+  showSync('live', '✦ Settings synced');
+  
+  // Refresh UI if in Layout Studio or Settings
+  if (document.getElementById('adminModeLayout')?.style.display === 'block') {
+    loadLsSettingsToUI();
+    renderSectionManager();
+  }
+}
+
 
 /* ── Submissions (cloud + local mirror) ── */
 async function dbLoadAll(){
@@ -197,13 +301,15 @@ async function dbLoadAll(){
   }
 }
 async function dbSaveSubmission(sub){
-  /* Always write to localStorage immediately */
+  /* Always write to localStorage immediately (Optimistic UI) */
   const local=JSON.parse(localStorage.getItem('me_subs')||'[]');
-  const idx=local.findIndex(s=>s.id===sub.id);
+  const idx=local.findIndex(s=>String(s.id)===String(sub.id));
   if(idx>=0)local[idx]=sub;else local.push(sub);
   localStorage.setItem('me_subs',JSON.stringify(local));
-  /* Cloud sync with retry */
-  showSync('syncing','Saving to cloud…');
+  subs=local;
+  
+  /* Cloud sync */
+  showSync('syncing','Syncing to cloud…');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
     const row={
@@ -215,57 +321,81 @@ async function dbSaveSubmission(sub){
       photo_data:sub.photoData||null,photo_name:sub.photoName||null,
       photos:sub.photos?JSON.stringify(sub.photos):null
     };
-    const result=await withRetry(async()=>{
-      const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
-      if(error)throw error;
-      return data;
-    },'Saving submission');
-    if(!result||result.length===0){
-      console.warn('[DB] Upsert returned empty after retries');
-      showSync('err','Cloud may be blocked — saved locally');
-      return;
+    
+    // Use a single attempt first for speed, then retry if needed
+    const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
+    if(error) {
+      // Fallback to retry logic if first attempt fails
+      await withRetry(async()=>{
+        const{error:e2,data:d2}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
+        if(e2)throw e2;
+        return d2;
+      }, 'Saving submission');
     }
-    showSync('ok','✓ Saved to cloud');
+    
+    showSync('ok','✓ Cloud synced');
   }catch(e){
-    console.warn('[DB] Cloud save failed after retries:',e.message);
-    showSync('err','Cloud unreachable — saved locally, will retry');
+    console.warn('[DB] Cloud save failed:',e.message);
+    showSync('err','Saved locally — cloud sync pending');
   }
 }
 async function dbDeleteSubmission(id){
+  /* Optimistic delete */
   const local=JSON.parse(localStorage.getItem('me_subs')||'[]').filter(s=>String(s.id)!==String(id));
   localStorage.setItem('me_subs',JSON.stringify(local));
-  showSync('syncing','Deleting…');
+  subs=local;
+  
+  showSync('syncing','Deleting from cloud…');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    await withRetry(async()=>{
-      const{error}=await sb.from('submissions').delete().eq('id',String(id));
-      if(error)throw error;
-    },'Deleting submission');
+    
+    // Attempt single delete first
+    const{error}=await sb.from('submissions').delete().eq('id',String(id));
+    if(error){
+      // Fallback to retry
+      await withRetry(async()=>{
+        const{error:e2}=await sb.from('submissions').delete().eq('id',String(id));
+        if(e2)throw e2;
+      },'Deleting submission');
+    }
+    
     showSync('ok','✓ Deleted from cloud');
   }catch(e){
-    console.warn('[DB] Cloud delete failed after retries:',e.message);
-    showSync('err','Deleted locally — cloud will sync later');
+    console.warn('[DB] Cloud delete failed:',e.message);
+    showSync('err','Deleted locally — cloud sync pending');
   }
 }
 async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
+  /* Optimistic update */
   const local=JSON.parse(localStorage.getItem('me_subs')||'[]');
   const s=local.find(x=>String(x.id)===String(id));
   if(s){s.status=status;s.reviewerNote=reviewerNote||'';s.reviewedAt=reviewedAt||null;}
   localStorage.setItem('me_subs',JSON.stringify(local));
-  showSync('syncing','Updating…');
+  subs=local;
+  
+  showSync('syncing','Updating cloud…');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    await withRetry(async()=>{
-      const{error}=await sb.from('submissions').update({
-        status,reviewer_note:reviewerNote||'',
-        reviewed_at:reviewedAt?new Date(reviewedAt).toISOString():null
-      }).eq('id',String(id));
-      if(error)throw error;
-    },'Updating status');
+    const updateData = {
+      status, 
+      reviewer_note:reviewerNote||'',
+      reviewed_at:reviewedAt?new Date(reviewedAt).toISOString():null
+    };
+    
+    // Attempt single update first
+    const{error}=await sb.from('submissions').update(updateData).eq('id',String(id));
+    if(error){
+      // Fallback to retry
+      await withRetry(async()=>{
+        const{error:e2}=await sb.from('submissions').update(updateData).eq('id',String(id));
+        if(e2)throw e2;
+      },'Updating status');
+    }
+    
     showSync('ok','✓ Updated in cloud');
   }catch(e){
-    console.warn('[DB] Cloud update failed after retries:',e.message);
-    showSync('err','Updated locally — cloud will sync later');
+    console.warn('[DB] Cloud update failed:',e.message);
+    showSync('err','Updated locally — cloud sync pending');
   }
 }
 
@@ -350,35 +480,37 @@ function getLabel(key,fallback){return labelOverrides[key]||fallback;}
 async function initCloudSync(){
   showSync('syncing','Connecting to cloud…');
   try{
+    /* Start Realtime listeners early */
+    initRealtime();
+
     /* Pull settings first */
     const [cloudCfg,cloudSettings,cloudLabels,cloudSectionOrder,cloudFormConfig]=await Promise.all([
       dbLoadSettings('cfg'),
       dbLoadSettings('ls_settings'),
       dbLoadSettings('labels'),
       dbLoadSettings('section_order'),
-      dbLoadSettings('form_config')  /* Fix 4: load custom form config from cloud */
+      dbLoadSettings('form_config')
     ]);
     if(cloudCfg){cfg={...cfg,...cloudCfg};localStorage.setItem('me_cfg',JSON.stringify(cfg));}
     if(cloudSettings){lsSettings={...lsSettings,...cloudSettings};localStorage.setItem('me_ls_settings',JSON.stringify(lsSettings));applyLsColors(lsSettings);}
     if(cloudLabels){labelOverrides={...labelOverrides,...cloudLabels};localStorage.setItem('me_labels',JSON.stringify(labelOverrides));}
     if(cloudSectionOrder&&Array.isArray(cloudSectionOrder)){localStorage.setItem('me_section_order',JSON.stringify(cloudSectionOrder));sectionOrder=cloudSectionOrder;}
-    /* Fix 4: Apply cloud form config — overwrites local so all links get admin's custom fields */
     if(cloudFormConfig&&typeof cloudFormConfig==='object'){
-      Object.keys(cloudFormConfig).forEach(k=>{
-        if(!cloudFormConfig[k])cloudFormConfig[k]={};
-        if(!cloudFormConfig[k].overrides)cloudFormConfig[k].overrides={};
-        if(!Array.isArray(cloudFormConfig[k].customFields))cloudFormConfig[k].customFields=[];
-      });
       formConfig=cloudFormConfig;
       localStorage.setItem('me_form_config',JSON.stringify(formConfig));
     }
     /* Pull submissions */
     subs=await dbLoadAll();
-    if(subs.length)showSync('ok','✓ Cloud sync complete');
-    /* Refresh any open admin/editor view */
+    if(subs.length)showSync('live','✦ Live & Synced');
+    
+    /* Refresh any open view */
     if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
     if(document.getElementById('viewEditor')?.classList.contains('active'))renderEditor();
-  }catch(e){showSync('err','Running offline — data from local cache');}
+    if(document.getElementById('viewLanding')?.classList.contains('active'))renderLandingCards();
+  }catch(e){
+    console.warn('[DB] Init sync failed:', e.message);
+    showSync('err','Running offline — using local cache');
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
