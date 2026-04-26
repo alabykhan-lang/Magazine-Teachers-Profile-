@@ -514,6 +514,64 @@
   </div>
 </div>
 
+<!-- EDITOR-IN-CHIEF PANEL -->
+<div id="viewEditor" class="view">
+  <div class="admin-layout">
+    <aside class="admin-sidebar" style="background:#fcfaff;border-right:1px solid #e9e0f5;">
+      <div class="admin-topbar" style="background:#2d1b4e;">
+        <div class="admin-topbar-left"><div><span class="admin-logo" style="color:#c6a5f0;">MagicEditor</span><h1 style="color:#fff;">Editor-in-Chief</h1></div></div>
+      </div>
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="setEditorCategory('pending')" id="etab-pending">Inbox <span class="tab-count" id="ecount-pending" style="background:#4a2d7a;color:#fff;">0</span></button>
+        <button class="admin-tab" onclick="setEditorCategory('approved')" id="etab-approved">Approved <span class="tab-count" id="ecount-approved">0</span></button>
+        <button class="admin-tab" onclick="setEditorCategory('rejected')" id="etab-rejected">Rejected <span class="tab-count" id="ecount-rejected">0</span></button>
+        <button class="admin-tab" onclick="setEditorCategory('all')" id="etab-all">All History <span class="tab-count" id="ecount-all">0</span></button>
+        <div style="margin-top:1.5rem;padding:0 14px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:700;">Special Sections</div>
+        <button class="admin-tab" onclick="setEditorCategory('editorial')" id="etab-editorial" style="color:var(--purple);font-style:italic;">✎ Editorial Note</button>
+      </div>
+      <div class="admin-topbar-right">
+        <button class="admin-exit" onclick="editorRefresh()">↻ Refresh Data</button>
+        <button class="admin-exit" onclick="goLanding()">← Back to Home</button>
+      </div>
+    </aside>
+    <main class="admin-main" style="background:#f7f3ff;">
+      <div style="background:#2d1b4e;color:#fff;padding:14px 20px;text-align:center;font-family:'Lato',sans-serif;border-bottom:4px solid #c6a5f0;">
+        <div style="font-size:11px;letter-spacing:3px;color:#c6a5f0;font-weight:700;margin-bottom:4px;">EDITOR-IN-CHIEF INBOX</div>
+        <div style="font-size:22px;font-weight:700;letter-spacing:1px;">✎ REVIEW &amp; PROOFREAD</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:3px;">Verify content · AI Proofread · Approve for Production Admin</div>
+      </div>
+      <div class="admin-body">
+        <!-- List Mode -->
+        <div id="editorModeList">
+          <div id="editorSubList" class="sub-list"></div>
+        </div>
+        
+        <!-- Editorial Note Mode -->
+        <div id="editorModeNote" style="display:none;">
+          <div class="editorial-compose" style="background:linear-gradient(135deg,#f4f0fd,#eae4fa);border-color:#c6a5f0;padding:2rem;">
+            <h3 style="color:#2d1b4e;font-size:20px;margin-bottom:8px;">✎ Write Editorial Note</h3>
+            <p class="intro" style="color:#4a2d7a;margin-bottom:1.5rem;">This note will appear on the first few pages of the magazine. Proofread carefully.</p>
+            <div class="field">
+              <label style="color:#2d1b4e;">Note Title</label>
+              <input type="text" id="edNoteTitle" placeholder="e.g., A Word from the Editor" style="border-color:#c6a5f0;"/>
+            </div>
+            <div class="field">
+              <label style="color:#2d1b4e;">Main Content</label>
+              <textarea id="edNoteBody" placeholder="Write your message to the students and parents..." style="border-color:#c6a5f0;min-height:300px;"></textarea>
+            </div>
+            <div class="compose-actions">
+              <button class="btn btn-primary" style="background:#2d1b4e;border-color:#2d1b4e;padding:12px 24px;" onclick="saveEditorialNote()">💾 Save &amp; Sync to Cloud</button>
+              <button class="btn btn-ai" onclick="proofreadText('edNoteBody')" style="padding:12px 24px;">✦ AI Proofread Content</button>
+              <span id="edNoteStatus" style="font-size:12px;color:#4a2d7a;font-weight:700;align-self:center;margin-left:10px;"></span>
+            </div>
+            <div id="proofread-edNoteBody" class="proofread-panel" style="display:none;margin-top:1.5rem;background:#fff;border:1px solid #c6a5f0;"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
 <!-- WORKSPACE — VS Code-style Design Studio -->
 <div id="viewWorkspace" class="view">
   <div class="ws-layout" id="wsLayout">
@@ -771,6 +829,11 @@
       <button class="btn btn-primary" onclick="confirmRename()">Rename</button>
     </div>
   </div>
+</div>
+
+<div class="sync-bar" id="syncBar">
+  <div class="sync-dot ok" id="syncDot"></div>
+  <span id="syncText">Cloud Sync Active</span>
 </div>
 
 <script src="script.js"></script>
