@@ -265,19 +265,33 @@ function handleRealtimeSetting(payload) {
 }
 
 
+/* ── Helper: Retry Logic for Flaky Networks ── */
+async function withRetry(fn, desc='Operation', retries=3) {
+  let lastErr;
+  for(let i=0; i<retries; i++){
+    try {
+      return await fn();
+    } catch(e) {
+      lastErr = e;
+      console.warn(`[DB] ${desc} failed (attempt ${i+1}/${retries}):`, e.message);
+      if(i < retries - 1) await new Promise(r => setTimeout(r, 1000 * (i+1))); // exponential backoff
+    }
+  }
+  throw lastErr;
+}
+
 /* ── Submissions (cloud + local mirror) ── */
 async function dbLoadAll(){
   const localCache=JSON.parse(localStorage.getItem('me_subs')||'[]');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
     
-    // Explicitly check for RLS or connection issues
-    const {data,error}=await sb.from('submissions').select('*').order('created_at',{ascending:true});
-    
-    if(error) {
-      console.error('[DB] Supabase Fetch Error:', error);
-      throw error;
-    }
+    // Explicitly check for RLS or connection issues using robust retry logic
+    const {data,error} = await withRetry(async()=>{
+      const res = await sb.from('submissions').select('*').order('created_at',{ascending:true});
+      if(res.error) throw res.error;
+      return res;
+    }, 'Fetching all submissions');
     
     const cloudRows = data || [];
 
