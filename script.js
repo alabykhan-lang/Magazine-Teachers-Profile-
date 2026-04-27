@@ -1245,7 +1245,21 @@ function saveAppreciation(){const title=document.getElementById('apprTitle').val
 /* SETTINGS */
 function savePins(){const a=document.getElementById('setAdminPin').value.trim();const e=document.getElementById('setEditorPin').value.trim();if(!/^\d{4}$/.test(a)||!/^\d{4}$/.test(e)){document.getElementById('pinSaveStatus').textContent='✗ PINs must be exactly 4 digits.';document.getElementById('pinSaveStatus').style.color='var(--red)';return;}if(a===e){document.getElementById('pinSaveStatus').textContent='✗ Admin and Editor PINs must differ.';document.getElementById('pinSaveStatus').style.color='var(--red)';return;}saveCfg({adminPin:a,editorPin:e});document.getElementById('pinSaveStatus').textContent='✓ PINs saved.';document.getElementById('pinSaveStatus').style.color='var(--green)';refreshDiag();}
 function resetPinsToDefault(){if(!confirm('Reset PINs to defaults (1234/5678)?'))return;saveCfg({adminPin:'1234',editorPin:'5678'});document.getElementById('setAdminPin').value='1234';document.getElementById('setEditorPin').value='5678';document.getElementById('pinSaveStatus').textContent='✓ PINs reset.';document.getElementById('pinSaveStatus').style.color='var(--green)';refreshDiag();}
-function wipeAllData(){if(!confirm('PERMANENTLY DELETE all submissions?'))return;if(!confirm('Really? All data will be lost.'))return;localStorage.removeItem('me_subs');subs=[];refreshDiag();alert('All submissions wiped.');}
+async function wipeAllData(){if(!confirm('PERMANENTLY DELETE all submissions from cloud AND local?'))return;if(!confirm('Really? This cannot be undone. All data will be lost forever.'))return;
+  showSync('syncing','Wiping all data…');
+  try{
+    const sb=getSupa();
+    if(sb){
+      const{error}=await sb.from('submissions').delete().neq('id','__never_match__');
+      if(error)console.warn('[DB] Cloud wipe failed:',error.message);
+      else console.log('[DB] Cloud submissions wiped');
+    }
+  }catch(e){console.warn('[DB] Cloud wipe error:',e.message);}
+  localStorage.removeItem('me_subs');subs=[];
+  refreshDiag();renderAdmin();
+  showSync('ok','✓ All data wiped');
+  alert('All submissions wiped from cloud and local storage.');
+}
 function refreshDiag(){const all=loadAll();const counts={};CATEGORY_KEYS.forEach(k=>counts[k]=all.filter(s=>s.category===k).length);counts['editorial-note']=all.filter(s=>s.category==='editorial-note').length;counts['appreciation']=all.filter(s=>s.category==='appreciation').length;const byStatus={};['draft','pending','approved','rejected','finalized'].forEach(st=>byStatus[st]=all.filter(s=>s.status===st).length);let sz=0;try{sz=(localStorage.getItem('me_subs')||'').length;}catch(e){}document.getElementById('diagOutput').textContent=[`MagicEditor v2.0 — Way To Success Standard Schools`,`Time: ${new Date().toLocaleString()}`,``,`--- PINs ---`,`Admin: ${cfg.adminPin}`,`Editor: ${cfg.editorPin}`,``,`--- By category ---`,...Object.entries(counts).map(([k,v])=>`  ${k}: ${v}`),`  TOTAL: ${all.length}`,``,`--- By status ---`,...Object.entries(byStatus).map(([k,v])=>`  ${k}: ${v}`),``,`localStorage: ${(sz/1024).toFixed(1)} KB`].join('\n');}
 
 /* FIELD CUSTOMIZER */
