@@ -559,6 +559,8 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 
 /* Responsive */
 @media(max-width:600px){
+  #viewAdmin.active, #viewEditor.active { height: auto !important; overflow: visible !important; display: block !important; }
+  #viewAdmin.active > .admin-layout, #viewEditor.active > .admin-layout { display: block; overflow: visible; }
   .admin-layout { flex-direction: column; height: auto; overflow: visible; }
   .admin-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); overflow-y: visible; }
   .admin-main { overflow-y: visible; }
@@ -680,3 +682,4 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
   border: 1px solid var(--cloud);
   border-radius: 4px;
 }
+
