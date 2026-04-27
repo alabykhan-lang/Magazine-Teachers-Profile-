@@ -461,6 +461,12 @@
         <button class="btn" onclick="resetPinsToDefault()">Reset PINs to defaults</button>
         <button class="btn btn-danger" onclick="wipeAllData()" style="margin-left:10px;">Wipe all submissions</button>
       </div>
+      <div class="settings-section">
+        <h3>🗑️ Purge Local Cache</h3>
+        <p class="desc">Clear stale localStorage data from old database connections. Cloud data remains safe.</p>
+        <button class="btn btn-danger" onclick="purgeLocalCache()" style="background:#d4380d;">Purge Local Cache</button>
+        <span id="purgeStatus" style="font-size:12px;color:var(--ink3);margin-left:10px;"></span>
+      </div>
       </div>
     </main>
   </div>
@@ -606,51 +612,7 @@
         </div>
         <div class="ws-panel-body" id="wsPageList"></div>
       </div>
-      <!-- Assets Panel -->
-      <div class="ws-panel" id="wsPanelAssets">
-        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelAssets')">
-          <span>🖼 Assets</span><span class="ws-chevron">▼</span>
-        </div>
-        <div class="ws-panel-body">
-          <div class="ws-asset-grid" id="wsAssetGrid"></div>
-          <div id="wsAssetEmpty" style="font-size:11px;color:var(--ws-text3);text-align:center;padding:12px;">No images in finalized submissions</div>
-        </div>
-      </div>
-      <!-- Colors Panel -->
-      <div class="ws-panel" id="wsPanelColors">
-        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelColors')">
-          <span>🎨 Colors</span><span class="ws-chevron">▼</span>
-        </div>
-        <div class="ws-panel-body" id="wsColorPanel"></div>
-      </div>
-      <!-- Fonts Panel -->
-      <div class="ws-panel" id="wsPanelFonts">
-        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelFonts')">
-          <span>🔤 Typography</span><span class="ws-chevron">▼</span>
-        </div>
-        <div class="ws-panel-body">
-          <span class="ws-font-label">Heading Font</span>
-          <select class="ws-font-select" id="wsHeadingFont" onchange="wsUpdateFont('headingFont',this.value)">
-            <option value="'Playfair Display',serif">Playfair Display</option>
-            <option value="Georgia,serif">Georgia</option>
-            <option value="'Times New Roman',serif">Times New Roman</option>
-            <option value="'Lato',sans-serif">Lato</option>
-          </select>
-          <span class="ws-font-label">Body Font</span>
-          <select class="ws-font-select" id="wsBodyFont" onchange="wsUpdateFont('bodyFont',this.value)">
-            <option value="'Crimson Text',serif">Crimson Text</option>
-            <option value="'Lato',sans-serif">Lato</option>
-            <option value="Georgia,serif">Georgia</option>
-          </select>
-          <span class="ws-font-label">Body Size</span>
-          <select class="ws-font-select" id="wsFontSize" onchange="wsUpdateFont('fontSize',this.value)">
-            <option value="10px">10px Compact</option>
-            <option value="11px">11px Standard</option>
-            <option value="12px">12px Comfortable</option>
-            <option value="13px">13px Large</option>
-          </select>
-        </div>
-      </div>
+      <!-- Design controls removed — AI handles all design via the right panel -->
       <!-- Export Panel -->
       <div class="ws-panel" id="wsPanelExport">
         <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelExport')">
@@ -756,7 +718,7 @@
       <div class="ws-statusbar-sep"></div>
       <div class="ws-statusbar-item" id="wsStatusZoom">100%</div>
       <div class="ws-statusbar-sep"></div>
-      <div class="ws-statusbar-item" id="wsStatusFinalized">0 finalized</div>
+      <div class="ws-statusbar-item" id="wsStatusFinalized">0 approved</div>
       <div style="flex:1;"></div>
       <div class="ws-statusbar-item">MagicEditor Workspace v1.0</div>
     </div>
