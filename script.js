@@ -123,6 +123,16 @@ function getSupa(){
   try{_supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);return _supa;}
   catch(e){console.warn('[DB] Supabase init failed:',e.message);return null;}
 }
+/* ── Supabase Storage: full-quality photo uploads ── */
+async function uploadToStorage(file, subId){
+  const sb=getSupa();if(!sb)throw new Error('No Supabase client');
+  const ext=(file.name||'photo.jpg').split('.').pop().toLowerCase();
+  const path=`submissions/${subId}.${ext}`;
+  const{error}=await sb.storage.from('photos').upload(path,file,{cacheControl:'31536000',upsert:true});
+  if(error)throw error;
+  const{data}=sb.storage.from('photos').getPublicUrl(path);
+  return data.publicUrl;
+}
 /* Retry helper for resilient cloud operations */
 async function withRetry(operation,label,retries=3){
   let lastErr;
@@ -704,11 +714,11 @@ function handleBulkPhotos(event){
 function processBulkPhoto(file){
   const ext=file.name.split('.').pop().toLowerCase();
   if(!['jpg','jpeg','png','webp'].includes(ext))return;
-  if(file.size>8*1024*1024)return;
+  if(file.size>15*1024*1024)return;
   const r=new FileReader();
-  const fileName=file.name;/* capture name now before ref goes stale */
+  const fileName=file.name;
   r.onload=ev=>{
-    bulkPhotos.push({dataURL:ev.target.result,fileName:fileName,caption:''});
+    bulkPhotos.push({dataURL:ev.target.result,file:file,fileName:fileName,caption:''});
     renderBulkGrid();
   };
   r.readAsDataURL(file);
@@ -741,8 +751,14 @@ async function submitBulkGallery(){
   showSync('syncing','Uploading '+bulkPhotos.length+' photos…');
   for(const p of bulkPhotos){
     try{
+      const subId=genId();
+      /* Upload to Storage for full quality */
+      let photoData=p.dataURL;
+      if(p.file){
+        try{photoData=await uploadToStorage(p.file,subId);}catch(e){console.warn('[Storage] Bulk photo upload failed:',e.message);}
+      }
       const sub={
-        id:genId(),
+        id:subId,
         category:'gallery',ts,createdAt:Date.now()+count,
         status:'pending',
         reviewerNote:'',reviewedAt:null,
@@ -753,7 +769,7 @@ async function submitBulkGallery(){
           photoCategory:{label:'Category',value:'Other'},
           photoDate:{label:'Date',value:''}
         },
-        photoData:p.dataURL,photoName:p.fileName||('photo_'+(count+1)+'.jpg'),photos:null
+        photoData:photoData,photoName:p.fileName||('photo_'+(count+1)+'.jpg'),photos:null
       };
       await dbSaveSubmission(sub);
       count++;
@@ -875,7 +891,7 @@ function processPhoto(file){
   const err=document.getElementById('photoErrMsg');err.style.display='none';
   const ext=file.name.split('.').pop().toLowerCase();
   if(!['jpg','jpeg','png','webp'].includes(ext)){err.textContent='Invalid format. Use JPG, PNG, or WebP.';err.style.display='block';return;}
-  if(file.size>5*1024*1024){err.textContent='File too large. Max 5 MB.';err.style.display='block';return;}
+  if(file.size>15*1024*1024){err.textContent='File too large. Max 15 MB.';err.style.display='block';return;}
   const img=new Image(),url=URL.createObjectURL(file);
   img.onload=function(){
     if(img.width<600||img.height<600){err.textContent='Image too small. Min 600×600 px.';err.style.display='block';URL.revokeObjectURL(url);return;}
@@ -886,7 +902,7 @@ function processPhoto(file){
 }
 function resetPhoto(e){e.stopPropagation();photoFile=null;photoDataURL=null;document.getElementById('photoInput').value='';document.getElementById('photoPreview').src='';document.getElementById('photoPlaceholder').style.display='block';document.getElementById('photoPreviewWrap').style.display='none';document.getElementById('photoDrop').classList.remove('uploaded');}
 function handlePhotoMulti(event,max){const files=Array.from(event.target.files||[]);if(!files.length)return;const err=document.getElementById('photoErrMsg');err.style.display='none';const rem=max-photoFilesMulti.length;if(rem<=0){err.textContent=`Maximum ${max} photos reached.`;err.style.display='block';event.target.value='';return;}const toAdd=files.slice(0,rem);if(files.length>rem){err.textContent=`Only ${rem} more can be added.`;err.style.display='block';}toAdd.forEach(f=>processPhotoForMulti(f,max));event.target.value='';}
-function processPhotoForMulti(file,max){const err=document.getElementById('photoErrMsg');const ext=file.name.split('.').pop().toLowerCase();if(!['jpg','jpeg','png','webp'].includes(ext)){err.textContent=`Skipped "${file.name}": invalid format.`;err.style.display='block';return;}if(file.size>5*1024*1024){err.textContent=`Skipped "${file.name}": too large.`;err.style.display='block';return;}const img=new Image();const url=URL.createObjectURL(file);img.onload=function(){if(img.width<600||img.height<600){err.textContent=`Skipped "${file.name}": too small.`;err.style.display='block';URL.revokeObjectURL(url);return;}const r=new FileReader();r.onload=ev=>{photoFilesMulti.push(file);photoDataURLsMulti.push(ev.target.result);renderMultiPhotoGrid(max);};r.readAsDataURL(file);URL.revokeObjectURL(url);};img.onerror=()=>{err.textContent=`Skipped "${file.name}".`;err.style.display='block';URL.revokeObjectURL(url);};img.src=url;}
+function processPhotoForMulti(file,max){const err=document.getElementById('photoErrMsg');const ext=file.name.split('.').pop().toLowerCase();if(!['jpg','jpeg','png','webp'].includes(ext)){err.textContent=`Skipped "${file.name}": invalid format.`;err.style.display='block';return;}if(file.size>15*1024*1024){err.textContent=`Skipped "${file.name}": too large (max 15 MB).`;err.style.display='block';return;}const img=new Image();const url=URL.createObjectURL(file);img.onload=function(){if(img.width<600||img.height<600){err.textContent=`Skipped "${file.name}": too small.`;err.style.display='block';URL.revokeObjectURL(url);return;}const r=new FileReader();r.onload=ev=>{photoFilesMulti.push(file);photoDataURLsMulti.push(ev.target.result);renderMultiPhotoGrid(max);};r.readAsDataURL(file);URL.revokeObjectURL(url);};img.onerror=()=>{err.textContent=`Skipped "${file.name}".`;err.style.display='block';URL.revokeObjectURL(url);};img.src=url;}
 function renderMultiPhotoGrid(max){const grid=document.getElementById('multiPhotoGrid');const ph=document.getElementById('photoPlaceholderMulti');const ctr=document.getElementById('multiPhotoCount');if(!grid)return;if(!photoDataURLsMulti.length){grid.innerHTML='';if(ph)ph.style.display='block';if(ctr)ctr.style.display='none';return;}if(ph)ph.style.display='none';grid.innerHTML=photoDataURLsMulti.map((url,i)=>`<div class="multi-photo-thumb"><img src="${url}" alt="Photo ${i+1}"/><button class="multi-photo-remove" type="button" onclick="removeMultiPhoto(${i},${max})">×</button></div>`).join('');if(ctr){ctr.style.display='inline-block';ctr.textContent=`${photoDataURLsMulti.length} of ${max} photos selected`;ctr.classList.toggle('full',photoDataURLsMulti.length>=max);}}
 function removeMultiPhoto(i,max){photoFilesMulti.splice(i,1);photoDataURLsMulti.splice(i,1);renderMultiPhotoGrid(max);}
 
@@ -905,13 +921,33 @@ async function submitForm(){
   }
   if(!valid){const fe=document.querySelector('.has-error')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});return;}
 
-  /* FIX 5: submissions start as 'pending' so they appear in Editor inbox first */
-  const sub={id:genId(),category:currentFormCategory,
+  /* Upload photo to Supabase Storage for full quality preservation */
+  const subId=genId();
+  let finalPhotoData=photoDataURL||null;
+  if(photoFile&&!cat.photoMulti){
+    try{
+      const storageUrl=await uploadToStorage(photoFile,subId);
+      finalPhotoData=storageUrl;/* full-quality URL replaces base64 */
+    }catch(e){console.warn('[Storage] Upload failed, using base64:',e.message);}
+  }
+  let finalPhotos=null;
+  if(cat.photoMulti&&photoFilesMulti.length){
+    finalPhotos=[];
+    for(let i=0;i<photoFilesMulti.length;i++){
+      try{
+        const url=await uploadToStorage(photoFilesMulti[i],subId+'_'+i);
+        finalPhotos.push({url:url,name:photoFilesMulti[i]?.name||`photo_${i+1}.jpg`});
+      }catch(e){
+        finalPhotos.push({data:photoDataURLsMulti[i],name:photoFilesMulti[i]?.name||`photo_${i+1}.jpg`});
+      }
+    }
+  }
+  const sub={id:subId,category:currentFormCategory,
     ts:new Date().toLocaleString(),createdAt:Date.now(),
-    status:'pending',/* goes straight to Editor-in-Chief queue */
+    status:'pending',
     reviewerNote:'',reviewedAt:null,data,
-    photoData:photoDataURL||null,photoName:photoFile?.name||null,
-    photos:cat.photoMulti?photoDataURLsMulti.map((url,i)=>({data:url,name:photoFilesMulti[i]?.name||`photo_${i+1}.jpg`})):null
+    photoData:finalPhotoData,photoName:photoFile?.name||null,
+    photos:finalPhotos
   };
 
   /* FIX 1: Show uploading state immediately, done state only after cloud confirms */
