@@ -1,6 +1,6 @@
 /* MagicEditor v2.0 — Way To Success Standard Schools — 1st Edition 2025/2026 */
 
-const CATEGORIES={
+let CATEGORIES={
   teachers:{label:'Teacher Profiles',tag:'Teachers',title:'Teacher Profile Submission',subtitle:'Share your journey and message to the graduating class.',icon:'👩‍🏫',photoRequired:true,fields:[
     {id:'name',label:'Full name',type:'text',required:true,placeholder:'As it should appear in print'},
     {id:'title',label:'Title / position',type:'text',required:true,placeholder:'e.g. Head of Mathematics Department'},
@@ -107,7 +107,7 @@ const CATEGORIES={
     {id:'photoDate',label:'Date photo was taken',type:'date',required:false}
   ]}
 };
-const CATEGORY_KEYS=Object.keys(CATEGORIES);
+let CATEGORY_KEYS=Object.keys(CATEGORIES);
 const EDITORIAL_META={'editorial-note':{label:'Editorial Note',tag:'Editorial Note'},'appreciation':{label:'Appreciation Section',tag:'Appreciation'}};
 
 /* ═══════════════════════════════════════════════════════════
@@ -507,9 +507,25 @@ function saveCfg(n){cfg=n;localStorage.setItem('me_cfg',JSON.stringify(n));dbSav
 let cfg=loadCfg();
 
 /* LAYOUT SETTINGS */
-function loadLsSettings(){try{return JSON.parse(localStorage.getItem('me_ls_settings')||'{}')||{};}catch(e){return{};}}
+let lsSettings={};
+function loadLsSettings(){try{lsSettings=JSON.parse(localStorage.getItem('me_ls_settings')||'{}');applyCustomCategories(lsSettings);}catch(e){}}
 function saveLsSettingsToStorage(s){localStorage.setItem('me_ls_settings',JSON.stringify(s));dbSaveSettings('ls_settings',s);}
-let lsSettings=loadLsSettings();
+
+function applyCustomCategories(s){
+  if(!s||!Array.isArray(s.customCategories))return;
+  s.customCategories.forEach(c=>{
+    CATEGORIES[c.id]=c;
+  });
+  CATEGORY_KEYS=Object.keys(CATEGORIES);
+  
+  // Ensure they are in sectionOrder
+  s.customCategories.forEach(c=>{
+    if(!sectionOrder.find(sec=>sec.key===c.id)){
+      sectionOrder.push({key:c.id,label:c.label,icon:c.icon,layout:'single',visible:true});
+    }
+  });
+  localStorage.setItem('me_section_order',JSON.stringify(sectionOrder));
+}
 
 /* LABELS */
 function loadLabels(){try{return JSON.parse(localStorage.getItem('me_labels')||'{}')||{};}catch(e){return{};}}
@@ -533,7 +549,12 @@ async function initCloudSync(){
       dbLoadSettings('form_config')
     ]);
     if(cloudCfg){cfg={...cfg,...cloudCfg};localStorage.setItem('me_cfg',JSON.stringify(cfg));}
-    if(cloudSettings){lsSettings={...lsSettings,...cloudSettings};localStorage.setItem('me_ls_settings',JSON.stringify(lsSettings));applyLsColors(lsSettings);}
+    if(cloudSettings&&typeof cloudSettings==='object'){
+      lsSettings=cloudSettings;
+      localStorage.setItem('me_ls_settings',JSON.stringify(lsSettings));
+      applyLsColors(lsSettings);
+      applyCustomCategories(lsSettings);
+    }
     if(cloudLabels){labelOverrides={...labelOverrides,...cloudLabels};localStorage.setItem('me_labels',JSON.stringify(labelOverrides));}
     if(cloudSectionOrder&&Array.isArray(cloudSectionOrder)){localStorage.setItem('me_section_order',JSON.stringify(cloudSectionOrder));sectionOrder=cloudSectionOrder;}
     if(cloudFormConfig&&typeof cloudFormConfig==='object'){
@@ -596,7 +617,7 @@ async function ocrProcess(event,catKey){
   const file=event.target.files?.[0];if(!file)return;
   const statusEl=document.getElementById(`ocrStatus-${catKey}`);
   const previewEl=document.getElementById(`ocrPreview-${catKey}`);
-  const s=loadLsSettings();
+  const s=lsSettings;
   const apiKey=s.apiKey;
   if(!apiKey){
     statusEl.className='ocr-status err';
@@ -1015,11 +1036,41 @@ function enterAdmin(){subs=loadAll();renderAdmin();show('viewAdmin');}
 function hideAllAdminModes(){['adminModeSubs','adminModeEditorial','adminModeLayout','adminModeShareLinks','adminModeSettings'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 function setCategory(cat){currentAdminCat=cat;document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));const btn=document.getElementById('tab-'+cat);if(btn)btn.classList.add('active');hideAllAdminModes();if(cat==='editorial'){document.getElementById('adminModeEditorial').style.display='block';renderEditorialMode();}else{document.getElementById('adminModeSubs').style.display='block';renderAdmin();}}
 function openLayoutStudio(){document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-layout').classList.add('active');hideAllAdminModes();document.getElementById('adminModeLayout').style.display='block';loadLsSettingsToUI();renderSectionManager();renderLabelRenameList();renderAIContentSummary();}
-function openSettings(){document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-settings').classList.add('active');hideAllAdminModes();document.getElementById('adminModeSettings').style.display='block';document.getElementById('setAdminPin').value=cfg.adminPin;document.getElementById('setEditorPin').value=cfg.editorPin;document.getElementById('pinSaveStatus').textContent='';refreshDiag();}
+function openSettings(){document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-settings').classList.add('active');hideAllAdminModes();document.getElementById('adminModeSettings').style.display='block';document.getElementById('setAdminPin').value=cfg.adminPin;document.getElementById('setEditorPin').value=cfg.editorPin;document.getElementById('pinSaveStatus').textContent='';const akEl=document.getElementById('settingsApiKey');if(akEl)akEl.value=lsSettings.apiKey||'';populateCustCatPicker();refreshDiag();}
+function populateCustCatPicker(){
+  const picker=document.getElementById('custCatPicker');if(!picker)return;
+  const currentVal=picker.value;
+  let html='<option value="">— Select a category —</option>';
+  CATEGORY_KEYS.forEach(k=>{
+    const c=CATEGORIES[k];
+    html+=`<option value="${k}">${c.icon||''} ${esc(getLabel('section_'+k,c.label))}</option>`;
+  });
+  picker.innerHTML=html;
+  if(CATEGORY_KEYS.includes(currentVal))picker.value=currentVal;
+}
 function openShareLinks(){document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-sharelinks').classList.add('active');hideAllAdminModes();document.getElementById('adminModeShareLinks').style.display='block';renderShareLinks();}
+
+function renderAdminTabs(){
+  const c=document.getElementById('dynamicAdminTabs');if(!c)return;
+  // Keep the 'All' tab, the bottom 4 tabs, but replace the middle with CATEGORY_KEYS
+  const curActive=document.querySelector('.admin-tab.active')?.id||'tab-all';
+  let html=`<button class="admin-tab" onclick="setCategory('all')" id="tab-all">All <span class="tab-count" id="count-all">0</span></button>\n`;
+  CATEGORY_KEYS.forEach(k=>{
+    html+=`<button class="admin-tab" onclick="setCategory('${k}')" id="tab-${k}">${esc(CATEGORIES[k].tag||CATEGORIES[k].label)} <span class="tab-count" id="count-${k}">0</span></button>\n`;
+  });
+  html+=`<button class="admin-tab" onclick="setCategory('editorial')" id="tab-editorial" style="color:var(--gold);font-style:italic;">✎ Editorial <span class="tab-count" id="count-editorial">0</span></button>
+        <button class="admin-tab" onclick="openWorkspace()" id="tab-layout" style="color:var(--ws-accent);font-weight:700;">🛠 Open Workspace</button>
+        <button class="admin-tab" onclick="openShareLinks()" id="tab-sharelinks">🔗 Share Links</button>
+        <button class="admin-tab" onclick="openSettings()" id="tab-settings">⚙ Settings</button>`;
+  c.innerHTML=html;
+  // Restore active
+  const act=document.getElementById(curActive);
+  if(act)act.classList.add('active');
+}
 
 function renderAdmin(){
   subs=loadAll();
+  renderAdminTabs();
   document.getElementById('count-all').textContent=subs.length;
   CATEGORY_KEYS.forEach(k=>{const el=document.getElementById('count-'+k);if(el)el.textContent=subs.filter(s=>s.category===k).length;});
   const edCount=document.getElementById('count-editorial');if(edCount)edCount.textContent=subs.filter(s=>s.category==='editorial-note'||s.category==='appreciation').length;
@@ -1245,6 +1296,17 @@ function saveAppreciation(){const title=document.getElementById('apprTitle').val
 /* SETTINGS */
 function savePins(){const a=document.getElementById('setAdminPin').value.trim();const e=document.getElementById('setEditorPin').value.trim();if(!/^\d{4}$/.test(a)||!/^\d{4}$/.test(e)){document.getElementById('pinSaveStatus').textContent='✗ PINs must be exactly 4 digits.';document.getElementById('pinSaveStatus').style.color='var(--red)';return;}if(a===e){document.getElementById('pinSaveStatus').textContent='✗ Admin and Editor PINs must differ.';document.getElementById('pinSaveStatus').style.color='var(--red)';return;}saveCfg({adminPin:a,editorPin:e});document.getElementById('pinSaveStatus').textContent='✓ PINs saved.';document.getElementById('pinSaveStatus').style.color='var(--green)';refreshDiag();}
 function resetPinsToDefault(){if(!confirm('Reset PINs to defaults (1234/5678)?'))return;saveCfg({adminPin:'1234',editorPin:'5678'});document.getElementById('setAdminPin').value='1234';document.getElementById('setEditorPin').value='5678';document.getElementById('pinSaveStatus').textContent='✓ PINs reset.';document.getElementById('pinSaveStatus').style.color='var(--green)';refreshDiag();}
+function saveApiKeyFromSettings(){
+  const key=(document.getElementById('settingsApiKey')?.value||'').trim();
+  if(!key){document.getElementById('apiKeySaveStatus').textContent='✗ Please enter an API key.';document.getElementById('apiKeySaveStatus').style.color='var(--red)';return;}
+  lsSettings.apiKey=key;
+  localStorage.setItem('me_ls_settings',JSON.stringify(lsSettings));
+  dbSaveSettings('ls_settings',lsSettings);
+  /* Also populate the Layout Studio field if it exists */
+  const lsEl=document.getElementById('ls-apiKey');if(lsEl)lsEl.value=key;
+  document.getElementById('apiKeySaveStatus').textContent='✓ API key saved & synced to cloud.';
+  document.getElementById('apiKeySaveStatus').style.color='var(--green)';
+}
 async function wipeAllData(){if(!confirm('PERMANENTLY DELETE all submissions from cloud AND local?'))return;if(!confirm('Really? This cannot be undone. All data will be lost forever.'))return;
   showSync('syncing','Wiping all data…');
   try{
@@ -1275,6 +1337,46 @@ function updateCustomFieldModalOptions(){document.getElementById('cfmOptionsWrap
 function editCustomField(id){openCustomFieldModal(id);}
 function saveCustomField(){if(!currentCustCat)return;const label=document.getElementById('cfmLabel').value.trim();const type=document.getElementById('cfmType').value;const options=document.getElementById('cfmOptions').value.trim();const placeholder=document.getElementById('cfmPlaceholder').value.trim();const required=document.getElementById('cfmRequired').checked;if(!label){alert('Field label is required.');return;}if(type==='select'&&!options){alert('Dropdown needs at least one option.');return;}const entry=ensureCatEntry(currentCustCat);if(editingCustomFieldId){const cf=entry.customFields.find(x=>x.id===editingCustomFieldId);if(cf){cf.label=label;cf.type=type;cf.options=options;cf.placeholder=placeholder;cf.required=required;}}else{const nId='cf_'+Date.now().toString(36);const maxO=Math.max(0,...getAllFieldsForEditing(currentCustCat).map(f=>f.order||0));entry.customFields.push({id:nId,label,type,options,placeholder,required,hidden:false,order:maxO+1});}saveFormConfig(formConfig);closeCustomFieldModal();renderFieldCustomizer();}
 function deleteCustomField(fieldId){if(!currentCustCat)return;const entry=formConfig[currentCustCat];if(!entry)return;const cf=entry.customFields.find(x=>x.id===fieldId);if(!cf)return;if(!confirm(`Delete custom field "${cf.label}"?`))return;entry.customFields=entry.customFields.filter(x=>x.id!==fieldId);saveFormConfig(formConfig);renderFieldCustomizer();}
+
+/* CUSTOM FORMS */
+function openCreateFormModal(){
+  document.getElementById('crfId').value='';
+  document.getElementById('crfName').value='';
+  document.getElementById('crfIcon').value='';
+  document.getElementById('crfTag').value='';
+  document.getElementById('crfSubtitle').value='';
+  document.getElementById('createFormModal').classList.add('active');
+}
+function closeCreateFormModal(){
+  document.getElementById('createFormModal').classList.remove('active');
+}
+function saveNewForm(){
+  const id=document.getElementById('crfId').value.trim();
+  const name=document.getElementById('crfName').value.trim();
+  const icon=document.getElementById('crfIcon').value.trim()||'📝';
+  const tag=document.getElementById('crfTag').value.trim()||name;
+  const subtitle=document.getElementById('crfSubtitle').value.trim();
+  
+  if(!id||!name){alert('ID and Name are required.');return;}
+  if(CATEGORIES[id]){alert('A category with this ID already exists.');return;}
+  
+  const newCat={
+    id,label:name,tag,title:name+' Submission',subtitle,icon,
+    photoRequired:false,
+    fields:[] // Initially empty, user can add fields via Field Customizer
+  };
+  
+  if(!lsSettings.customCategories)lsSettings.customCategories=[];
+  lsSettings.customCategories.push(newCat);
+  saveLsSettingsToStorage(lsSettings);
+  applyCustomCategories(lsSettings);
+  
+  closeCreateFormModal();
+  populateCustCatPicker();
+  document.getElementById('custCatPicker').value=id;
+  renderFieldCustomizer();
+  alert(`Form "${name}" created successfully!\nYou can now add fields to it.`);
+}
 
 /* LAYOUT STUDIO */
 function lsTab(tab){currentLsTab=tab;document.querySelectorAll('.ls-tab').forEach(t=>t.classList.remove('active'));document.getElementById('lstab-'+tab).classList.add('active');['preview','sections','design','toc','aiassist'].forEach(t=>{const el=document.getElementById('lspanel-'+t);if(el)el.style.display=t===tab?'block':'none';});if(tab==='sections')renderSectionManager();if(tab==='toc')renderTOC();if(tab==='aiassist'){renderAIContentSummary();renderAIChatHistory();}if(tab==='design'){loadLsSettingsToUI();renderLabelRenameList();}}
