@@ -1568,7 +1568,7 @@ function openPrintView(){
   <title>${esc(s.magTitle||'The Torch')} — Print</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
   <style>
-    *{box-sizing:border-box;margin:0;padding:0;}
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
     body{background:#888;font-family:'Lato',sans-serif;}
     @media print{
       body{background:#fff;}
@@ -1576,6 +1576,7 @@ function openPrintView(){
       .no-print{display:none!important;}
       .mag-sheet{box-shadow:none!important;margin:0!important;page-break-after:always;}
       .mag-sheet:last-child{page-break-after:auto;}
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
     }
     .no-print{
       padding:16px 24px;text-align:center;background:#1a2744;color:#fff;
@@ -1595,13 +1596,15 @@ function openPrintView(){
     .mag-page{width:${w}px!important;height:${h}px!important;}
     .mag-page-inner{width:100%;height:100%;overflow:hidden;}
     img{max-width:100%;}
+    /* AI-injected styles carried to print */
+    ${(document.getElementById('ai-custom-css')?.textContent||'').replace(/</g,'\u003c')}
   </style>
 </head>
 <body>
   <div class="no-print">
     <h2>🖨 ${esc(s.magTitle||'The Torch')} &mdash; ${magPages.length} pages</h2>
     <button onclick="window.print()">Print / Save as PDF</button>
-    <p>Paper: ${ps} &middot; ${orient} &middot; Margins: None &middot; Enable Background graphics</p>
+    <p>Paper: ${ps} &middot; ${orient} &middot; Margins: None &middot; <strong>Enable Background graphics ✓</strong></p>
   </div>
   <div id="printPages">
     ${allPagesHtml}
@@ -2184,8 +2187,8 @@ function wsGeneratePreview(){
   subs=loadAll();
   wsPages=[];wsPageIdx=0;
   const s=lsSettings;
-  const finalized=subs.filter(sub=>sub.status==='finalized');
-  document.getElementById('wsStatusFinalized').textContent=finalized.length+' finalized';
+  const finalized=subs.filter(sub=>sub.status==='approved'||sub.status==='finalized');
+  document.getElementById('wsStatusFinalized').textContent=finalized.length+' approved';
 
   sectionOrder.filter(sec=>sec.visible).forEach(sec=>{
     if(sec.key==='cover'){wsPages.push({type:'cover',sec,label:'Cover Page'});return;}
@@ -2307,7 +2310,7 @@ function wsTogglePanel(id){document.getElementById(id)?.classList.toggle('collap
 
 /* ── Assets Panel ── */
 function wsRenderAssets(){
-  const grid=document.getElementById('wsAssetGrid');
+  const grid=document.getElementById('wsAssetGrid');if(!grid)return;
   const empty=document.getElementById('wsAssetEmpty');
   const finalized=loadAll().filter(s=>s.status==='finalized');
   const photos=[];
@@ -2322,6 +2325,7 @@ function wsRenderAssets(){
 
 /* ── Color Panel ── */
 function wsRenderColorPanel(){
+  if(!document.getElementById('wsColorPanel'))return;
   const c=document.getElementById('wsColorPanel');if(!c)return;
   const s=lsSettings;
   const colors=[
@@ -2349,6 +2353,7 @@ function wsUpdateColor(key,val){
 
 /* ── Font Panel ── */
 function wsRenderFontPanel(){
+  if(!document.getElementById('wsFontSize'))return;
   const s=lsSettings;
   const hf=document.getElementById('wsHeadingFont');if(hf)hf.value=s.headingFont||"'Playfair Display',serif";
   const bf=document.getElementById('wsBodyFont');if(bf)bf.value=s.bodyFont||"'Crimson Text',serif";
@@ -2457,26 +2462,35 @@ TYPOGRAPHY: Heading:${s.headingFont||'Playfair Display'} Body:${s.bodyFont||'Cri
 CURRENT PAGE: ${wsPageIdx+1} of ${wsPages.length} — ${wsPages[wsPageIdx]?.label||'none'}`;
 
   const taskPrompts={
-    design:'You are a world-class magazine designer. Analyze the layout and suggest improvements to typography, spacing, colour, alignment, and visual hierarchy. Provide CSS injection commands using [FORMAT:customCSS:...] and settings JSON blocks.',
-    reasoning:'You are a production strategist. Analyze the magazine structure, content balance, page count, and help optimize the overall layout for cost-effective printing.',
+    design:`You are an AGENT controlling a magazine design system. You MUST directly implement changes by outputting [FORMAT:customCSS:...] and settings JSON blocks in EVERY response. Do NOT just suggest — EXECUTE.
+
+RULES:
+1. ALWAYS include a [FORMAT:customCSS:...] block with CSS that directly implements your design changes.
+2. ALWAYS include a settings JSON block to change colours, fonts, spacing.
+3. Explain what you changed BRIEFLY, then show the implementation.
+4. You are the sole design controller — the user has no manual design tools.
+5. Make designs PREMIUM: rich colours, elegant typography, professional spacing.
+6. For print magazines use CMYK-friendly colours, high contrast, proper margins.`,
+    reasoning:'You are a production strategist. Analyze the magazine structure, content balance, page count, and help optimize the overall layout for cost-effective printing. Output settings JSON to implement any changes.',
     proofread:'You are a professional proofreader for a Nigerian school graduation magazine. Check grammar, spelling, punctuation across all finalized content.',
-    image:'You are a design analyst. Analyze the uploaded design sample image and describe its typography, colours, spacing, layout structure, and visual hierarchy. Then suggest how to replicate that style.'
+    image:`You are a design analyst AND agent. Analyze the uploaded design sample image, describe its style, then REPLICATE it by outputting [FORMAT:customCSS:...] and settings JSON blocks. Do not just describe — implement the style directly.`
   };
 
   const messages=[{role:'system',content:`${taskPrompts[task]||taskPrompts.design}
 
-FORMATTING COMMANDS (include in your response for instant application):
-• [FORMAT:customCSS:...css...] — inject CSS to restyle the magazine preview
-• Target sections: .mag-page[data-category="teachers"], .mag-page[data-category="creative"], etc.
-• Classes: .mag-item, .mag-item-name, .mag-item-subtitle, .mag-item-photo, .mag-item-fields, .mag-item-body
+FORMATTING COMMANDS (you MUST include these in every design response):
+\u2022 [FORMAT:customCSS:...css...] \u2014 inject CSS to restyle the magazine preview. This is MANDATORY for design tasks.
+\u2022 Target sections: .mag-page[data-category="teachers"], .mag-page[data-category="creative"], etc.
+\u2022 Classes: .mag-item, .mag-item-name, .mag-item-subtitle, .mag-item-photo, .mag-item-fields, .mag-item-body
+\u2022 Page structure: .mag-page > .mag-page-inner contains all content
 
-SETTINGS JSON: End your response with a settings block to change layout settings:
+SETTINGS JSON (you MUST include this to change layout settings):
 \`\`\`settings
 {"color1":"#hex","teachersPerPage":9,...}
 \`\`\`
 Available keys: teachersPerPage, studentsPerPage, galleryPerPage, speechesPerPage, creativePerPage, orientation, pageSize, pageNums, autoTrim, color1, color2, color3, pageBg, textColor, headingFont, bodyFont, fontSize, magTitle, schoolName, edition, year, theme.
 
-BE CONVERSATIONAL. Explain your suggestions clearly.
+You are an AGENT. Every response MUST contain at least one [FORMAT:customCSS:...] or settings block. Never respond with only text suggestions.
 
 Context:\n${ctx}`}];
 
@@ -2499,7 +2513,7 @@ Context:\n${ctx}`}];
     const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
         'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Workspace AI'},
-      body:JSON.stringify({model,max_tokens:2500,messages})
+      body:JSON.stringify({model,max_tokens:4000,messages})
     });
     if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.substring(0,120)}`);}
     const data=await resp.json();
@@ -2539,7 +2553,7 @@ Context:\n${ctx}`}];
       }catch(e){}
     }
 
-    if(fmtChanges.length)wsRenderCurrentPage();
+    if(fmtChanges.length){wsGeneratePreview();wsRenderCurrentPage();}
 
     const htmlResp=esc(adviceText).replace(/\n/g,'<br>')+(fmtChanges.length?`<br><br><em style="color:var(--ws-green);">✓ ${fmtChanges.join(', ')}</em>`:'');
     wsAIAddMsg('assistant',adviceText,htmlResp);
@@ -2619,6 +2633,23 @@ function checkUrlRouting(){try{const params=new URLSearchParams(window.location.
 /* KEYBOARD SHORTCUT — type "admin" or "editor" on landing page */
 let keyBuffer='';
 document.addEventListener('keydown',function(e){if(document.querySelector('.view.active')?.id!=='viewLanding')return;keyBuffer+=e.key.toLowerCase();if(keyBuffer.length>8)keyBuffer=keyBuffer.slice(-8);if(keyBuffer.endsWith('admin')){keyBuffer='';openPIN('admin');}if(keyBuffer.endsWith('editor')){keyBuffer='';openPIN('editor');}});
+
+/* PURGE LOCAL CACHE */
+function purgeLocalCache(){
+  if(!confirm('This will clear ALL local cached data (submissions, settings, labels).\nCloud data will remain safe.\n\nContinue?'))return;
+  const keys=['me_subs','me_cfg','me_ls_settings','me_labels','me_section_order','me_form_config'];
+  let removed=0;
+  keys.forEach(k=>{if(localStorage.getItem(k)){localStorage.removeItem(k);removed++;}});
+  const st=document.getElementById('purgeStatus');
+  if(st)st.textContent=`✓ Cleared ${removed} cached items. Reloading from cloud…`;
+  setTimeout(()=>{
+    initCloudSync().then(()=>{
+      subs=loadAll();
+      renderAdmin();
+      if(st)st.textContent=`✓ Done! Now showing ${subs.length} items from cloud.`;
+    });
+  },500);
+}
 
 /* INIT */
 renderLandingCards();
