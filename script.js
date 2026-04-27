@@ -265,20 +265,7 @@ function handleRealtimeSetting(payload) {
 }
 
 
-/* ── Helper: Retry Logic for Flaky Networks ── */
-async function withRetry(fn, desc='Operation', retries=3) {
-  let lastErr;
-  for(let i=0; i<retries; i++){
-    try {
-      return await fn();
-    } catch(e) {
-      lastErr = e;
-      console.warn(`[DB] ${desc} failed (attempt ${i+1}/${retries}):`, e.message);
-      if(i < retries - 1) await new Promise(r => setTimeout(r, 1000 * (i+1))); // exponential backoff
-    }
-  }
-  throw lastErr;
-}
+/* (withRetry defined above — duplicate removed) */
 
 /* ── Submissions (cloud + local mirror) ── */
 async function dbLoadAll(){
@@ -321,18 +308,11 @@ async function dbLoadAll(){
       photos:r.photos?(typeof r.photos==='string'?JSON.parse(r.photos):r.photos):null
     }));
 
-    /* If cloud returned ZERO rows but local has data, it is definitely RLS */
+    /* If cloud returned ZERO rows but local has data, push local items to cloud */
     if(mapped.length===0 && localCache.length>0){
-      showSync('err','⚠ RLS blocking reads — '+localCache.length+' items in local cache only (check console)');
-      console.error('[DB] CRITICAL: Cloud returned 0 rows but localStorage has '+localCache.length+
-        '. This means Supabase RLS is blocking SELECT for anon role.\n\n' +
-        'Fix: Supabase Dashboard → Table Editor → submissions → RLS → Add Policy:\n' +
-        '  Name: Allow all\n  Operation: ALL\n  Target roles: anon\n  Using expression: true\n  With check: true\n\n' +
-        'OR run in SQL Editor:\n' +
-        'CREATE POLICY "public_access" ON public.submissions FOR ALL TO anon USING (true) WITH CHECK (true);\n' +
-        'CREATE POLICY "public_access" ON public.settings FOR ALL TO anon USING (true) WITH CHECK (true);\n');
-      /* Merge local into cloud — surface local data so editor can still work */
-      return localCache;
+      console.log('[DB] Cloud is empty but localStorage has '+localCache.length+' items — pushing to cloud…');
+      showSync('syncing','Migrating '+localCache.length+' local items to cloud…');
+      try { await dbSaveAllToCloud(localCache); } catch(e) { console.warn('[DB] Migration failed:',e.message); }
     }
 
     /* Merge: keep any local-only items that aren't in cloud yet (e.g. pending upload) */
@@ -454,11 +434,11 @@ async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
 async function dbLoadSettings(key){
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const data=await withRetry(async()=>{
-      const{data,error}=await sb.from('settings').select('value').eq('key',key).single();
-      if(error&&error.code!=='PGRST116')throw error;
+    const data=await (async()=>{
+      const{data,error}=await sb.from('settings').select('value').eq('key',key).maybeSingle();
+      if(error)throw error;
       return data;
-    },'Loading settings '+key);
+    })();
     if(data?.value){
       const parsed=typeof data.value==='string'?JSON.parse(data.value):data.value;
       localStorage.setItem('me_'+key,JSON.stringify(parsed));
@@ -726,8 +706,9 @@ function processBulkPhoto(file){
   if(!['jpg','jpeg','png','webp'].includes(ext))return;
   if(file.size>8*1024*1024)return;
   const r=new FileReader();
+  const fileName=file.name;/* capture name now before ref goes stale */
   r.onload=ev=>{
-    bulkPhotos.push({dataURL:ev.target.result,file,caption:''});
+    bulkPhotos.push({dataURL:ev.target.result,fileName:fileName,caption:''});
     renderBulkGrid();
   };
   r.readAsDataURL(file);
@@ -751,31 +732,43 @@ function updateBulkCaption(i,val){if(bulkPhotos[i])bulkPhotos[i].caption=val;}
 
 async function submitBulkGallery(){
   if(!bulkPhotos.length){alert('Please add at least one photo.');return;}
-  const ts=new Date().toLocaleString();
-  const submitterName=(document.getElementById('ff-submitterName')?.value||'').trim()||'Bulk Upload';
+  /* Validate required fields */
+  const submitterName=(document.getElementById('ff-submitterName')?.value||'').trim();
+  if(!submitterName){alert('Please enter your name before submitting.');document.getElementById('ff-submitterName')?.focus();return;}
   const submitterRole=(document.getElementById('ff-submitterRole')?.value||'').trim()||'';
-  let count=0;
+  const ts=new Date().toLocaleString();
+  let count=0;let errors=0;
+  showSync('syncing','Uploading '+bulkPhotos.length+' photos…');
   for(const p of bulkPhotos){
-    const sub={
-      id:genId(),
-      category:'gallery',ts,createdAt:Date.now()+count,
-      status:'pending',/* FIXED: Gallery items now go to Editor review inbox */
-      reviewerNote:'',reviewedAt:null,
-      data:{
-        submitterName:{label:'Submitted by',value:submitterName},
-        submitterRole:{label:'Role',value:submitterRole},
-        photoCaption:{label:'Photo caption',value:p.caption||'Gallery photo'},
-        photoCategory:{label:'Category',value:'Other'},
-        photoDate:{label:'Date',value:''}
-      },
-      photoData:p.dataURL,photoName:p.file.name,photos:null
-    };
-    await dbSaveSubmission(sub);
-    count++;
+    try{
+      const sub={
+        id:genId(),
+        category:'gallery',ts,createdAt:Date.now()+count,
+        status:'pending',
+        reviewerNote:'',reviewedAt:null,
+        data:{
+          submitterName:{label:'Submitted by',value:submitterName},
+          submitterRole:{label:'Role',value:submitterRole},
+          photoCaption:{label:'Photo caption',value:p.caption||'Gallery photo'},
+          photoCategory:{label:'Category',value:'Other'},
+          photoDate:{label:'Date',value:''}
+        },
+        photoData:p.dataURL,photoName:p.fileName||('photo_'+(count+1)+'.jpg'),photos:null
+      };
+      await dbSaveSubmission(sub);
+      count++;
+    }catch(e){
+      console.warn('[Gallery] Failed to save photo '+(count+1)+':',e.message);
+      errors++;
+    }
   }
   bulkPhotos=[];renderBulkGrid();
-  alert(`✓ ${count} photos submitted successfully! They are now awaiting Editor review.`);
-
+  if(errors){
+    alert(`${count} photos submitted, ${errors} failed. Failed items saved locally and will sync later.`);
+  } else {
+    alert(`✓ ${count} photos submitted successfully! They are now awaiting Editor review.`);
+  }
+  showSync('ok','✓ '+count+' photos uploaded');
   document.getElementById('formContainer').style.display='none';
   document.getElementById('successWrap').style.display='block';
   window.scrollTo({top:0,behavior:'smooth'});
