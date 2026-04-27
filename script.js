@@ -2347,7 +2347,14 @@ function wsRenderPageList(){
 }
 
 /* ── Page Navigation ── */
-function wsSelectPage(idx){if(idx<0||idx>=wsPages.length)return;wsPageIdx=idx;wsRenderCurrentPage();wsRenderPageList();wsUpdateNavUI();}
+function wsSelectPage(idx){
+  if(idx<0||idx>=wsPages.length)return;
+  wsPageIdx=idx;
+  wsRenderPageList();
+  wsUpdateNavUI();
+  const el = document.getElementById('ws-page-'+idx);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+}
 function wsPrevPage(){if(wsPageIdx>0)wsSelectPage(wsPageIdx-1);}
 function wsNextPage(){if(wsPageIdx<wsPages.length-1)wsSelectPage(wsPageIdx+1);}
 function wsUpdateNavUI(){
@@ -2363,25 +2370,16 @@ function wsRenderCurrentPage(){
     container.innerHTML='<div class="ws-empty"><div class="ws-empty-icon">🛠</div><h3>No pages yet</h3><p>Finalize submissions in the Production Admin, then click <strong>Generate</strong> to build your magazine preview.</p></div>';
     return;
   }
-  /* Reuse existing page renderer from the Layout Studio */
   const origIdx=currentPageIdx;const origPages=magPages;
-  magPages=wsPages;currentPageIdx=wsPageIdx;
-
-  const page=wsPages[wsPageIdx];const{w,h}=getPageDimensions();
+  magPages=wsPages;
+  const{w,h}=getPageDimensions();
   const scale=(wsZoom/100);
 
-  /* Build page HTML using existing renderCurrentPage logic */
   const tempCanvas=document.createElement('div');
   tempCanvas.id='magCanvas';tempCanvas.style.display='none';
   document.body.appendChild(tempCanvas);
-  renderCurrentPage();
-  const pageHtml=tempCanvas.innerHTML;
-  document.body.removeChild(tempCanvas);
 
-  /* Restore original state */
-  magPages=origPages;currentPageIdx=origIdx;
-
-  /* Build workspace page with guides */
+  let allPagesHtml='';
   const guidesHtml=wsShowGuides?`
     <div class="ws-bleed"></div>
     <div class="ws-safe"></div>
@@ -2391,12 +2389,20 @@ function wsRenderCurrentPage(){
     <div class="ws-guide-label safe-label">SAFE AREA</div>
   `:'';
 
-  container.innerHTML=`
-    <div class="ws-mag-page ${wsShowGuides?'ws-guides':''}" style="width:${w}px;height:${h}px;transform:scale(${scale});">
+  for(let i=0;i<wsPages.length;i++){
+    currentPageIdx=i;
+    renderCurrentPage();
+    const pageHtml=tempCanvas.innerHTML;
+    allPagesHtml+=`<div class="ws-mag-page ${wsShowGuides?'ws-guides':''}" id="ws-page-${i}" style="width:${w}px;height:${h}px;transform:scale(${scale}); margin-bottom: 24px;">
       ${guidesHtml}
       <div class="ws-mag-page-inner">${pageHtml}</div>
-    </div>
-  `;
+    </div>`;
+  }
+
+  document.body.removeChild(tempCanvas);
+  magPages=origPages;currentPageIdx=origIdx;
+
+  container.innerHTML=allPagesHtml;
 }
 
 /* ── Zoom ── */
@@ -2596,6 +2602,9 @@ RULES:
 
 FORMATTING COMMANDS (you MUST include these in every design response):
 \u2022 [FORMAT:customCSS:...css...] \u2014 inject CSS to restyle the magazine preview. This is MANDATORY for design tasks.
+\u2022 [FORMAT:action:approveAll] \u2014 Approve all pending submissions
+\u2022 [FORMAT:action:finalizeCategory:teachers] \u2014 Finalize approved submissions in a category (e.g. teachers, primary5, gallery)
+\u2022 [FORMAT:action:setSectionOrder:cover,toc,editorial-note,teachers,...] \u2014 Reorder the magazine sections
 \u2022 Target sections: .mag-page[data-category="teachers"], .mag-page[data-category="creative"], etc.
 \u2022 Classes: .mag-item, .mag-item-name, .mag-item-subtitle, .mag-item-photo, .mag-item-fields, .mag-item-body
 \u2022 Page structure: .mag-page > .mag-page-inner contains all content
@@ -2626,15 +2635,30 @@ Context:\n${ctx}`}];
   }
 
   try{
-    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
-        'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Workspace AI'},
-      body:JSON.stringify({model,max_tokens:4000,messages})
-    });
-    if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.substring(0,120)}`);}
-    const data=await resp.json();
-    if(data.error)throw new Error(data.error.message||'API error');
-    let result=data.choices?.[0]?.message?.content||'No response.';
+    const modelsToTry = [model, 'google/gemini-2.0-flash-lite-001', 'anthropic/claude-3-haiku'];
+    let result = '';
+    let lastErr = null;
+    
+    for(const tryModel of modelsToTry){
+      try{
+        const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+            'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Workspace AI'},
+          body:JSON.stringify({model:tryModel,max_tokens:4000,messages})
+        });
+        if(resp.status===504||resp.status===503){throw new Error('timeout_'+resp.status);}
+        if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.substring(0,120)}`);}
+        const data=await resp.json();
+        if(data.error)throw new Error(data.error.message||'API error');
+        result=data.choices?.[0]?.message?.content||'No response.';
+        if(result)break;
+      }catch(e){
+        lastErr = e;
+        if(tryModel===modelsToTry[modelsToTry.length-1] || !e.message.startsWith('timeout_')){
+          throw e;
+        }
+      }
+    }
 
     /* Remove thinking indicator */
     wsAIChatHistory.splice(thinkIdx,1);
@@ -2656,6 +2680,31 @@ Context:\n${ctx}`}];
       const aiStyle=document.getElementById('ai-custom-css');
       if(aiStyle)aiStyle.textContent=fmtCommands.customCSS;
       fmtChanges.push('Injected CSS');
+    }
+
+    /* Process Action Commands */
+    if(fmtCommands.action){
+      const action = fmtCommands.action.trim();
+      if(action === 'approveAll'){
+        const allSubs = loadAll();
+        let changed = 0;
+        allSubs.forEach(s => { if(s.status==='pending'){ s.status='approved'; changed++; }});
+        if(changed){ saveAll(allSubs); fmtChanges.push(`Approved ${changed} submissions`); }
+      } else if(action.startsWith('finalizeCategory:')){
+        const cat = action.split(':')[1].trim();
+        const allSubs = loadAll();
+        let changed = 0;
+        allSubs.forEach(s => { if((s.category===cat || cat==='all') && s.status==='approved'){ s.status='finalized'; changed++; }});
+        if(changed){ saveAll(allSubs); fmtChanges.push(`Finalized ${changed} submissions in ${cat}`); }
+      } else if(action.startsWith('setSectionOrder:')){
+        const keys = action.split(':')[1].split(',').map(k=>k.trim());
+        const oldOrder = [...sectionOrder];
+        sectionOrder = keys.map(k => oldOrder.find(o => o.key === k)).filter(Boolean);
+        oldOrder.forEach(o => { if(!sectionOrder.find(s=>s.key===o.key)) sectionOrder.push(o); });
+        saveLsSettingsToStorage(lsSettings);
+        dbSaveSettings('section_order', sectionOrder);
+        fmtChanges.push('Reordered sections');
+      }
     }
 
     /* Apply settings if present */
