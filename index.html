@@ -416,7 +416,10 @@
     <!-- Settings -->
     <div id="adminModeSettings" style="display:none;">
       <div class="settings-section">
-        <h3>🛠️ Customize Forms</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;">🛠️ Customize Forms</h3>
+          <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openCreateFormModal()">+ Create New Form</button>
+        </div>
         <p class="desc">Hide/show fields, toggle required status, reorder, or add custom fields per form.</p>
         <div class="cust-cat-picker">
           <label>Edit form:</label>
@@ -448,6 +451,13 @@
         <div class="settings-row"><label>Editor-in-Chief PIN:</label><input type="text" id="setEditorPin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="4 digits"/></div>
         <button class="btn btn-primary" onclick="savePins()">Save PINs</button>
         <span id="pinSaveStatus" style="font-size:12px;color:var(--ink3);margin-left:10px;"></span>
+      </div>
+      <div class="settings-section">
+        <h3>🤖 AI API Key</h3>
+        <p class="desc">Required for the AI Design Assistant and AI Proofreader in the workspace. Get a free key from <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--school-mint3);font-weight:700;">openrouter.ai/keys</a></p>
+        <div class="settings-row"><label>OpenRouter API Key:</label><input type="password" id="settingsApiKey" placeholder="sk-or-v1-…" style="flex:1;max-width:400px;"/></div>
+        <button class="btn btn-primary" onclick="saveApiKeyFromSettings()">Save API Key</button>
+        <span id="apiKeySaveStatus" style="font-size:12px;color:var(--ink3);margin-left:10px;"></span>
       </div>
       <div class="settings-section">
         <h3>System Diagnostics</h3>
@@ -802,6 +812,37 @@
   <span id="syncMsg">Cloud Sync Active</span>
 </div>
 
-<script src="script.js"></script>
+  <!-- Create Form Modal -->
+  <div class="modal-overlay" id="createFormModal">
+    <div class="modal-box">
+      <h3 id="cfmFormTitle" style="margin-bottom:15px;">Create New Form</h3>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Form Internal ID (e.g. debate_club)</label>
+        <input type="text" id="crfId" placeholder="letters and underscores only" style="width:100%;" oninput="this.value=this.value.replace(/[^a-z0-9_]/g,'')"/>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Form Name (e.g. Debate Club)</label>
+        <input type="text" id="crfName" placeholder="Public facing name" style="width:100%;"/>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Icon (Emoji)</label>
+        <input type="text" id="crfIcon" placeholder="e.g. 🗣️" style="width:100px;"/>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Form Tag (e.g. Debate)</label>
+        <input type="text" id="crfTag" placeholder="Short tag" style="width:100%;"/>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Subtitle / Description</label>
+        <textarea id="crfSubtitle" style="width:100%;font-family:'Lato',sans-serif;padding:8px;" rows="2" placeholder="Description of what this form is for"></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+        <button class="btn" onclick="closeCreateFormModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveNewForm()">Create Form</button>
+      </div>
+    </div>
+  </div>
+  
+  <script src="script.js"></script>
 </body>
 </html>
