@@ -214,7 +214,6 @@ function initRealtime() {
 
 function handleRealtimeSubmission(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
-  let local = JSON.parse(localStorage.getItem('me_subs') || '[]');
   
   if (eventType === 'INSERT' || eventType === 'UPDATE') {
     const sub = {
@@ -226,20 +225,17 @@ function handleRealtimeSubmission(payload) {
       photos: newRow.photos ? (typeof newRow.photos === 'string' ? JSON.parse(newRow.photos) : newRow.photos) : null
     };
     
-    const idx = local.findIndex(s => String(s.id) === String(sub.id));
+    const idx = subs.findIndex(s => String(s.id) === String(sub.id));
     if (idx >= 0) {
-      local[idx] = sub;
+      subs[idx] = sub;
     } else {
-      local.push(sub);
+      subs.push(sub);
     }
     showSync('live', '✦ New data received');
   } else if (eventType === 'DELETE') {
-    local = local.filter(s => String(s.id) !== String(oldRow.id));
+    subs = subs.filter(s => String(s.id) !== String(oldRow.id));
     showSync('live', '✦ Data removed');
   }
-  
-  localStorage.setItem('me_subs', JSON.stringify(local));
-  subs = local;
 
   // Refresh active views
   if (document.getElementById('viewAdmin')?.classList.contains('active')) renderAdmin();
@@ -253,8 +249,6 @@ function handleRealtimeSetting(payload) {
   
   const key = newRow.key;
   const val = typeof newRow.value === 'string' ? JSON.parse(newRow.value) : newRow.value;
-  
-  localStorage.setItem('me_' + key, JSON.stringify(val));
   
   if (key === 'cfg') cfg = val;
   if (key === 'ls_settings') {
@@ -279,7 +273,6 @@ function handleRealtimeSetting(payload) {
 
 /* ── Submissions (cloud + local mirror) ── */
 async function dbLoadAll(){
-  const localCache=JSON.parse(localStorage.getItem('me_subs')||'[]');
   showSync('syncing','Connecting to cloud…');
   try{
     const sb=getSupa();
@@ -318,36 +311,19 @@ async function dbLoadAll(){
       photos:r.photos?(typeof r.photos==='string'?JSON.parse(r.photos):r.photos):null
     }));
 
-    /* If cloud returned ZERO rows but local has data, push local items to cloud */
-    if(mapped.length===0 && localCache.length>0){
-      console.log('[DB] Cloud is empty but localStorage has '+localCache.length+' items — pushing to cloud…');
-      showSync('syncing','Migrating '+localCache.length+' local items to cloud…');
-      try { await dbSaveAllToCloud(localCache); } catch(e) { console.warn('[DB] Migration failed:',e.message); }
-    }
-
-    /* Merge: keep any local-only items that aren't in cloud yet (e.g. pending upload) */
-    const cloudIds = new Set(mapped.map(m=>String(m.id)));
-    const localOnly = localCache.filter(l=>!cloudIds.has(String(l.id)));
-    const merged = [...mapped, ...localOnly];
-
-    /* Mirror to localStorage */
-    localStorage.setItem('me_subs',JSON.stringify(merged));
-    showSync('ok','✓ Cloud synced — '+merged.length+' submissions');
-    return merged;
+    showSync('ok','✓ Cloud synced — '+mapped.length+' submissions');
+    return mapped;
   }catch(e){
     console.warn('[DB] Cloud load failed:',e.message);
-    showSync('err','⚠ Cloud unreachable — showing '+localCache.length+' local items');
-    return localCache;
+    showSync('err','⚠ Cloud unreachable — cannot load data');
+    return subs || [];
   }
 }
 
 async function dbSaveSubmission(sub){
-  /* Always write to localStorage immediately (Optimistic UI) */
-  const local=JSON.parse(localStorage.getItem('me_subs')||'[]');
-  const idx=local.findIndex(s=>String(s.id)===String(sub.id));
-  if(idx>=0)local[idx]=sub;else local.push(sub);
-  localStorage.setItem('me_subs',JSON.stringify(local));
-  subs=local;
+  /* Optimistic memory update */
+  const idx=subs.findIndex(s=>String(s.id)===String(sub.id));
+  if(idx>=0)subs[idx]=sub;else subs.push(sub);
   
   /* Cloud sync */
   showSync('syncing','Syncing to cloud…');
@@ -363,10 +339,8 @@ async function dbSaveSubmission(sub){
       photos:sub.photos?JSON.stringify(sub.photos):null
     };
     
-    // Use a single attempt first for speed, then retry if needed
     const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
     if(error) {
-      // Fallback to retry logic if first attempt fails
       await withRetry(async()=>{
         const{error:e2,data:d2}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
         if(e2)throw e2;
@@ -377,23 +351,19 @@ async function dbSaveSubmission(sub){
     showSync('ok','✓ Cloud synced');
   }catch(e){
     console.warn('[DB] Cloud save failed:',e.message);
-    showSync('err','Saved locally — cloud sync pending');
+    showSync('err','Failed to sync to cloud');
   }
 }
 async function dbDeleteSubmission(id){
-  /* Optimistic delete */
-  const local=JSON.parse(localStorage.getItem('me_subs')||'[]').filter(s=>String(s.id)!==String(id));
-  localStorage.setItem('me_subs',JSON.stringify(local));
-  subs=local;
+  /* Optimistic memory delete */
+  subs=subs.filter(s=>String(s.id)!==String(id));
   
   showSync('syncing','Deleting from cloud…');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
     
-    // Attempt single delete first
     const{error}=await sb.from('submissions').delete().eq('id',String(id));
     if(error){
-      // Fallback to retry
       await withRetry(async()=>{
         const{error:e2}=await sb.from('submissions').delete().eq('id',String(id));
         if(e2)throw e2;
@@ -403,16 +373,18 @@ async function dbDeleteSubmission(id){
     showSync('ok','✓ Deleted from cloud');
   }catch(e){
     console.warn('[DB] Cloud delete failed:',e.message);
-    showSync('err','Deleted locally — cloud sync pending');
+    showSync('err','Failed to delete from cloud');
   }
 }
 async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
-  /* Optimistic update */
-  const local=JSON.parse(localStorage.getItem('me_subs')||'[]');
-  const s=local.find(x=>String(x.id)===String(id));
+  if(status === 'rejected') {
+    console.log('[DB] Submission rejected. Permanently wiping from system.');
+    return dbDeleteSubmission(id);
+  }
+
+  /* Optimistic memory update */
+  const s=subs.find(x=>String(x.id)===String(id));
   if(s){s.status=status;s.reviewerNote=reviewerNote||'';s.reviewedAt=reviewedAt||null;}
-  localStorage.setItem('me_subs',JSON.stringify(local));
-  subs=local;
   
   showSync('syncing','Updating cloud…');
   try{
@@ -423,10 +395,8 @@ async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
       reviewed_at:reviewedAt?new Date(reviewedAt).toISOString():null
     };
     
-    // Attempt single update first
     const{error}=await sb.from('submissions').update(updateData).eq('id',String(id));
     if(error){
-      // Fallback to retry
       await withRetry(async()=>{
         const{error:e2}=await sb.from('submissions').update(updateData).eq('id',String(id));
         if(e2)throw e2;
@@ -436,7 +406,7 @@ async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
     showSync('ok','✓ Updated in cloud');
   }catch(e){
     console.warn('[DB] Cloud update failed:',e.message);
-    showSync('err','Updated locally — cloud sync pending');
+    showSync('err','Failed to update cloud');
   }
 }
 
@@ -451,14 +421,12 @@ async function dbLoadSettings(key){
     })();
     if(data?.value){
       const parsed=typeof data.value==='string'?JSON.parse(data.value):data.value;
-      localStorage.setItem('me_'+key,JSON.stringify(parsed));
       return parsed;
     }
   }catch(e){console.warn('[DB] Settings load failed:',key,e.message);}
-  try{return JSON.parse(localStorage.getItem('me_'+key)||'null');}catch(e){return null;}
+  return null;
 }
 async function dbSaveSettings(key,value){
-  localStorage.setItem('me_'+key,JSON.stringify(value));
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
     await withRetry(async()=>{
@@ -469,7 +437,7 @@ async function dbSaveSettings(key,value){
 }
 
 /* ── Patched legacy sync functions ── */
-function loadAll(){return JSON.parse(localStorage.getItem('me_subs')||'[]');}
+function loadAll(){return subs;}
 
 async function dbSaveAllToCloud(list){
   if(!list||!list.length)return;
@@ -496,20 +464,20 @@ async function dbSaveAllToCloud(list){
 }
 
 function saveAll(list){
-  localStorage.setItem('me_subs',JSON.stringify(list));
+  subs = list;
   /* Fire-and-forget bulk upsert */
   dbSaveAllToCloud(list);
 }
 
 /* CONFIG */
-function loadCfg(){let c={};try{c=JSON.parse(localStorage.getItem('me_cfg')||'{}')||{};}catch(e){c={};}const isValid=p=>typeof p==='string'&&/^\d{4}$/.test(p);return{adminPin:isValid(c.adminPin)?c.adminPin:'1234',editorPin:isValid(c.editorPin)?c.editorPin:'5678'};}
-function saveCfg(n){cfg=n;localStorage.setItem('me_cfg',JSON.stringify(n));dbSaveSettings('cfg',n);}
+function loadCfg(){return{adminPin:'1234',editorPin:'5678'};}
+function saveCfg(n){cfg=n;dbSaveSettings('cfg',n);}
 let cfg=loadCfg();
 
 /* LAYOUT SETTINGS */
 let lsSettings={};
-function loadLsSettings(){try{lsSettings=JSON.parse(localStorage.getItem('me_ls_settings')||'{}');applyCustomCategories(lsSettings);}catch(e){}}
-function saveLsSettingsToStorage(s){localStorage.setItem('me_ls_settings',JSON.stringify(s));dbSaveSettings('ls_settings',s);}
+function loadLsSettings(){try{applyCustomCategories(lsSettings);}catch(e){}}
+function saveLsSettingsToStorage(s){dbSaveSettings('ls_settings',s);}
 
 function applyCustomCategories(s){
   if(!s||!Array.isArray(s.customCategories))return;
@@ -524,12 +492,11 @@ function applyCustomCategories(s){
       sectionOrder.push({key:c.id,label:c.label,icon:c.icon,layout:'single',visible:true});
     }
   });
-  localStorage.setItem('me_section_order',JSON.stringify(sectionOrder));
 }
 
 /* LABELS */
-function loadLabels(){try{return JSON.parse(localStorage.getItem('me_labels')||'{}')||{};}catch(e){return{};}}
-function saveLabels(l){localStorage.setItem('me_labels',JSON.stringify(l));dbSaveSettings('labels',l);}
+function loadLabels(){return{};}
+function saveLabels(l){dbSaveSettings('labels',l);}
 let labelOverrides=loadLabels();
 function getLabel(key,fallback){return labelOverrides[key]||fallback;}
 
@@ -548,18 +515,16 @@ async function initCloudSync(){
       dbLoadSettings('section_order'),
       dbLoadSettings('form_config')
     ]);
-    if(cloudCfg){cfg={...cfg,...cloudCfg};localStorage.setItem('me_cfg',JSON.stringify(cfg));}
+    if(cloudCfg){cfg={...cfg,...cloudCfg};}
     if(cloudSettings&&typeof cloudSettings==='object'){
       lsSettings=cloudSettings;
-      localStorage.setItem('me_ls_settings',JSON.stringify(lsSettings));
       applyLsColors(lsSettings);
       applyCustomCategories(lsSettings);
     }
-    if(cloudLabels){labelOverrides={...labelOverrides,...cloudLabels};localStorage.setItem('me_labels',JSON.stringify(labelOverrides));}
-    if(cloudSectionOrder&&Array.isArray(cloudSectionOrder)){localStorage.setItem('me_section_order',JSON.stringify(cloudSectionOrder));sectionOrder=cloudSectionOrder;}
+    if(cloudLabels){labelOverrides={...labelOverrides,...cloudLabels};}
+    if(cloudSectionOrder&&Array.isArray(cloudSectionOrder)){sectionOrder=cloudSectionOrder;}
     if(cloudFormConfig&&typeof cloudFormConfig==='object'){
       formConfig=cloudFormConfig;
-      localStorage.setItem('me_form_config',JSON.stringify(formConfig));
     }
     /* Pull submissions */
     subs=await dbLoadAll();
