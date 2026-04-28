@@ -4,167 +4,564 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MagicEditor v2.0 | Way To Success Standard Schools</title>
+  
+  <!-- SEO & Social Meta -->
+  <meta name="description" content="Professional editorial management system for school graduation magazines. Build, review, and design your publication with AI-powered tools."/>
+  <meta name="author" content="MagicEditor Team"/>
+  <link rel="icon" type="image/png" href="https://srkgolzstppnyntrkemk.supabase.co/storage/v1/object/public/assets/mag_icon.png"/>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link rel="stylesheet" href="style.css"/>
   <style id="ai-custom-css"></style>
 </head>
 <body>
-  <!-- LANDING PAGE -->
-  <div id="viewLanding" class="view active">
-    <div class="land-hero">
-      <div class="land-hero-inner">
-        <span class="land-logo">MagicEditor</span>
-        <h1>The <span class="me-magic">Magic</span> Behind Every Edition</h1>
-        <div class="land-hero-school">Way To Success Standard Schools · Ejigbo, Osun State</div>
-        <p>A magazine production pipeline for the Editorial Committee. Submit content — all in one place.</p>
-      </div>
-    </div>
-    <div class="land-body">
-      <div class="land-section-title">Submission Portals</div>
-      <h2 class="land-section-h" id="landingHeading">Choose a content category</h2>
-      <div class="form-grid" id="formGrid"></div>
-      <div class="land-footer" onclick="handleFooterClick()">
-        <p>MagicEditor · Way To Success Standard Schools</p>
-        <p style="margin-top:6px;">1st Edition · 2025/2026 Graduation</p>
-      </div>
-    </div>
+
+  <!-- LOADING OVERLAY -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loader"></div>
+    <p>Connecting to Cloud...</p>
   </div>
 
-  <!-- FORM VIEW -->
-  <div id="viewForm" class="view">
-    <div class="form-hero">
-      <button class="form-hero-back" onclick="goLanding()">← Back</button>
-      <div class="form-hero-inner">
-        <span class="form-hero-tag" id="formTag">—</span>
-        <h1 id="formTitle">—</h1>
-        <p id="formSubtitle">—</p>
+  <!-- NAVIGATION -->
+  <nav class="main-nav">
+    <div class="nav-container">
+      <div class="nav-brand" onclick="show('viewLanding')">
+        <span class="brand-icon">✨</span>
+        <div class="brand-text">
+          <span class="brand-name">MagicEditor</span>
+          <span class="brand-tag">v2.0 Beta</span>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn btn-nav" onclick="openPIN('editor')">Editor-in-Chief</button>
+        <button class="btn btn-primary btn-nav" onclick="openPIN('admin')">Production Admin</button>
       </div>
     </div>
-    <div id="formContainer" class="form-body"></div>
-    <div id="successWrap" class="success-wrap" style="display:none;">
-      <div id="successUploading" style="display:none;text-align:center;">
-        <div style="font-size:56px;margin-bottom:1rem;">⏳</div>
-        <h2>Saving your submission…</h2>
-        <div style="width:100%;height:4px;background:#eee;border-radius:2px;overflow:hidden;margin-top:1rem;"><div style="width:0%;height:100%;background:var(--school-navy);" id="uploadProgress"></div></div>
-      </div>
-      <div id="successDone" style="display:none;text-align:center;">
-        <div class="success-icon">✨</div>
-        <h2>Submission Received!</h2>
-        <p>Thank you! Your content has been sent to the Editor-in-Chief for review.</p>
-        <button onclick="goLanding()">Finish</button>
-      </div>
-    </div>
-  </div>
+  </nav>
 
-  <!-- ADMIN DASHBOARD -->
-  <div id="viewAdmin" class="view">
-    <div class="admin-layout">
-      <div class="admin-sidebar">
-        <div class="admin-topbar">
-          <span class="admin-logo">Admin Console</span>
-          <h1>Production Suite</h1>
+  <main class="content-wrapper">
+
+    <!-- VIEW: LANDING -->
+    <section id="viewLanding" class="view active">
+      <header class="view-header text-center">
+        <h1 class="hero-title">Way To Success Standard Schools</h1>
+        <p class="hero-subtitle">Official Graduation Magazine Submission Portal</p>
+        <div class="hero-badges">
+          <span class="badge badge-outline">2025/2026 Edition</span>
+          <span class="badge badge-success">Cloud Active</span>
         </div>
-        <div class="admin-tabs" id="adminTabs">
-          <button class="admin-tab active" onclick="openAdmin()">Submissions</button>
-          <button class="admin-tab" onclick="openWorkspace()">Layout Studio</button>
-          <button class="admin-tab" onclick="alert('Settings modal')">Settings</button>
-        </div>
-        <div class="admin-topbar-right">
-          <button class="admin-exit" onclick="goLanding()">Exit Admin</button>
-        </div>
+      </header>
+
+      <div class="category-grid" id="landingCards">
+        <!-- JS Rendered -->
       </div>
-      <div class="admin-main">
-        <div class="admin-body">
-          <div class="stats-row">
-            <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">Total</div></div>
-            <div class="stat-card"><div class="stat-num pending" id="statPending">0</div><div class="stat-lbl">Pending</div></div>
-            <div class="stat-card"><div class="stat-num approved" id="statApproved">0</div><div class="stat-lbl">Approved</div></div>
-            <div class="stat-card"><div class="stat-num" id="statFinalized">0</div><div class="stat-lbl">Finalized</div></div>
+
+      <footer class="landing-footer" onclick="handleFooterClick()">
+        <p>© 2025 Way To Success Schools. All Rights Reserved.</p>
+        <div class="footer-links">
+          <a href="#">Privacy Policy</a>
+          <span class="dot"></span>
+          <a href="#">Support</a>
+        </div>
+      </footer>
+    </section>
+
+    <!-- VIEW: SUBMISSION FORM -->
+    <section id="viewForm" class="view">
+      <div class="form-container">
+        <button class="btn-back" onclick="show('viewLanding')">← Back to Home</button>
+        
+        <div class="form-card">
+          <div class="form-header">
+            <div id="formIcon" class="form-header-icon"></div>
+            <div>
+              <h2 id="formTitle">Form Title</h2>
+              <p id="formDesc">Form Description</p>
+            </div>
           </div>
-          <div id="adminSubList" class="sub-list"></div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- EDITOR DASHBOARD -->
-  <div id="viewEditor" class="view">
-    <div class="admin-layout">
-      <div class="admin-sidebar">
-        <div class="admin-topbar">
-          <span class="admin-logo">Editor Box</span>
-          <h1>Editorial Desk</h1>
-        </div>
-        <div class="admin-tabs">
-          <button class="admin-tab active">Inbox</button>
-        </div>
-        <div class="admin-topbar-right">
-          <button class="admin-exit" onclick="goLanding()">Exit Editor</button>
-        </div>
-      </div>
-      <div class="admin-main">
-        <div class="admin-body">
-          <div id="editorSubList" class="sub-list"></div>
-        </div>
-      </div>
-    </div>
-  </div>
+          <form id="submissionForm" onsubmit="handleFormSubmit(event)">
+            <div id="formFields" class="form-fields-grid">
+              <!-- JS Rendered -->
+            </div>
 
-  <!-- WORKSPACE -->
-  <div id="viewWorkspace" class="view">
-    <div class="ws-layout">
-      <div class="ws-topbar">
-        <span class="ws-topbar-logo">Layout Studio</span>
-        <div class="ws-topbar-title">The Torch — Graduation 2026</div>
-        <button class="ws-topbar-btn" onclick="openAdmin()">← Dashboard</button>
-        <button class="ws-topbar-btn accent" onclick="window.print()">Export PDF</button>
-      </div>
-      <div class="ws-sidebar">
-        <div class="ws-panel">
-          <div class="ws-panel-header">Pages</div>
-          <div class="ws-panel-body" id="wsPageList"></div>
+            <div class="form-footer">
+              <div id="submitStatus" class="submit-status"></div>
+              <button type="submit" id="btnSubmit" class="btn btn-primary btn-lg">
+                <span class="btn-text">Send Submission</span>
+                <div class="btn-loader"></div>
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-      <div class="ws-canvas" id="wsCanvas"></div>
-      <div class="ws-ai">
-        <div class="ws-ai-header">
-          <div class="ws-ai-title">✦ MagAssistant</div>
-          <div class="ws-ai-selectors">
-            <select class="ws-ai-select" id="wsAIModel"><option value="google/gemini-2.0-flash-001">Gemini 2.0</option></select>
+    </section>
+
+    <!-- VIEW: PIN ENTRY -->
+    <section id="viewPIN" class="view">
+      <div class="pin-card">
+        <div class="pin-icon">🔒</div>
+        <h3>Secure Access</h3>
+        <p id="pinPrompt">Enter access PIN to continue</p>
+        <div class="pin-input-group">
+          <input type="password" id="pinInput" placeholder="••••" maxlength="4" autofocus/>
+          <button class="btn btn-primary" onclick="verifyPIN()">Unlock</button>
+        </div>
+        <button class="btn-link" onclick="show('viewLanding')">Cancel</button>
+      </div>
+    </section>
+
+    <!-- VIEW: EDITOR-IN-CHIEF -->
+    <section id="viewEditor" class="view">
+      <div class="admin-layout">
+        <aside class="admin-sidebar">
+          <div class="sidebar-header">
+            <h3>Editor-in-Chief</h3>
+            <span class="badge badge-primary">Review Mode</span>
+          </div>
+          <nav class="sidebar-nav">
+            <button class="nav-item active" onclick="setEditorCat('pending')">
+              <span class="nav-icon">📥</span> Pending Review
+            </button>
+            <button class="nav-item" onclick="setEditorCat('approved')">
+              <span class="nav-icon">✅</span> Approved
+            </button>
+            <button class="nav-item" onclick="setEditorCat('finalized')">
+              <span class="nav-icon">✨</span> Finalized
+            </button>
+          </nav>
+          <div class="sidebar-footer">
+            <button class="btn btn-outline btn-sm w-full" onclick="show('viewLanding')">Logout</button>
+          </div>
+        </aside>
+
+        <div class="admin-main">
+          <header class="admin-header">
+            <div class="header-info">
+              <h2 id="editorCatTitle">Pending Submissions</h2>
+              <p id="editorCatCount">0 items</p>
+            </div>
+            <div class="header-actions">
+              <button class="btn btn-outline" onclick="editorRefresh()">Refresh Cloud</button>
+            </div>
+          </header>
+
+          <div id="editorGrid" class="admin-grid">
+            <!-- JS Rendered -->
           </div>
         </div>
-        <div class="ws-ai-chat" id="wsAIChat"></div>
-        <div class="ws-ai-input">
-          <textarea class="ws-ai-textarea" id="wsAIInput" placeholder="Describe layout changes..."></textarea>
-          <button class="ws-ai-send" onclick="wsAISend()">➔</button>
+      </div>
+    </section>
+
+    <!-- VIEW: PRODUCTION ADMIN -->
+    <section id="viewAdmin" class="view">
+      <div class="admin-layout">
+        <aside class="admin-sidebar">
+          <div class="sidebar-header">
+            <h3>Production Admin</h3>
+            <span class="badge badge-success">Control Panel</span>
+          </div>
+          <nav class="sidebar-nav">
+            <div class="nav-group">MANAGEMENT</div>
+            <button class="nav-item active" onclick="setAdminCat('all')">
+              <span class="nav-icon">📊</span> All Submissions
+            </button>
+            <button class="nav-item" onclick="setAdminCat('editorial')">
+              <span class="nav-icon">✍️</span> Editorial Pieces
+            </button>
+            
+            <div class="nav-group">PRODUCTION</div>
+            <button class="nav-item" onclick="openWorkspace()">
+              <span class="nav-icon">🛠</span> Design Studio
+            </button>
+            <button class="nav-item" onclick="showAdminSection('settings')">
+              <span class="nav-icon">⚙️</span> Settings
+            </button>
+            <button class="nav-item" onclick="showAdminSection('sharing')">
+              <span class="nav-icon">🔗</span> Share Links
+            </button>
+          </nav>
+          <div class="sidebar-footer">
+            <div class="system-status">
+              <div class="status-dot online"></div>
+              <span>Cloud Connected</span>
+            </div>
+            <button class="btn btn-outline btn-sm w-full mt-10" onclick="show('viewLanding')">Logout</button>
+          </div>
+        </aside>
+
+        <div class="admin-main">
+          <!-- ADMIN CONTENT: GRID -->
+          <div id="adminContentGrid" class="admin-content-section active">
+            <header class="admin-header">
+              <div class="header-info">
+                <h2 id="adminCatTitle">All Submissions</h2>
+                <div class="admin-filters">
+                  <button class="filter-pill active" onclick="filterAdminByStatus('all')">All</button>
+                  <button class="filter-pill" onclick="filterAdminByStatus('pending')">Pending</button>
+                  <button class="filter-pill" onclick="filterAdminByStatus('approved')">Approved</button>
+                  <button class="filter-pill" onclick="filterAdminByStatus('finalized')">Finalized</button>
+                </div>
+              </div>
+              <div class="header-actions">
+                <button class="btn btn-primary" onclick="exportMasterMagazine()">Export Master ZIP</button>
+                <button class="btn btn-outline" onclick="adminRefresh()">Refresh</button>
+              </div>
+            </header>
+            <div id="adminGrid" class="admin-grid"></div>
+          </div>
+
+          <!-- ADMIN CONTENT: SETTINGS -->
+          <div id="adminContentSettings" class="admin-content-section">
+            <header class="admin-header">
+              <h2>System Settings</h2>
+            </header>
+            <div class="settings-container">
+              
+              <!-- Tabs -->
+              <div class="settings-tabs">
+                <button class="tab-btn active" onclick="setSettingsTab('general')">General</button>
+                <button class="tab-btn" onclick="setSettingsTab('layout')">Layout Studio</button>
+                <button class="tab-btn" onclick="setSettingsTab('maintenance')">Maintenance</button>
+              </div>
+
+              <!-- Tab: General -->
+              <div id="tab-general" class="settings-tab-content active">
+                <div class="settings-group">
+                  <label>Magazine Identity</label>
+                  <div class="input-row">
+                    <div class="input-field">
+                      <span>Title</span>
+                      <input type="text" id="ls-magTitle" placeholder="The Torch"/>
+                    </div>
+                    <div class="input-field">
+                      <span>Edition</span>
+                      <input type="text" id="ls-edition" placeholder="1st Edition"/>
+                    </div>
+                  </div>
+                  <div class="input-field">
+                    <span>School Name</span>
+                    <input type="text" id="ls-schoolName" placeholder="Way To Success Schools"/>
+                  </div>
+                </div>
+                <button class="btn btn-primary" onclick="saveAdminSettings()">Save Identity</button>
+              </div>
+
+              <!-- Tab: Layout -->
+              <div id="tab-layout" class="settings-tab-content">
+                <div class="layout-studio-grid">
+                  <div class="layout-controls">
+                    <div class="settings-group">
+                      <label>AI Configuration (Gemini/OpenRouter)</label>
+                      <div class="input-field">
+                        <span>API Key</span>
+                        <input type="password" id="ls-apiKey" placeholder="sk-or-..."/>
+                      </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                      <label>Design Palette</label>
+                      <div class="color-grid">
+                        <div class="color-input">
+                          <span>Primary</span>
+                          <input type="color" id="ls-color1" value="#1a2744"/>
+                        </div>
+                        <div class="color-input">
+                          <span>Accent</span>
+                          <input type="color" id="ls-color2" value="#7dd4a8"/>
+                        </div>
+                        <div class="color-input">
+                          <span>Text</span>
+                          <input type="color" id="ls-textColor" value="#1c1c1e"/>
+                        </div>
+                        <div class="color-input">
+                          <span>Page BG</span>
+                          <input type="color" id="ls-pageBg" value="#ffffff"/>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="settings-group">
+                      <label>Pagination & Content</label>
+                      <div class="input-row">
+                        <div class="input-field">
+                          <span>Teachers / Page</span>
+                          <select id="ls-teachersPerPage">
+                            <option value="6">6 Items</option>
+                            <option value="9" selected>9 Items</option>
+                            <option value="12">12 Items</option>
+                          </select>
+                        </div>
+                        <div class="input-field">
+                          <span>Students / Page</span>
+                          <select id="ls-studentsPerPage">
+                            <option value="1">1 Large</option>
+                            <option value="2" selected>2 Items</option>
+                            <option value="4">4 Grid</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <button class="btn btn-primary w-full" onclick="saveAdminSettings()">Apply & Regenerate Preview</button>
+                  </div>
+
+                  <div class="layout-preview">
+                    <div class="preview-toolbar">
+                      <span>Live Magazine Preview</span>
+                      <div class="preview-nav">
+                        <button id="btnPrevPage" onclick="prevPage()">←</button>
+                        <span id="pageNavInfo">1 / 1</span>
+                        <button id="btnNextPage" onclick="nextPage()">→</button>
+                      </div>
+                    </div>
+                    <div id="magCanvasWrapper" class="mag-canvas-wrapper">
+                      <div id="magCanvas"></div>
+                    </div>
+                    <div class="preview-footer">
+                      <p id="previewPageTitle">Cover Page</p>
+                      <button class="btn btn-success btn-sm" onclick="openPrintView()">Print/Export PDF</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- AI ASSISTANT PANEL -->
+                <div class="ai-assist-panel">
+                  <div class="ai-assist-header">
+                    <span class="ai-sparkle">✦</span>
+                    <h4>AI Layout Architect</h4>
+                  </div>
+                  <div class="ai-chat-history" id="aiChatHistory">
+                    <!-- Messages -->
+                  </div>
+                  <div id="aiReviewBox" class="ai-review-box" style="display:none;">
+                    <p id="aiReviewText"></p>
+                    <div class="ai-review-actions">
+                      <button class="btn btn-success btn-sm" onclick="approveAISuggestion()">Approve & Apply</button>
+                      <button class="btn btn-outline btn-sm" onclick="rejectAISuggestion()">Discard</button>
+                    </div>
+                  </div>
+                  <div id="aiApplyLog" class="ai-apply-log" style="display:none;"></div>
+                  <div class="ai-input-wrapper">
+                    <textarea id="aiAssistQuery" placeholder="Ask AI to redesign the layout... (e.g., 'Make the teacher section dark themed with gold accents')"></textarea>
+                    <button class="btn-ai-send" onclick="runLayoutAI()">✦</button>
+                  </div>
+                  <div class="ai-assist-footer">
+                    <button class="btn-link-sm" onclick="clearAIChat()">Clear Conversation</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab: Maintenance -->
+              <div id="tab-maintenance" class="settings-tab-content">
+                <div class="maintenance-grid">
+                  <div class="maintenance-card">
+                    <h4>Cloud Database Sync</h4>
+                    <p>Force a complete refresh from the cloud storage.</p>
+                    <button class="btn btn-outline" onclick="initCloudSync()">Sync Now</button>
+                  </div>
+                  <div class="maintenance-card danger">
+                    <h4>Local Storage Purge</h4>
+                    <p>Wipe all local data. Does not affect cloud storage.</p>
+                    <button class="btn btn-danger" onclick="purgeLocalCache()">Purge Cache</button>
+                    <p id="purgeStatus" class="mt-10"></p>
+                  </div>
+                  <div class="maintenance-card">
+                    <h4>System Diagnostics</h4>
+                    <div class="diag-info" id="diagOutput">
+                      <!-- Rendered -->
+                    </div>
+                    <button class="btn btn-sm btn-outline mt-10" onclick="refreshDiag()">Run Diagnostics</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ADMIN CONTENT: SHARING -->
+          <div id="adminContentSharing" class="admin-content-section">
+            <header class="admin-header">
+              <h2>Share Submission Links</h2>
+              <p>Send these URLs to teachers and students to collect content.</p>
+            </header>
+            <div id="shareLinksContainer" class="share-links-grid">
+              <!-- JS Rendered -->
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <!-- PIN OVERLAY -->
-  <div id="pinOverlay" class="pin-overlay">
-    <div class="pin-box">
-      <h2 id="pinTitle">Enter PIN</h2>
-      <p class="pin-sub">Access restricted to authorized committee members.</p>
-      <div class="pin-dots">
-        <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div><div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
-      </div>
-      <div class="pin-pad">
-        <button class="pin-key" onclick="pinKey('1')">1</button><button class="pin-key" onclick="pinKey('2')">2</button><button class="pin-key" onclick="pinKey('3')">3</button>
-        <button class="pin-key" onclick="pinKey('4')">4</button><button class="pin-key" onclick="pinKey('5')">5</button><button class="pin-key" onclick="pinKey('6')">6</button>
-        <button class="pin-key" onclick="pinKey('7')">7</button><button class="pin-key" onclick="pinKey('8')">8</button><button class="pin-key" onclick="pinKey('9')">9</button>
-        <button class="pin-key pin-del" onclick="pinDel()">⌫</button><button class="pin-key zero" onclick="pinKey('0')">0</button>
-      </div>
-    </div>
-  </div>
+    <!-- VIEW: DESIGN WORKSPACE (VS CODE STYLE) -->
+    <section id="viewWorkspace" class="view">
+      <div class="ws-root">
+        <!-- Sidebar -->
+        <aside class="ws-sidebar">
+          <div class="ws-sidebar-top">
+            <div class="ws-tab active" title="Pages"><span class="ws-icon">📄</span></div>
+            <div class="ws-tab" title="Assets"><span class="ws-icon">🖼️</span></div>
+            <div class="ws-tab" title="Layers"><span class="ws-icon">🥞</span></div>
+          </div>
+          <div class="ws-sidebar-bottom">
+            <div class="ws-tab" title="Settings" onclick="showAdminSection('settings')"><span class="ws-icon">⚙️</span></div>
+          </div>
+        </aside>
 
-  <!-- SYNC STATUS -->
-  <div class="sync-bar" id="syncBar">
-    <div class="sync-dot" id="syncDot"></div>
-    <span id="syncMsg">Syncing...</span>
+        <!-- Explorer -->
+        <div class="ws-explorer">
+          <div class="ws-explorer-header">
+            <span class="ws-exp-title">PAGES</span>
+            <button class="ws-btn-icon" onclick="wsGeneratePreview()" title="Refresh">🔄</button>
+          </div>
+          <div class="ws-page-list" id="wsPageList">
+            <!-- Rendered -->
+          </div>
+        </div>
+
+        <!-- Editor Area -->
+        <div class="ws-editor-area">
+          <header class="ws-editor-header">
+            <div class="ws-breadcrumb">
+              <span class="ws-project" id="wsProjectTitle">The Torch</span>
+              <span class="ws-sep">›</span>
+              <span class="ws-file" id="wsCurrentFile">Master Preview</span>
+            </div>
+            <div class="ws-editor-actions">
+              <button class="ws-btn" id="wsGuidesBtn" onclick="wsToggleGuides()">☑ Guides</button>
+              <button class="ws-btn" id="wsSpreadBtn" onclick="wsToggleSpread()">⊞ Spread</button>
+              <div class="ws-zoom-ctrl">
+                <button onclick="wsSetZoom(wsZoom-10)">-</button>
+                <span id="wsZoomLevel">100%</span>
+                <button onclick="wsSetZoom(wsZoom+10)">+</button>
+              </div>
+              <button class="ws-btn ws-btn-primary" onclick="wsExportPrintPDF()">Export PDF</button>
+              <button class="ws-btn-close" onclick="closeWorkspace()">✕</button>
+            </div>
+          </header>
+          
+          <div class="ws-canvas-wrapper" id="wsCanvasWrapper">
+            <div class="ws-page-container" id="wsPageContainer">
+              <!-- Live Preview -->
+            </div>
+          </div>
+
+          <footer class="ws-statusbar">
+            <div class="ws-status-left">
+              <span id="wsStatusPages">0 pages</span>
+              <span class="ws-sep">|</span>
+              <span id="wsStatusFinalized">0 finalized</span>
+            </div>
+            <div class="ws-status-right">
+              <span id="wsSaveIndicator">● Saved</span>
+              <span class="ws-sep">|</span>
+              <span>UTF-8</span>
+              <span class="ws-sep">|</span>
+              <span id="wsStatusZoom">100%</span>
+            </div>
+          </footer>
+        </div>
+
+        <!-- Inspector / Right Panel -->
+        <div class="ws-inspector">
+          <!-- AI Terminal -->
+          <div class="ws-panel ws-panel-ai">
+            <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelAI')">
+              <span>✦ AI ARCHITECT TERMINAL</span>
+              <span class="ws-panel-toggle">▾</span>
+            </div>
+            <div class="ws-panel-content" id="wsPanelAI">
+              <div class="ws-ai-history" id="wsAIChat">
+                <div class="ws-ai-msg system">Ready to design. Try "Make teacher section more elegant"</div>
+              </div>
+              <div class="ws-ai-input-row">
+                <textarea id="wsAIInput" placeholder="Command..."></textarea>
+                <div class="ws-ai-controls">
+                  <button class="ws-btn-ai" onclick="wsAISend()">EXECUTE</button>
+                  <select id="wsAIModel" class="ws-select-sm">
+                    <option value="google/gemini-2.0-flash-001">Gemini 2.0</option>
+                    <option value="anthropic/claude-3-haiku">Haiku</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Color Styles -->
+          <div class="ws-panel">
+            <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelColors')">
+              <span>COLOR SYSTEM</span>
+              <span class="ws-panel-toggle">▾</span>
+            </div>
+            <div class="ws-panel-content" id="wsPanelColors">
+              <div id="wsColorPanel" class="ws-color-list"></div>
+            </div>
+          </div>
+
+          <!-- Typography -->
+          <div class="ws-panel">
+            <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelType')">
+              <span>TYPOGRAPHY</span>
+              <span class="ws-panel-toggle">▾</span>
+            </div>
+            <div class="ws-panel-content" id="wsPanelType">
+              <div class="ws-input-group">
+                <label>Heading Font</label>
+                <select id="wsHeadingFont" onchange="wsUpdateFont('headingFont',this.value)">
+                  <option value="'Playfair Display',serif">Playfair Display</option>
+                  <option value="Georgia,serif">Georgia</option>
+                  <option value="'Lato',sans-serif">Lato Bold</option>
+                </select>
+              </div>
+              <div class="ws-input-group">
+                <label>Body Font</label>
+                <select id="wsBodyFont" onchange="wsUpdateFont('bodyFont',this.value)">
+                  <option value="'Crimson Text',serif">Crimson Text</option>
+                  <option value="'Lato',sans-serif">Lato Regular</option>
+                  <option value="Georgia,serif">Georgia</option>
+                </select>
+              </div>
+              <div class="ws-input-group">
+                <label>Base Size</label>
+                <select id="wsFontSize" onchange="wsUpdateFont('fontSize',this.value)">
+                  <option value="10px">10px</option>
+                  <option value="11px">11px</option>
+                  <option value="12px">12px</option>
+                  <option value="13px">13px</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Assets -->
+          <div class="ws-panel">
+            <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelAssets')">
+              <span>ASSETS (LATEST)</span>
+              <span class="ws-panel-toggle">▾</span>
+            </div>
+            <div class="ws-panel-content" id="wsPanelAssets">
+              <div id="wsAssetGrid" class="ws-asset-grid"></div>
+              <p id="wsAssetEmpty" style="display:none;font-size:11px;color:var(--ws-text3);text-align:center;">No images found.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- OVERLAYS -->
+  <div id="modalOverlay" class="modal-overlay" onclick="closeModals()"></div>
+  <div id="subDetailModal" class="modal sub-detail-modal">
+    <!-- JS Rendered -->
   </div>
 
   <script src="script.js"></script>
