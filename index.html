@@ -2,565 +2,171 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MagicEditor v2.0 | Way To Success Standard Schools</title>
-  
-  <!-- Fonts & Icons -->
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet"/>
-  
-  <!-- External Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  
-  <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="style.css">
+  <style id="ai-custom-css"></style>
 </head>
-<body class="dark-theme">
-
-  <!-- SYNC INDICATOR -->
-  <div class="sync-indicator" id="syncIndicator">
-    <div class="sync-status">
-      <span class="sync-icon" id="syncIcon">●</span>
-      <span id="syncText">Syncing...</span>
+<body>
+  <!-- LANDING PAGE -->
+  <div id="viewLanding" class="view active">
+    <div class="land-hero">
+      <div class="land-hero-inner">
+        <span class="land-logo">MagicEditor</span>
+        <h1>The <span class="me-magic">Magic</span> Behind Every Edition</h1>
+        <div class="land-hero-school">Way To Success Standard Schools · Ejigbo, Osun State</div>
+        <p>A magazine production pipeline for the Editorial Committee. Submit content — all in one place.</p>
+      </div>
+    </div>
+    <div class="land-body">
+      <div class="land-section-title">Submission Portals</div>
+      <h2 class="land-section-h" id="landingHeading">Choose a content category</h2>
+      <div class="form-grid" id="formGrid"></div>
+      <div class="land-footer" onclick="handleFooterClick()">
+        <p>MagicEditor · Way To Success Standard Schools</p>
+        <p style="margin-top:6px;">1st Edition · 2025/2026 Graduation</p>
+      </div>
     </div>
   </div>
 
-  <!-- NAVIGATION -->
-  <nav class="main-nav">
-    <div class="nav-container">
-      <div class="nav-logo" onclick="goLanding()">
-        <span class="logo-icon">🗞</span>
-        <div class="logo-text">
-          <span class="logo-main">MagicEditor</span>
-          <span class="logo-sub">Production Suite</span>
-        </div>
-      </div>
-      <div class="nav-links">
-        <button class="nav-btn" onclick="openPIN('editor')">Editor-in-Chief</button>
-        <button class="nav-btn btn-primary" onclick="openPIN('admin')">Production Admin</button>
+  <!-- FORM VIEW -->
+  <div id="viewForm" class="view">
+    <div class="form-hero">
+      <button class="form-hero-back" onclick="goLanding()">← Back</button>
+      <div class="form-hero-inner">
+        <span class="form-hero-tag" id="formTag">—</span>
+        <h1 id="formTitle">—</h1>
+        <p id="formSubtitle">—</p>
       </div>
     </div>
-  </nav>
-
-  <main class="container">
-    
-    <!-- VIEW: LANDING -->
-    <div id="viewLanding" class="view active">
-      <div class="hero">
-        <h1 id="landingHeading">Choose a content category</h1>
-        <p>Way To Success Standard Schools Magazine Production</p>
+    <div id="formContainer" class="form-body"></div>
+    <div id="successWrap" class="success-wrap" style="display:none;">
+      <div id="successUploading" style="display:none;text-align:center;">
+        <div style="font-size:56px;margin-bottom:1rem;">⏳</div>
+        <h2>Saving your submission…</h2>
+        <div style="width:100%;height:4px;background:#eee;border-radius:2px;overflow:hidden;margin-top:1rem;"><div style="width:0%;height:100%;background:var(--school-navy);" id="uploadProgress"></div></div>
       </div>
-      <div class="form-grid" id="formGrid">
-        <!-- Cards injected by JS -->
+      <div id="successDone" style="display:none;text-align:center;">
+        <div class="success-icon">✨</div>
+        <h2>Submission Received!</h2>
+        <p>Thank you! Your content has been sent to the Editor-in-Chief for review.</p>
+        <button onclick="goLanding()">Finish</button>
       </div>
-      
-      <footer class="landing-footer" onclick="handleFooterClick()">
-        <p>&copy; 2025 Way To Success Standard Schools &middot; Powered by MagicEditor Agentic AI</p>
-        <div class="footer-tag">E-Publication &amp; Print System</div>
-      </footer>
     </div>
+  </div>
 
-    <!-- VIEW: FORM SUBMISSION -->
-    <div id="viewForm" class="view">
-      <div class="form-header">
-        <button class="back-btn" onclick="goLanding()">← Back</button>
-        <div class="form-badge" id="formTag">Category</div>
-        <h2 id="formTitle">Submission Form</h2>
-        <p id="formSubtitle">Please fill in the details below for the magazine.</p>
-      </div>
-
-      <div id="formContainer" class="form-container">
-        <!-- Fields injected by JS -->
-      </div>
-
-      <div id="successWrap" class="success-wrap" style="display:none;">
-        <div id="successUploading" class="upload-progress">
-          <div class="spinner"></div>
-          <h3>Uploading to Cloud...</h3>
-          <p id="uploadProgressText">Preserving quality and syncing data across devices.</p>
-          <div class="progress-track"><div class="progress-bar" id="uploadProgressBar"></div></div>
+  <!-- ADMIN DASHBOARD -->
+  <div id="viewAdmin" class="view">
+    <div class="admin-layout">
+      <div class="admin-sidebar">
+        <div class="admin-topbar">
+          <span class="admin-logo">Admin Console</span>
+          <h1>Production Suite</h1>
         </div>
-        <div id="successDone" class="success-card">
-          <div class="success-icon">✓</div>
-          <h3>Submission Received!</h3>
-          <p>Thank you! Your content has been sent to the Editor-in-Chief for review.</p>
-          <button class="btn btn-primary" onclick="goLanding()">Submit Another</button>
+        <div class="admin-tabs" id="adminTabs">
+          <button class="admin-tab active" onclick="openAdmin()">Submissions</button>
+          <button class="admin-tab" onclick="openWorkspace()">Layout Studio</button>
+          <button class="admin-tab" onclick="alert('Settings modal')">Settings</button>
+        </div>
+        <div class="admin-topbar-right">
+          <button class="admin-exit" onclick="goLanding()">Exit Admin</button>
+        </div>
+      </div>
+      <div class="admin-main">
+        <div class="admin-body">
+          <div class="stats-row">
+            <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">Total</div></div>
+            <div class="stat-card"><div class="stat-num pending" id="statPending">0</div><div class="stat-lbl">Pending</div></div>
+            <div class="stat-card"><div class="stat-num approved" id="statApproved">0</div><div class="stat-lbl">Approved</div></div>
+            <div class="stat-card"><div class="stat-num" id="statFinalized">0</div><div class="stat-lbl">Finalized</div></div>
+          </div>
+          <div id="adminSubList" class="sub-list"></div>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- VIEW: EDITOR INBOX -->
-    <div id="viewEditor" class="view">
-      <div class="admin-header">
-        <div class="admin-header-main">
-          <h2>Editor-in-Chief Inbox</h2>
-          <p>Review, proofread, and approve student & staff submissions.</p>
+  <!-- EDITOR DASHBOARD -->
+  <div id="viewEditor" class="view">
+    <div class="admin-layout">
+      <div class="admin-sidebar">
+        <div class="admin-topbar">
+          <span class="admin-logo">Editor Box</span>
+          <h1>Editorial Desk</h1>
         </div>
-        <div class="admin-header-actions">
-          <button class="btn btn-refresh" onclick="editorRefresh()">Refresh Cloud</button>
-          <button class="btn" onclick="goLanding()">Exit</button>
+        <div class="admin-tabs">
+          <button class="admin-tab active">Inbox</button>
         </div>
-      </div>
-
-      <div class="admin-tabs">
-        <button class="editor-tab active" id="etab-pending" onclick="setEditorCategory('pending')">Pending <span class="tab-count" id="ecount-pending">0</span></button>
-        <button class="editor-tab" id="etab-approved" onclick="setEditorCategory('approved')">Approved <span class="tab-count" id="ecount-approved">0</span></button>
-        <button class="editor-tab" id="etab-rejected" onclick="setEditorCategory('rejected')">Rejected <span class="tab-count" id="ecount-rejected">0</span></button>
-        <button class="editor-tab" id="etab-all" onclick="setEditorCategory('all')">History <span class="tab-count" id="ecount-all">0</span></button>
-        <button class="editor-tab" id="etab-editorial" onclick="setEditorCategory('editorial')" style="color:var(--school-red);">Editorial Note</button>
-      </div>
-
-      <div id="editorModeList">
-        <div id="editorSubList" class="sub-list">
-          <!-- Submissions injected by JS -->
+        <div class="admin-topbar-right">
+          <button class="admin-exit" onclick="goLanding()">Exit Editor</button>
         </div>
       </div>
-
-      <div id="editorModeNote" style="display:none;">
-        <div class="f-card">
-          <div class="f-card-title">Editorial Note (Editor-in-Chief)</div>
-          <div class="field">
-            <label>Title</label>
-            <input type="text" id="edNoteTitle" placeholder="e.g. A Message from the Editor"/>
-          </div>
-          <div class="field">
-            <label>Body Content</label>
-            <textarea id="edNoteBody" style="min-height:300px;" placeholder="Write your full editorial address here..."></textarea>
-            <div id="proofread-edNoteBody" class="proofread-panel" style="display:none;margin-top:10px;"></div>
-          </div>
-          <div class="modal-actions" style="justify-content:space-between;">
-            <button class="btn btn-ai" onclick="proofreadText('edNoteBody')">✦ AI Proofread</button>
-            <div>
-              <span id="edNoteStatus" style="font-size:12px;color:var(--school-mint3);margin-right:10px;"></span>
-              <button class="btn btn-primary" onclick="saveEditorialNote()">Save to Cloud</button>
-            </div>
-          </div>
+      <div class="admin-main">
+        <div class="admin-body">
+          <div id="editorSubList" class="sub-list"></div>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- VIEW: PRODUCTION ADMIN -->
-    <div id="viewAdmin" class="view">
-      <div class="admin-header">
-        <div class="admin-header-main">
-          <h2>Production Admin</h2>
-          <p>Manage the final magazine structure, settings, and print exports.</p>
-        </div>
-        <div class="admin-header-actions">
-          <button class="btn btn-refresh" onclick="adminRefresh()">Refresh Cloud</button>
-          <button class="btn" onclick="goLanding()">Exit</button>
+  <!-- WORKSPACE -->
+  <div id="viewWorkspace" class="view">
+    <div class="ws-layout">
+      <div class="ws-topbar">
+        <span class="ws-topbar-logo">Layout Studio</span>
+        <div class="ws-topbar-title">The Torch — Graduation 2026</div>
+        <button class="ws-topbar-btn" onclick="openAdmin()">← Dashboard</button>
+        <button class="ws-topbar-btn accent" onclick="window.print()">Export PDF</button>
+      </div>
+      <div class="ws-sidebar">
+        <div class="ws-panel">
+          <div class="ws-panel-header">Pages</div>
+          <div class="ws-panel-body" id="wsPageList"></div>
         </div>
       </div>
-
-      <div class="admin-stats">
-        <div class="stat-card">
-          <div class="stat-val" id="statTotal">0</div>
-          <div class="stat-label">Total Subs</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="statPending" style="color:var(--amber);">0</div>
-          <div class="stat-label">Awaiting Review</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="statApproved" style="color:var(--green);">0</div>
-          <div class="stat-label">Editor Approved</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="statFinalized" style="color:var(--school-red);">0</div>
-          <div class="stat-label">Finalized for Print</div>
-        </div>
-      </div>
-
-      <div class="admin-tabs" id="dynamicAdminTabs">
-        <!-- Tabs injected by JS -->
-      </div>
-
-      <div id="adminModeSubs">
-        <div class="admin-controls">
-          <div class="filter-group">
-            <label>Status:</label>
-            <select id="filterStatus" onchange="renderAdmin()">
-              <option value="all">All</option>
-              <option value="approved">Approved</option>
-              <option value="finalized">Finalized</option>
-            </select>
-          </div>
-          <div class="action-group">
-            <button class="btn" onclick="exportCurrentCategory()">Export Category ZIP</button>
-            <button class="btn btn-primary" onclick="exportMasterMagazine()">Export Master ZIP</button>
+      <div class="ws-canvas" id="wsCanvas"></div>
+      <div class="ws-ai">
+        <div class="ws-ai-header">
+          <div class="ws-ai-title">✦ MagAssistant</div>
+          <div class="ws-ai-selectors">
+            <select class="ws-ai-select" id="wsAIModel"><option value="google/gemini-2.0-flash-001">Gemini 2.0</option></select>
           </div>
         </div>
-        <div id="adminSubList" class="sub-list">
-          <!-- Submissions injected by JS -->
-        </div>
-      </div>
-
-      <div id="adminModeLayout" style="display:none;">
-        <!-- Legacy Layout Studio Moved to Workspace View -->
-      </div>
-
-      <div id="adminModeShareLinks" style="display:none;">
-        <div class="f-card">
-          <div class="f-card-title">Shareable Submission Links</div>
-          <p style="font-size:13px;color:var(--ink3);margin-bottom:20px;">Copy these links and share them with the appropriate groups (Teachers, Students, etc.)</p>
-          <div id="shareLinksContainer" class="share-links-grid"></div>
-        </div>
-      </div>
-
-      <div id="adminModeSettings" style="display:none;">
-        <div class="settings-grid">
-          <div class="f-card">
-            <div class="f-card-title">Access & Security</div>
-            <div class="settings-row">
-              <label>Admin PIN (4 digits)</label>
-              <input type="text" id="setAdminPin" maxlength="4" style="width:80px;text-align:center;letter-spacing:4px;"/>
-            </div>
-            <div class="settings-row">
-              <label>Editor PIN (4 digits)</label>
-              <input type="text" id="setEditorPin" maxlength="4" style="width:80px;text-align:center;letter-spacing:4px;"/>
-            </div>
-            <div id="pinSaveStatus" style="font-size:12px;margin-top:10px;"></div>
-            <div class="modal-actions" style="margin-top:20px;">
-              <button class="btn" onclick="resetPinsToDefault()">Reset Defaults</button>
-              <button class="btn btn-primary" onclick="savePins()">Save PINs</button>
-            </div>
-          </div>
-
-          <div class="f-card">
-            <div class="f-card-title">AI Configuration</div>
-            <p style="font-size:12px;color:var(--ink3);margin-bottom:15px;">Required for AI Proofreading and Layout Studio Agent.</p>
-            <div class="field">
-              <label>OpenRouter API Key</label>
-              <input type="password" id="settingsApiKey" placeholder="sk-or-v1-..." />
-            </div>
-            <div id="apiKeySaveStatus" style="font-size:12px;margin-top:10px;"></div>
-            <div class="modal-actions">
-              <button class="btn btn-primary" onclick="saveApiKeyFromSettings()">Save API Key</button>
-            </div>
-          </div>
-
-          <div class="f-card">
-            <div class="f-card-title">Form Customizer</div>
-            <p style="font-size:12px;color:var(--ink3);margin-bottom:15px;">Add, remove, or reorder fields for any submission form.</p>
-            <div class="field">
-              <label>Select Category</label>
-              <select id="custCatPicker" onchange="renderFieldCustomizer()">
-                <!-- Injected by JS -->
-              </select>
-            </div>
-            <div id="custFieldsList" class="cust-fields-list"></div>
-            <div id="custActions" class="modal-actions" style="display:none;margin-top:20px;justify-content:space-between;">
-               <button class="btn" onclick="resetCategoryToDefaults()">Reset to Defaults</button>
-               <div style="display:flex;gap:10px;">
-                 <button class="btn btn-primary" onclick="openCreateFormModal()">+ New Form</button>
-                 <button class="btn btn-primary" onclick="openCustomFieldModal()">+ Add Field</button>
-               </div>
-            </div>
-          </div>
-
-          <div class="f-card" style="border-color:var(--school-red);">
-            <div class="f-card-title" style="color:var(--school-red);">System & Data</div>
-            <p style="font-size:12px;color:var(--ink3);margin-bottom:15px;">Permanent management of local and cloud storage.</p>
-            <div class="modal-actions" style="flex-direction:column;gap:10px;align-items:stretch;">
-              <button class="btn" onclick="purgeLocalCache()" id="purgeBtn">Purge Local Cache (Hard Reload)</button>
-              <div id="purgeStatus" style="font-size:11px;text-align:center;"></div>
-              <button class="btn btn-danger" onclick="wipeAllData()">WIPE ALL CLOUD DATA</button>
-            </div>
-            
-            <div class="diag-box" id="diagOutput">
-              <!-- Diagnostics injected by JS -->
-            </div>
-          </div>
+        <div class="ws-ai-chat" id="wsAIChat"></div>
+        <div class="ws-ai-input">
+          <textarea class="ws-ai-textarea" id="wsAIInput" placeholder="Describe layout changes..."></textarea>
+          <button class="ws-ai-send" onclick="wsAISend()">➔</button>
         </div>
       </div>
     </div>
-
-    <!-- VIEW: WORKSPACE (VS CODE STYLE) -->
-    <div id="viewWorkspace" class="view">
-      <div class="ws-wrapper">
-        <!-- Sidebar -->
-        <div class="ws-sidebar">
-          <div class="ws-sidebar-header">
-            <div class="ws-sidebar-title">WORKSPACE</div>
-            <button class="ws-sidebar-close" onclick="closeWorkspace()">×</button>
-          </div>
-          <div class="ws-sidebar-tabs">
-            <button class="ws-tab active" id="lstab-preview" onclick="lsTab('preview')">Pages</button>
-            <button class="ws-tab" id="lstab-sections" onclick="lsTab('sections')">Sections</button>
-            <button class="ws-tab" id="lstab-design" onclick="lsTab('design')">Design</button>
-            <button class="ws-tab" id="lstab-aiassist" onclick="lsTab('aiassist')">AI Agent</button>
-          </div>
-          <div class="ws-sidebar-content">
-            <!-- Panels -->
-            <div id="lspanel-preview" class="ws-panel active">
-              <div class="ws-panel-header">EXPLORER</div>
-              <div id="wsPageList" class="ws-page-list"></div>
-            </div>
-            
-            <div id="lspanel-sections" class="ws-panel" style="display:none;">
-              <div class="ws-panel-header">SECTION MANAGER</div>
-              <div id="sectionList" class="section-list"></div>
-            </div>
-
-            <div id="lspanel-design" class="ws-panel" style="display:none;">
-              <div class="ws-panel-header">DESIGN TOKENS</div>
-              <div class="ws-scroll-area">
-                <div class="ws-group">
-                  <div class="ws-group-title" onclick="wsTogglePanel('wsGroupIdentity')">Identity</div>
-                  <div id="wsGroupIdentity" class="ws-group-content">
-                    <div class="ws-field"><label>Mag Title</label><input type="text" id="ls-magTitle" onchange="wsMarkDirty()"/></div>
-                    <div class="ws-field"><label>School Name</label><input type="text" id="ls-schoolName" onchange="wsMarkDirty()"/></div>
-                  </div>
-                </div>
-                <div class="ws-group">
-                  <div class="ws-group-title" onclick="wsTogglePanel('wsGroupColors')">Color Palette</div>
-                  <div id="wsGroupColors" class="ws-group-content">
-                    <div id="wsColorPanel"></div>
-                  </div>
-                </div>
-                <div class="ws-group">
-                  <div class="ws-group-title" onclick="wsTogglePanel('wsGroupType')">Typography</div>
-                  <div id="wsGroupType" class="ws-group-content">
-                    <div class="ws-field"><label>Heading Font</label><select id="wsHeadingFont" onchange="wsUpdateFont('headingFont',this.value)"><option value=\"'Playfair Display',serif\">Playfair Display</option><option value=\"'Outfit',sans-serif\">Outfit</option><option value=\"'Lato',sans-serif\">Lato</option></select></div>
-                    <div class="ws-field"><label>Body Font</label><select id="wsBodyFont" onchange="wsUpdateFont('bodyFont',this.value)"><option value=\"'Crimson Text',serif\">Crimson Text</option><option value=\"'Lato',sans-serif\">Lato</option></select></div>
-                    <div class="ws-field"><label>Base Size</label><select id="wsFontSize" onchange="wsUpdateFont('fontSize',this.value)"><option value=\"10px\">10px</option><option value=\"11px\">11px</option><option value=\"12px\">12px</option></select></div>
-                  </div>
-                </div>
-                <div class="ws-group">
-                  <div class="ws-group-title" onclick="wsTogglePanel('wsGroupGrid')">Layout Grid</div>
-                  <div id="wsGroupGrid" class="ws-group-content">
-                    <div class="ws-field"><label>Teachers/pg</label><input type="number" id="ls-teachersPerPage" onchange="wsMarkDirty()"/></div>
-                    <div class="ws-field"><label>Students/pg</label><input type="number" id="ls-studentsPerPage" onchange="wsMarkDirty()"/></div>
-                    <div class="ws-field"><label>Gallery/pg</label><input type="number" id="ls-galleryPerPage" onchange="wsMarkDirty()"/></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div id="lspanel-aiassist" class="ws-panel" style="display:none;">
-              <div class="ws-panel-header">AI AGENT (OpenRouter)</div>
-              <div class="ws-ai-container">
-                <div class="ws-ai-header">
-                  <select id="wsAIModel" class="ws-ai-select">
-                    <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
-                    <option value="google/gemini-pro-1.5">Gemini 1.5 Pro</option>
-                    <option value="anthropic/claude-3-haiku">Claude Haiku</option>
-                  </select>
-                  <select id="wsAITask" class="ws-ai-select">
-                    <option value="design">Style Controller</option>
-                    <option value="reasoning">Production Strategy</option>
-                    <option value="image">Design Sample Analysis</option>
-                  </select>
-                </div>
-                <div class="ws-ai-chat" id="wsAIChat">
-                  <!-- Messages injected by JS -->
-                </div>
-                <div id="wsAISamplePreview" class="ws-ai-sample-preview" style="display:none;">
-                  <img id="wsAISampleImg" src=""/>
-                  <button onclick="wsAIClearSample()">×</button>
-                </div>
-                <div class="ws-ai-input-area">
-                  <textarea id="wsAIInput" placeholder="Command the AI..." rows="1"></textarea>
-                  <div class="ws-ai-actions">
-                    <label class="ws-ai-btn-icon" title="Upload Sample Image">
-                      📷<input type="file" hidden accept="image/*" onchange="wsAIUploadSample(event)"/>
-                    </label>
-                    <button class="ws-ai-send" onclick="wsAISend()">➔</button>
-                  </div>
-                </div>
-                <div class="ws-ai-quick">
-                  <button onclick="wsAIQuick('Apply modern minimalist style')">Modern</button>
-                  <button onclick="wsAIQuick('Match uploaded sample style')">Match Sample</button>
-                  <button onclick="wsAIQuick('Optimize pagination')">Paginate</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Main Workspace Area -->
-        <div class="ws-main">
-          <div class="ws-toolbar">
-            <div class="ws-toolbar-left">
-              <button class="ws-tool-btn" onclick="wsGeneratePreview()" title="Refresh Layout">🔄 Generate</button>
-              <div class="ws-divider"></div>
-              <button class="ws-tool-btn" id="wsUndoBtn" onclick="wsUndo()" title="Undo (Ctrl+Z)">↶</button>
-              <button class="ws-tool-btn" id="wsRedoBtn" onclick="wsRedo()" title="Redo (Ctrl+Y)">↷</button>
-              <div class="ws-divider"></div>
-              <button class="ws-tool-btn" id="wsGuidesBtn" onclick="wsToggleGuides()">☑ Guides</button>
-              <button class="ws-tool-btn" id="wsSpreadBtn" onclick="wsToggleSpread()">⊞ Spread</button>
-            </div>
-            <div class="ws-toolbar-center">
-              <span id="wsProjectTitle">The Torch — Design Workspace</span>
-            </div>
-            <div class="ws-toolbar-right">
-              <div class="ws-zoom-ctrl">
-                <button onclick="wsSetZoom(wsZoom-10)">−</button>
-                <span id="wsZoomLevel">100%</span>
-                <button onclick="wsSetZoom(wsZoom+10)">+</button>
-              </div>
-              <div class="ws-divider"></div>
-              <button class="ws-tool-btn primary" onclick="wsExportPrintPDF()">🖨 Export PDF</button>
-              <button class="ws-tool-btn" onclick="wsExportEditable()">📦 ZIP</button>
-            </div>
-          </div>
-
-          <div class="ws-canvas-area" id="wsCanvasArea">
-             <div id="wsPageContainer" class="ws-page-container">
-               <!-- Interactive canvas injected by JS -->
-             </div>
-          </div>
-
-          <div class="ws-statusbar">
-            <div class="ws-status-left">
-              <span id="wsStatusFinalized">0 finalized</span>
-              <span id="wsStatusPages">0 pages</span>
-            </div>
-            <div class="ws-status-center">
-              <span id="wsStatusZoom">100%</span>
-              <div class="ws-divider"></div>
-              <span id="wsSaveIndicator">● Saved</span>
-            </div>
-            <div class="ws-status-right">
-              <span>Cloud Sync Active</span>
-              <div class="ws-sync-dot ok"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </main>
+  </div>
 
   <!-- PIN OVERLAY -->
-  <div class="modal-overlay" id="pinOverlay">
-    <div class="pin-card">
-      <div class="pin-badge" id="pinModeBadge">ADMIN</div>
+  <div id="pinOverlay" class="pin-overlay">
+    <div class="pin-box">
       <h2 id="pinTitle">Enter PIN</h2>
-      <p id="pinSub">Enter your 4-digit security code</p>
-      
-      <div class="pin-dots" id="pinDots">
-        <div class="pin-dot" id="pd0"></div>
-        <div class="pin-dot" id="pd1"></div>
-        <div class="pin-dot" id="pd2"></div>
-        <div class="pin-dot" id="pd3"></div>
+      <p class="pin-sub">Access restricted to authorized committee members.</p>
+      <div class="pin-dots">
+        <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div><div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
       </div>
-      
-      <div id="pinErr" class="pin-err"></div>
-      
       <div class="pin-pad">
-        <button onclick="pinKey(1)">1</button><button onclick="pinKey(2)">2</button><button onclick="pinKey(3)">3</button>
-        <button onclick="pinKey(4)">4</button><button onclick="pinKey(5)">5</button><button onclick="pinKey(6)">6</button>
-        <button onclick="pinKey(7)">7</button><button onclick="pinKey(8)">8</button><button onclick="pinKey(9)">9</button>
-        <button class="pin-empty"></button><button onclick="pinKey(0)">0</button><button class="pin-del" onclick="pinDel()">⌫</button>
-      </div>
-      
-      <button class="btn btn-close" onclick="closePIN()">Cancel</button>
-    </div>
-  </div>
-
-  <!-- REVIEW MODAL -->
-  <div class="modal-overlay" id="reviewModal">
-    <div class="modal-box">
-      <h2 id="reviewTitle">Review Submission</h2>
-      <p id="reviewSub">Add notes or proofreading comments for the production team.</p>
-      <textarea id="reviewNote" rows="4" placeholder="Type your review note here..."></textarea>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeReviewModal()">Cancel</button>
-        <button class="btn btn-primary" id="reviewConfirm">Confirm</button>
+        <button class="pin-key" onclick="pinKey('1')">1</button><button class="pin-key" onclick="pinKey('2')">2</button><button class="pin-key" onclick="pinKey('3')">3</button>
+        <button class="pin-key" onclick="pinKey('4')">4</button><button class="pin-key" onclick="pinKey('5')">5</button><button class="pin-key" onclick="pinKey('6')">6</button>
+        <button class="pin-key" onclick="pinKey('7')">7</button><button class="pin-key" onclick="pinKey('8')">8</button><button class="pin-key" onclick="pinKey('9')">9</button>
+        <button class="pin-key pin-del" onclick="pinDel()">⌫</button><button class="pin-key zero" onclick="pinKey('0')">0</button>
       </div>
     </div>
   </div>
 
-  <!-- CUSTOM FIELD MODAL -->
-  <div class="modal-overlay" id="customFieldModal">
-    <div class="modal-box">
-      <h2 id="cfmTitle">Add Custom Field</h2>
-      <div class="field">
-        <label>Field Label</label>
-        <input type="text" id="cfmLabel" placeholder="e.g. Favorite Subject"/>
-      </div>
-      <div class="field">
-        <label>Input Type</label>
-        <select id="cfmType" onchange="updateCustomFieldModalOptions()">
-          <option value="text">Short Text</option>
-          <option value="textarea">Long Text / Paragraph</option>
-          <option value="select">Dropdown / Choices</option>
-          <option value="number">Number</option>
-          <option value="date">Date</option>
-          <option value="checkbox">Yes/No Checkbox</option>
-        </select>
-      </div>
-      <div class="field" id="cfmOptionsWrap" style="display:none;">
-        <label>Options (one per line)</label>
-        <textarea id="cfmOptions" rows="3" placeholder="Option 1\nOption 2..."></textarea>
-      </div>
-      <div class="field">
-        <label>Placeholder (optional)</label>
-        <input type="text" id="cfmPlaceholder" placeholder="Hint text"/>
-      </div>
-      <div class="field checkbox">
-        <input type="checkbox" id="cfmRequired"/>
-        <label for="cfmRequired">Required Field</label>
-      </div>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeCustomFieldModal()">Cancel</button>
-        <button class="btn btn-primary" id="cfmSaveBtn" onclick="saveCustomField()">Save Field</button>
-      </div>
-    </div>
+  <!-- SYNC STATUS -->
+  <div class="sync-bar" id="syncBar">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncMsg">Syncing...</span>
   </div>
 
-  <!-- RENAME SECTION MODAL -->
-<div class="modal-overlay" id="renameModal">
-  <div class="modal-box" style="max-width:420px;">
-    <h2>Rename Section</h2>
-    <p class="modal-sub" id="renameModalSub">Enter the new name.</p>
-    <input type="text" id="renameInput" placeholder="New section name" maxlength="60" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:9px;font-size:15px;font-family:'Lato',sans-serif;margin-top:12px;"/>
-    <div class="modal-actions">
-      <button class="btn" onclick="closeRenameModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmRename()">Rename</button>
-    </div>
-  </div>
-</div>
-
-<div class="sync-bar" id="syncBar">
-  <div class="sync-dot ok" id="syncDot"></div>
-  <span id="syncMsg">Cloud Sync Active</span>
-</div>
-
-  <!-- Create Form Modal -->
-  <div class="modal-overlay" id="createFormModal">
-    <div class="modal-box">
-      <h3 id="cfmFormTitle" style="margin-bottom:15px;">Create New Form</h3>
-      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
-        <label>Form Internal ID (e.g. debate_club)</label>
-        <input type="text" id="crfId" placeholder="letters and underscores only" style="width:100%;" oninput="this.value=this.value.replace(/[^a-z0-9_]/g,'')"/>
-      </div>
-      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
-        <label>Form Name (e.g. Debate Club)</label>
-        <input type="text" id="crfName" placeholder="Public facing name" style="width:100%;"/>
-      </div>
-      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
-        <label>Icon (Emoji)</label>
-        <input type="text" id="crfIcon" placeholder="e.g. 🗣️" style="width:100px;"/>
-      </div>
-      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
-        <label>Form Tag (e.g. Debate)</label>
-        <input type="text" id="crfTag" placeholder="Short tag" style="width:100%;"/>
-      </div>
-      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
-        <label>Subtitle / Description</label>
-        <textarea id="crfSubtitle" style="width:100%;font-family:'Lato',sans-serif;padding:8px;" rows="2" placeholder="Description of what this form is for"></textarea>
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
-        <button class="btn" onclick="closeCreateFormModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveNewForm()">Create Form</button>
-      </div>
-    </div>
-  </div>
-  
   <script src="script.js"></script>
 </body>
 </html>
