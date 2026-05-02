@@ -881,10 +881,28 @@ function goLanding(){show('viewLanding');currentFormCategory=null;resetFormState
 /* LANDING CARDS */
 function renderLandingCards(){
   const grid=document.getElementById('formGrid');
+  if(!grid) return;
   const h=document.getElementById('landingHeading');if(h)h.textContent=getLabel('landing_heading','Choose a content category');
   const DESCS={teachers:'For teaching staff. Share your journey, subjects, and message to the graduating class.',primary5:'For Primary 5 pupils moving on. Tell the world who you are.',jss3:'For Junior Secondary 3 students finishing this phase.',ss3:'For the main graduating class. Your legacy, your ambitions, your message.',speeches:'Proprietor, Senior Boy, guest speakers — formal addresses for the magazine.',creative:'Poems, short stories, jokes, riddles — creative writing from across the school.',events:'Sports days, excursions, competitions, achievements — the year\'s highlights.',academic:'Articles, subject features, research write-ups, and educational content.',interviews:'Q&A with old students, guest speakers, and notable voices.',motivational:'Inspirational messages and wisdom for the graduating class.',gallery:'Submit standalone photos with captions for the gallery section.'};
   const STRIPES={teachers:'stripe-gold',primary5:'stripe-green',jss3:'stripe-green',ss3:'stripe-green',speeches:'stripe-blue',creative:'stripe-purple',events:'stripe-amber',academic:'stripe-blue',interviews:'stripe-mint',motivational:'stripe-purple',gallery:'stripe-gold'};
-  grid.innerHTML=CATEGORY_KEYS.map(k=>{const cat=CATEGORIES[k];const lbl=getLabel('cat_label_'+k,cat.label);return`<div class="form-card" onclick="openForm('${k}')"><span class="form-card-stripe ${STRIPES[k]||'stripe-blue'}"></span><span class="form-card-icon">${cat.icon}</span><h3>${esc(lbl)}</h3><p>${esc(getLabel('cat_desc_'+k,DESCS[k]||''))}</p></div>`;}).join('');
+  
+  if(!CATEGORY_KEYS || !CATEGORY_KEYS.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--ink2);">No categories found. Please check configuration.</div>';
+    return;
+  }
+
+  grid.innerHTML=CATEGORY_KEYS.map(k=>{
+    const cat=CATEGORIES[k];
+    if(!cat) return '';
+    const lbl=getLabel('cat_label_'+k, cat.label || k);
+    const dsc=getLabel('cat_desc_'+k, DESCS[k]||'');
+    return`<div class="form-card" onclick="openForm('${k}')">
+      <span class="form-card-stripe ${STRIPES[k]||'stripe-blue'}"></span>
+      <span class="form-card-icon">${cat.icon||'📝'}</span>
+      <h3>${esc(lbl)}</h3>
+      <p>${esc(dsc)}</p>
+    </div>`;
+  }).join('');
 }
 
 /* FORM BUILDING */
