@@ -134,8 +134,20 @@ function loadLsSettingsFromStorage(){
 
 function getSupa(){
   if(_supa)return _supa;
+  if(!window.supabase){console.warn('[DB] Supabase CDN not yet loaded');return null;}
   try{_supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);return _supa;}
   catch(e){console.warn('[DB] Supabase init failed:',e.message);return null;}
+}
+/* Wait for async Supabase CDN to load (max ~6s) */
+function waitForSupabase(maxMs){
+  return new Promise(resolve=>{
+    if(window.supabase){resolve(true);return;}
+    const t0=Date.now();
+    const iv=setInterval(()=>{
+      if(window.supabase){clearInterval(iv);resolve(true);return;}
+      if(Date.now()-t0>(maxMs||6000)){clearInterval(iv);resolve(false);return;}
+    },100);
+  });
 }
 /* ── Supabase Storage: full-quality photo uploads ── */
 async function uploadToStorage(file, subId){
@@ -490,9 +502,19 @@ function saveAll(list){
   dbSaveAllToCloud(list);
 }
 
-/* CONFIG */
-function loadCfg(){return{adminPin:'1234',editorPin:'5678'};}
-function saveCfg(n){cfg=n;dbSaveSettings('cfg',n);}
+/* CONFIG — loads from localStorage (cloud override happens in initCloudSync) */
+function loadCfg(){
+  try{
+    const s=JSON.parse(localStorage.getItem('me_cfg')||'null');
+    if(s&&typeof s==='object'&&s.adminPin&&s.editorPin)return s;
+  }catch(e){}
+  return{adminPin:'1234',editorPin:'5678'};
+}
+function saveCfg(n){
+  cfg=n;
+  localStorage.setItem('me_cfg',JSON.stringify(n));
+  dbSaveSettings('cfg',n);
+}
 let cfg=loadCfg();
 
 /* LAYOUT SETTINGS */
@@ -511,21 +533,306 @@ function applyCustomCategories(s){
   CATEGORY_KEYS=Object.keys(CATEGORIES);
   
   // Ensure they are in sectionOrder
-  if(sectionOrder){
-    s.customCategories.forEach(c=>{
-      if(!sectionOrder.find(so=>so.key===c.id)){
-        sectionOrder.push({key:c.id,label:c.label,icon:c.icon,editable:true,visible:true,layout:'single'});
+  s.customCategories.forEach(c=>{
+    if(!sectionOrder.find(sec=>sec.key===c.id)){
+      sectionOrder.push({key:c.id,label:c.label,icon:c.icon,layout:'single',visible:true});
+    }
+  });
+}
+
+/* LABELS */
+function loadLabels(){try{const s=JSON.parse(localStorage.getItem('me_labels')||'null');if(s&&typeof s==='object')return s;}catch(e){}return{};}
+function saveLabels(l){labelOverrides=l;try{localStorage.setItem('me_labels',JSON.stringify(l));}catch(e){}dbSaveSettings('labels',l);}
+let labelOverrides=loadLabels();
+function getLabel(key,fallback){return labelOverrides[key]||fallback;}
+
+/* ── Async init: pull cloud data on page load ── */
+async function initCloudSync(){
+  const statusEl = document.getElementById('bootLoadingStatus');
+  if(statusEl) statusEl.textContent = 'Syncing settings…';
+  showSync('syncing','Connecting to cloud…');
+  try{
+    /* Start Realtime listeners early */
+    initRealtime();
+
+    /* Pull settings first */
+    const settingsToLoad = ['cfg','ls_settings','labels','section_order','form_config'];
+    const results = await Promise.allSettled(settingsToLoad.map(k => dbLoadSettings(k)));
+    
+    results.forEach((res, i) => {
+      const key = settingsToLoad[i];
+      if(res.status === 'fulfilled' && res.value){
+        const val = res.value;
+        if(key === 'cfg'){ cfg = {...cfg, ...val}; try{localStorage.setItem('me_cfg',JSON.stringify(cfg));}catch(e){} }
+        if(key === 'ls_settings'){
+          lsSettings = val;
+          try{localStorage.setItem('me_ls_settings',JSON.stringify(val));}catch(e){}
+          applyLsColors(val);
+          applyCustomCategories(val);
+        }
+        if(key === 'labels'){ labelOverrides = {...labelOverrides, ...val}; try{localStorage.setItem('me_labels',JSON.stringify(labelOverrides));}catch(e){} }
+        if(key === 'section_order'){ sectionOrder = val; try{localStorage.setItem('me_section_order',JSON.stringify(val));}catch(e){} }
+        if(key === 'form_config'){ formConfig = val; try{localStorage.setItem('me_form_config',JSON.stringify(val));}catch(e){} }
       }
     });
+
+    if(statusEl) statusEl.textContent = 'Loading submissions…';
+    /* Pull submissions */
+    subs=await dbLoadAll();
+    
+    showSync('ok', subs.length ? '✓ Cloud Synced' : '✓ Connected (Empty)');
+    if(subs.length) showSync('live','✦ Live & Synced');
+    
+    /* Refresh any open view */
+    if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
+    if(document.getElementById('viewEditor')?.classList.contains('active'))renderEditor();
+    if(document.getElementById('viewLanding')?.classList.contains('active'))renderLandingCards();
+  }catch(e){
+    console.warn('[DB] Init sync failed:', e.message);
+    showSync('err','Running offline — using local cache');
   }
 }
 
-/* SECTION ORDER */
+/* ═══════════════════════════════════════════════════════════
+   OCR ENGINE — Gemini 2.0 Flash via OpenRouter
+   Targets: academic, interviews, speeches, creative, motivational
+═══════════════════════════════════════════════════════════ */
+const OCR_TARGET_CATS=['academic','interviews','speeches','creative','motivational'];
+const OCR_TARGET_FIELDS={
+  academic:'ff-articleBody',
+  interviews:'ff-qaBody',
+  speeches:'ff-speechBody',
+  creative:'ff-contribBody',
+  motivational:'ff-articleBody'
+};
+
+function buildOCRPanel(catKey){
+  if(!OCR_TARGET_CATS.includes(catKey))return'';
+  return`
+  <div class="f-card">
+    <div class="f-card-title">📷 Snap &amp; Transcribe — OCR</div>
+    <div class="ocr-panel">
+      <div class="ocr-panel-title">✦ Scan Handwritten or Printed Text</div>
+      <p style="font-size:12px;color:rgba(255,255,255,.7);margin-bottom:12px;">Take a photo or upload an image of your document. Gemini AI will read and transcribe the text directly into the form field below.</p>
+      <div class="ocr-btn-row">
+        <button class="ocr-btn ocr-btn-cam" onclick="ocrCapture('${catKey}','camera')">📷 Take Photo</button>
+        <button class="ocr-btn ocr-btn-file" onclick="ocrCapture('${catKey}','file')">📁 Upload Image</button>
+      </div>
+      <input type="file" id="ocrInput-${catKey}" accept="image/*" style="display:none;" onchange="ocrProcess(event,'${catKey}')"/>
+      <input type="file" id="ocrCamInput-${catKey}" accept="image/*" capture="environment" style="display:none;" onchange="ocrProcess(event,'${catKey}')"/>
+      <div class="ocr-status" id="ocrStatus-${catKey}">Ready — point camera at any text</div>
+      <img class="ocr-preview-img" id="ocrPreview-${catKey}" alt="Scanned image"/>
+    </div>
+  </div>`;
+}
+
+function ocrCapture(catKey,mode){
+  const inputId=mode==='camera'?`ocrCamInput-${catKey}`:`ocrInput-${catKey}`;
+  document.getElementById(inputId)?.click();
+}
+
+async function ocrProcess(event,catKey){
+  const file=event.target.files?.[0];if(!file)return;
+  const statusEl=document.getElementById(`ocrStatus-${catKey}`);
+  const previewEl=document.getElementById(`ocrPreview-${catKey}`);
+  const s=lsSettings;
+  const apiKey=s.apiKey;
+  if(!apiKey){
+    statusEl.className='ocr-status err';
+    statusEl.textContent='⚠ No API key. Go to Design Settings → AI Configuration.';
+    return;
+  }
+  /* Show preview */
+  const previewURL=URL.createObjectURL(file);
+  previewEl.src=previewURL;previewEl.style.display='block';
+  statusEl.className='ocr-status running';
+  statusEl.textContent='🔍 Reading text with Gemini…';
+  /* Convert to base64 */
+  const base64=await new Promise((res,rej)=>{
+    const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);
+    r.onerror=rej;r.readAsDataURL(file);
+  });
+  const mimeType=file.type||'image/jpeg';
+  try{
+    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+        'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor OCR'},
+      body:JSON.stringify({
+        model:'google/gemini-2.0-flash-001',
+        max_tokens:4000,
+        messages:[{
+          role:'user',
+          content:[
+            {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}},
+            {type:'text',text:'You are a precise OCR engine for a school magazine. Transcribe ALL text from this image EXACTLY as written — preserve every word, punctuation, paragraph break, and line break. Do not summarize, paraphrase, or add anything. If the handwriting is unclear, make your best attempt and mark unclear words with [?]. Output only the transcribed text with no preamble.'}
+          ]
+        }]
+      })
+    });
+    const data=await resp.json();
+    const transcribed=data.choices?.[0]?.message?.content||'';
+    if(!transcribed){statusEl.className='ocr-status err';statusEl.textContent='✗ No text found. Try a clearer image.';return;}
+    /* Inject into target field */
+    const fieldId=OCR_TARGET_FIELDS[catKey];
+    const ta=document.getElementById(fieldId);
+    if(ta){
+      const existing=ta.value.trim();
+      ta.value=existing?(existing+'\n\n'+transcribed):transcribed;
+      ta.dispatchEvent(new Event('input'));
+      ta.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+    statusEl.className='ocr-status done';
+    statusEl.textContent=`✓ Transcribed ${transcribed.length} characters — text added to form.`;
+    URL.revokeObjectURL(previewURL);
+  }catch(e){
+    statusEl.className='ocr-status err';
+    statusEl.textContent='✗ Error: '+e.message;
+  }
+  event.target.value='';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GALLERY BULK UPLOAD
+═══════════════════════════════════════════════════════════ */
+/* Gallery bulk upload state (global) */
+function buildGalleryTabs(){
+  return`
+  <div class="f-card">
+    <div class="gallery-tabs">
+      <button class="gallery-tab active" id="gtab-single" onclick="switchGalleryTab('single')">📷 Single Upload</button>
+      <button class="gallery-tab" id="gtab-bulk" onclick="switchGalleryTab('bulk')">📦 Bulk Upload</button>
+    </div>
+    <!-- Single upload tab (existing photo flow) -->
+    <div class="gallery-tab-pane active" id="gpane-single">
+      <div class="f-card-title">Photo &amp; Caption</div>
+      <div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)">
+        <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/>
+        <div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>Upload gallery photo <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">High quality · Min 600×600px</span></div>
+        <div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><div class="photo-dims" id="photoDims"></div><button class="photo-change" onclick="resetPhoto(event)">Change photo</button></div>
+      </div>
+      <div class="photo-err-msg" id="photoErrMsg"></div>
+      <div class="photo-reqs"><p><strong>For print quality:</strong> minimum 600×600 pixels, JPG or PNG, up to 5 MB.</p></div>
+    </div>
+    <!-- Bulk upload tab -->
+    <div class="gallery-tab-pane" id="gpane-bulk">
+      <div class="f-card-title">Bulk Photo Upload</div>
+      <div class="bulk-drop-zone" onclick="document.getElementById('bulkPhotoInput').click()">
+        <input type="file" id="bulkPhotoInput" accept=".jpg,.jpeg,.png,.webp" multiple style="display:none;" onchange="handleBulkPhotos(event)"/>
+        <span style="font-size:40px;display:block;margin-bottom:10px;">📦</span>
+        <h3>Select Multiple Photos</h3>
+        <p>Click to choose up to 30 photos at once — add captions for each</p>
+      </div>
+      <div id="bulkGrid" class="bulk-grid"></div>
+      <div id="bulkCount" style="margin-top:10px;font-size:13px;color:var(--ink3);"></div>
+      <div id="bulkErrMsg" class="photo-err-msg"></div>
+      <button class="submit-btn" style="margin-top:1.25rem;" onclick="submitBulkGallery()">📦 Submit All Bulk Photos</button>
+    </div>
+  </div>`;
+}
+
+function switchGalleryTab(tab){
+  ['single','bulk'].forEach(t=>{
+    document.getElementById('gtab-'+t)?.classList.toggle('active',t===tab);
+    document.getElementById('gpane-'+t)?.classList.toggle('active',t===tab);
+  });
+}
+
+function handleBulkPhotos(event){
+  const files=Array.from(event.target.files||[]);
+  const errEl=document.getElementById('bulkErrMsg');errEl.style.display='none';
+  const max=30;
+  const rem=max-bulkPhotos.length;
+  if(rem<=0){errEl.textContent=`Maximum ${max} photos reached.`;errEl.style.display='block';return;}
+  const toAdd=files.slice(0,rem);
+  if(files.length>rem){errEl.textContent=`Adding first ${rem} — limit is ${max} total.`;errEl.style.display='block';}
+  toAdd.forEach(f=>processBulkPhoto(f));
+  event.target.value='';
+}
+function processBulkPhoto(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['jpg','jpeg','png','webp'].includes(ext))return;
+  if(file.size>15*1024*1024)return;
+  const r=new FileReader();
+  const fileName=file.name;
+  r.onload=ev=>{
+    bulkPhotos.push({dataURL:ev.target.result,file:file,fileName:fileName,caption:''});
+    renderBulkGrid();
+  };
+  r.readAsDataURL(file);
+}
+function renderBulkGrid(){
+  const grid=document.getElementById('bulkGrid');
+  const ctr=document.getElementById('bulkCount');
+  if(!grid)return;
+  grid.innerHTML=bulkPhotos.map((p,i)=>`
+    <div class="bulk-thumb">
+      <img src="${p.dataURL}" alt="Photo ${i+1}"/>
+      <button class="bulk-thumb-rm" onclick="removeBulkPhoto(${i})">×</button>
+      <div class="bulk-thumb-cap">
+        <input type="text" placeholder="Caption for photo ${i+1}" value="${esc(p.caption)}" oninput="updateBulkCaption(${i},this.value)"/>
+      </div>
+    </div>`).join('');
+  if(ctr)ctr.textContent=bulkPhotos.length?`${bulkPhotos.length} photo${bulkPhotos.length>1?'s':''} ready to submit`:'';
+}
+function removeBulkPhoto(i){bulkPhotos.splice(i,1);renderBulkGrid();}
+function updateBulkCaption(i,val){if(bulkPhotos[i])bulkPhotos[i].caption=val;}
+
+async function submitBulkGallery(){
+  if(!bulkPhotos.length){alert('Please add at least one photo.');return;}
+  /* Validate required fields */
+  const submitterName=(document.getElementById('ff-submitterName')?.value||'').trim();
+  if(!submitterName){alert('Please enter your name before submitting.');document.getElementById('ff-submitterName')?.focus();return;}
+  const submitterRole=(document.getElementById('ff-submitterRole')?.value||'').trim()||'';
+  const ts=new Date().toLocaleString();
+  let count=0;let errors=0;
+  showSync('syncing','Uploading '+bulkPhotos.length+' photos…');
+  for(const p of bulkPhotos){
+    try{
+      const subId=genId();
+      /* Upload to Storage for full quality */
+      let photoData=p.dataURL;
+      if(p.file){
+        try{photoData=await uploadToStorage(p.file,subId);}catch(e){console.warn('[Storage] Bulk photo upload failed:',e.message);}
+      }
+      const sub={
+        id:subId,
+        category:'gallery',ts,createdAt:Date.now()+count,
+        status:'pending',
+        reviewerNote:'',reviewedAt:null,
+        data:{
+          submitterName:{label:'Submitted by',value:submitterName},
+          submitterRole:{label:'Role',value:submitterRole},
+          photoCaption:{label:'Photo caption',value:p.caption||'Gallery photo'},
+          photoCategory:{label:'Category',value:'Other'},
+          photoDate:{label:'Date',value:''}
+        },
+        photoData:photoData,photoName:p.fileName||('photo_'+(count+1)+'.jpg'),photos:null
+      };
+      await dbSaveSubmission(sub);
+      count++;
+    }catch(e){
+      console.warn('[Gallery] Failed to save photo '+(count+1)+':',e.message);
+      errors++;
+    }
+  }
+  bulkPhotos=[];renderBulkGrid();
+  if(errors){
+    alert(`${count} photos submitted, ${errors} failed. Failed items saved locally and will sync later.`);
+  } else {
+    alert(`✓ ${count} photos submitted successfully! They are now awaiting Editor review.`);
+  }
+  showSync('ok','✓ '+count+' photos uploaded');
+  document.getElementById('formContainer').style.display='none';
+  document.getElementById('successWrap').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 const DEFAULT_SECTION_ORDER=[
-  {key:'cover',label:'Front Cover',icon:'📔',editable:false,visible:true,layout:'cover'},
+  {key:'cover',label:'Cover Page',icon:'📕',editable:false,visible:true,layout:'cover'},
   {key:'toc',label:'Table of Contents',icon:'📑',editable:false,visible:true,layout:'toc'},
-  {key:'editorial-note',label:'Editorial Note',icon:'📜',editable:true,visible:true,layout:'single'},
+  {key:'editorial-note',label:'Editorial Note',icon:'✎',editable:true,visible:true,layout:'single'},
   {key:'speeches',label:'Speeches & Addresses',icon:'🎤',editable:true,visible:true,layout:'single'},
+  {key:'primary5',label:'Primary 5 Graduates',icon:'🧒',editable:true,visible:true,layout:'grid'},
   {key:'jss3',label:'JSS3 Graduates',icon:'🎒',editable:true,visible:true,layout:'grid'},
   {key:'ss3',label:'SS3 Graduates',icon:'🎓',editable:true,visible:true,layout:'grid'},
   {key:'teachers',label:'Teacher Profiles',icon:'👩‍🏫',editable:true,visible:true,layout:'teacher-grid'},
@@ -538,7 +845,11 @@ const DEFAULT_SECTION_ORDER=[
   {key:'appreciation',label:'Appreciation Section',icon:'🙏',editable:true,visible:true,layout:'single'}
 ];
 function loadSectionOrder(){try{const s=JSON.parse(localStorage.getItem('me_section_order')||'null');if(s&&Array.isArray(s)&&s.length)return s;}catch(e){}return JSON.parse(JSON.stringify(DEFAULT_SECTION_ORDER));}
-function saveSectionOrder(){localStorage.setItem('me_section_order',JSON.stringify(sectionOrder));alert('Section order saved!');}
+function saveSectionOrder(){
+  localStorage.setItem('me_section_order',JSON.stringify(sectionOrder));
+  dbSaveSettings('section_order',sectionOrder);
+  alert('Section order saved!');
+}
 sectionOrder=loadSectionOrder();
 
 /* FORM CONFIG — Fix 4: synced to cloud so all devices/links get same custom fields */
@@ -784,13 +1095,14 @@ function renderAdmin(){
   document.getElementById('statApproved').textContent=subs.filter(s=>s.status==='approved').length;
   document.getElementById('statFinalized').textContent=subs.filter(s=>s.status==='finalized').length;
   const sf=document.getElementById('filterStatus').value;
-  let filtered=subs.slice().reverse();
+  /* Sequence order: sort by createdAt ascending (oldest first = submission order) */
+  let filtered=subs.slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
   /* WORKFLOW: Production Admin only sees approved/finalized — pending stays with Editor */
   filtered=filtered.filter(s=>s.status==='approved'||s.status==='finalized'||s.status==='rejected');
   if(currentAdminCat!=='all')filtered=filtered.filter(s=>s.category===currentAdminCat);
   if(sf!=='all')filtered=filtered.filter(s=>s.status===sf);
   const list=document.getElementById('adminSubList');
-  /* Fix 5: Workflow notice for admin */
+  /* Workflow notice for admin */
   const pendingCount=subs.filter(s=>s.status==='pending').length;
   const approvedCount=subs.filter(s=>s.status==='approved').length;
   const workflowBanner=`<div style="background:linear-gradient(135deg,#f0fdf6,#e6faf0);border:1px solid var(--school-mint2);border-radius:var(--radius);padding:14px 18px;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -938,10 +1250,11 @@ function renderEditor(){
   document.getElementById('ecount-approved').textContent=approvedCount;
   document.getElementById('ecount-rejected').textContent=subs.filter(s=>s.status==='rejected').length;
   document.getElementById('ecount-all').textContent=subs.length;
-  let filtered=subs.slice().reverse();
+  /* Sequence order: sort by createdAt ascending (oldest first = submission order) */
+  let filtered=subs.slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
   if(currentEditorCat!=='all')filtered=filtered.filter(s=>s.status===currentEditorCat);
   const list=document.getElementById('editorSubList');
-  /* Fix 5: Inbox banner for editor */
+  /* Inbox banner for editor */
   const inboxBanner=pendingCount>0?`<div style="background:linear-gradient(135deg,#2d1b4e,#4a2d7a);color:#fff;border-radius:var(--radius);padding:14px 18px;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;">
     <span style="font-size:24px;">📬</span>
     <div>
@@ -1326,215 +1639,1171 @@ function renderCurrentPage(){
         return `<div class="mag-item mag-item-single" style="margin-bottom:16px;">
           ${name ? `<div class="mag-item-header" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #e8e8e0;">
             <div class="mag-item-photo-wrap">${ph}</div>
-            <div style="flex:1;">
-              <h3 class="mag-item-name" style="font-family:${hFont};font-size:13px;color:${c1};margin:0;line-height:1.2;">${esc(name)}</h3>
-              ${subtitle ? `<div class="mag-item-subtitle" style="font-size:8px;text-transform:uppercase;letter-spacing:1px;color:${c2};font-weight:700;margin-top:2px;">${esc(subtitle)}</div>` : ''}
+            <div class="mag-item-header-text">
+              <div class="mag-item-name" style="font-size:13px;font-weight:700;color:${c1};font-family:${hFont};">${esc(name)}</div>
+              ${subtitle ? `<div class="mag-item-subtitle" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:${c2};font-weight:700;">${esc(subtitle)}</div>` : ''}
             </div>
           </div>` : ''}
+          ${pullQuote ? `<div class="mag-item-quote" style="border-left:4px solid ${c2};padding:8px 12px;margin:8px 0;background:${c2}22;border-radius:0 8px 8px 0;">
+            <p style="font-family:${hFont};font-size:12px;color:${c1};font-style:italic;">${esc(pullQuote)}</p>
+          </div>` : ''}
+          ${mainText ? `<p class="mag-item-body" style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;margin-bottom:10px;">${esc(mainText)}</p>` : ''}
           <div class="mag-item-fields">${allFields}</div>
-          ${pullQuote ? `<div class="mag-item-pullquote" style="margin:12px 0;padding:10px 15px;border-left:3px solid ${c2};background:#fdfcf0;font-style:italic;font-family:${bFont};font-size:11px;color:${c1};">"${esc(pullQuote)}"</div>` : ''}
         </div>`;
       }).join('');
     }
 
-    inner = `<div style="background:${pageBg};height:100%;display:flex;flex-direction:column;">
-      <div style="padding:1.5rem 2rem 1rem;display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid ${c1}11;">
-        <div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;">${esc(secLabel)}</div>
-        <div style="font-family:${hFont};font-size:14px;color:${c1};opacity:.5;">${esc(magTitle)}</div>
-      </div>
-      <div style="padding:1.5rem 2rem;flex:1;overflow:hidden;">
-        ${contentHtml}
-      </div>
-      ${s.pageNums!=='no'?foot:''}
+    inner=`<div style="background:${pageBg};height:100%;display:flex;flex-direction:column;">${page.isFirst?`<div style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.25rem 2rem;min-height:90px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:5px;">Section</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(secLabel)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div>`:`<div style="background:${c1};padding:6px 2rem;"><span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:${c2};font-weight:700;">${esc(secLabel)} (continued)</span></div>`}<div style="padding:1rem 1.5rem;flex:1;overflow:hidden;">${contentHtml}</div>${s.pageNums!=='no'?foot:''}</div>`;
+  }
+  canvas.innerHTML=`<div class="mag-page" data-category="${esc(page.sec?.key || page.type)}" style="width:${w}px;height:${h}px;transform:scale(${scale});transform-origin:top center;"><div class="mag-page-inner">${inner}</div></div>`;
+  document.getElementById('previewPageTitle').textContent=`Page ${currentPageIdx+1} — ${page.sec?.label||page.type}`;
+}
+
+function prevPage(){if(currentPageIdx>0){currentPageIdx--;renderCurrentPage();updatePageNavUI();}}
+function nextPage(){if(currentPageIdx<magPages.length-1){currentPageIdx++;renderCurrentPage();updatePageNavUI();}}
+function updatePageNavUI(){const total=magPages.length||1;document.getElementById('pageNavInfo').textContent=`${currentPageIdx+1} / ${total}`;document.getElementById('btnPrevPage').disabled=currentPageIdx===0;document.getElementById('btnNextPage').disabled=currentPageIdx>=magPages.length-1;}
+
+/* TOC */
+function buildTOCItems(){const items=[];let pageNum=1;subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');const s=lsSettings;sectionOrder.filter(sec=>sec.visible).forEach(sec=>{if(sec.key==='cover'){pageNum++;return;}if(sec.key==='toc'){pageNum++;return;}const catSubs=approved.filter(sub=>sub.category===sec.key);if(sec.key==='editorial-note'||sec.key==='appreciation'){if(catSubs.length||approved.find(sub=>sub.category===sec.key)){items.push({num:items.length+1,name:getLabel('section_'+sec.key,sec.label),page:pageNum});pageNum++;}return;}if(!catSubs.length)return;items.push({num:items.length+1,name:getLabel('section_'+sec.key,sec.label),page:pageNum});let pp=1;if(sec.key==='teachers')pp=parseInt(s.teachersPerPage)||9;else if(['primary5','jss3','ss3'].includes(sec.key))pp=parseInt(s.studentsPerPage)||2;else if(sec.key==='speeches')pp=parseInt(s.speechesPerPage)||1;else if(sec.key==='gallery')pp=parseInt(s.galleryPerPage)||4;else if(sec.key==='creative')pp=parseInt(s.creativePerPage)||2;pageNum+=Math.ceil(catSubs.length/pp);});return items;}
+function renderTOC(){const c=document.getElementById('tocPreview');if(!c)return;const items=buildTOCItems();if(!items.length){c.innerHTML='<p style="color:var(--ink3);font-size:13px;">No approved content yet. Generate a preview first.</p>';return;}const s=lsSettings;const c1=s.color1||'#1a2744',c2=s.color2||'#7dd4a8';c.innerHTML=`<div style="max-width:500px;">${items.map(item=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed #e0e0d8;"><span style="font-size:12px;font-weight:700;color:${c2};width:24px;">${item.num}</span><span style="font-size:14px;color:var(--ink);flex:1;">${esc(item.name)}</span><span style="flex:1;border-bottom:1px dotted #ccc;height:14px;margin:0 6px;"></span><span style="font-size:12px;color:var(--ink3);font-weight:700;">p. ${item.page}</span></div>`).join('')}</div>`;}
+
+/* PRINT */
+function openPrintView(){
+  if(!magPages.length){alert('Please click "Generate Preview" first to build your magazine pages.');return;}
+  const s=lsSettings;
+  const ps=s.pageSize==='a4'?'A4':s.pageSize==='a5'?'A5':'letter';
+  const orient=s.orientation||'portrait';
+  const{w,h}=getPageDimensions();
+
+  /* Render every page to HTML by cycling through each page index */
+  const savedIdx=currentPageIdx;
+  let allPagesHtml='';
+  for(let i=0;i<magPages.length;i++){
+    currentPageIdx=i;
+    renderCurrentPage();
+    const pageEl=document.getElementById('magCanvas');
+    /* Strip the scale transform — print window uses real dimensions */
+    const inner=pageEl.innerHTML.replace(/transform:scale\([^)]+\);?/g,'').replace(/transform-origin:[^;]+;?/g,'');
+    allPagesHtml+=`<div class="mag-sheet">${inner}</div>`;
+  }
+  /* Restore original page */
+  currentPageIdx=savedIdx;
+  renderCurrentPage();
+  updatePageNavUI();
+
+  const win=window.open('','_blank','width=960,height=800');
+  if(!win){alert('Please allow popups for this site to open the print window.');return;}
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>${esc(s.magTitle||'The Torch')} — Print</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
+    body{background:#888;font-family:'Lato',sans-serif;}
+    @media print{
+      body{background:#fff;}
+      @page{size:${ps} ${orient};margin:0;}
+      .no-print{display:none!important;}
+      .mag-sheet{box-shadow:none!important;margin:0!important;page-break-after:always;}
+      .mag-sheet:last-child{page-break-after:auto;}
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
+    }
+    .no-print{
+      padding:16px 24px;text-align:center;background:#1a2744;color:#fff;
+      position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;
+    }
+    .no-print h2{font-size:16px;margin:0;}
+    .no-print button{
+      background:#7dd4a8;color:#1a2744;border:none;padding:10px 26px;
+      border-radius:999px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;
+    }
+    .no-print p{font-size:11px;color:#aaa;margin:0;}
+    .mag-sheet{
+      width:${w}px;height:${h}px;margin:24px auto;
+      box-shadow:0 4px 24px rgba(0,0,0,.35);overflow:hidden;
+      background:#fff;position:relative;
+    }
+    .mag-page{width:${w}px!important;height:${h}px!important;}
+    .mag-page-inner{width:100%;height:100%;overflow:hidden;}
+    img{max-width:100%;}
+    /* AI-injected styles carried to print */
+    ${(document.getElementById('ai-custom-css')?.textContent||'').replace(/</g,'\u003c')}
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <h2>🖨 ${esc(s.magTitle||'The Torch')} &mdash; ${magPages.length} pages</h2>
+    <button onclick="window.print()">Print / Save as PDF</button>
+    <p>Paper: ${ps} &middot; ${orient} &middot; Margins: None &middot; <strong>Enable Background graphics ✓</strong></p>
+  </div>
+  <div id="printPages">
+    ${allPagesHtml}
+  </div>
+</body>
+</html>`);
+  win.document.close();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AI PROOFREADER — Fix 2
+   • Scans ALL text fields from submission (not just one field)
+   • Inline edit box so editor can correct mistakes directly
+   • Retry with fallback model on 504/timeout
+   • Works from both admin and editor panels
+═══════════════════════════════════════════════════════════ */
+function extractAllText(s){
+  /* Gather ALL text-heavy fields from the submission */
+  const longFields=[];
+  Object.entries(s.data||{}).forEach(([k,fc])=>{
+    if(!fc||!fc.value)return;
+    const v=String(fc.value);
+    if(v.length>10)longFields.push({label:fc.label,key:k,value:v});
+  });
+  return longFields;
+}
+
+async function proofreadSubmission(subId){
+  /* Use string comparison to handle both uuid and numeric ids */
+  const allSubs=loadAll();
+  const s=allSubs.find(x=>String(x.id)===String(subId));if(!s)return;
+  const panel=document.getElementById('proof-result-'+subId);if(!panel)return;
+  const fields=extractAllText(s);
+  const combinedText=fields.map(f=>`[${f.label}]\n${f.value}`).join('\n\n---\n\n');
+  if(!combinedText.trim()){
+    panel.innerHTML='<p style="color:var(--ink3);font-size:13px;">No text content found in this submission to proofread.</p>';
+    panel.style.display='block';return;
+  }
+  await proofreadWithAI(combinedText,panel,subId,fields);
+}
+
+async function proofreadWithAI(text,panelEl,subId,fields){
+  const s=loadLsSettings();
+  const apiKey=s.apiKey;
+  if(!apiKey){
+    panelEl.innerHTML=`<div class="proofread-panel"><p class="proofread-panel-title">✦ AI Proofreading</p><p style="color:var(--red);font-size:13px;"><strong>No API key.</strong> Go to Layout Studio → Design Settings → AI Configuration.</p></div>`;
+    panelEl.style.display='block';return;
+  }
+  panelEl.innerHTML=`<div class="proofread-panel"><p class="proofread-panel-title">✦ AI Proofreading</p><div style="display:flex;align-items:center;gap:8px;"><div style="width:16px;height:16px;border:2px solid var(--purple);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></div><p class="proofread-loading">Reading all fields…</p></div></div>`;
+  panelEl.style.display='block';
+
+  /* Try Gemini 2.0 first, fall back to Claude Haiku on 504 */
+  const models=['google/gemini-2.0-flash-001','google/gemini-2.0-flash-lite-001','anthropic/claude-3-haiku'];
+  let result='';
+  for(const model of models){
+    try{
+      const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+          'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Proofread'},
+        body:JSON.stringify({
+          model,max_tokens:2500,
+          messages:[
+            {role:'system',content:'You are a professional editorial proofreader for a Nigerian school graduation magazine. Review ALL the text sections provided. For each section label, list: (1) spelling errors with corrections, (2) grammar issues with fixes, (3) punctuation problems, (4) awkward phrasing improvements. Format each issue as: ❌ Original: "..." → ✅ Correction: "..." with a brief reason. If a section is clean, say "✓ Clean". Be thorough but concise.'},
+            {role:'user',content:`Proofread all fields in this submission:\n\n${text.substring(0,4000)}`}
+          ]
+        })
+      });
+      if(resp.status===504||resp.status===503){throw new Error('timeout_'+resp.status);}
+      if(!resp.ok){const e=await resp.text();throw new Error(`HTTP ${resp.status}: ${e.substring(0,100)}`);}
+      const data=await resp.json();
+      if(data.error)throw new Error(data.error.message||'API error');
+      result=data.choices?.[0]?.message?.content||'';
+      if(result)break;/* success — stop trying models */
+    }catch(e){
+      if(model===models[models.length-1]||!e.message.startsWith('timeout_')){
+        /* Last model or non-timeout error */
+        if(!result)result=`Error with ${model}: ${e.message}`;
+      }
+      /* Otherwise try next model */
+    }
+  }
+  if(!result)result='No response from AI. Please try again.';
+
+  /* Build edit boxes for each field */
+  let editBoxes='';
+  if(subId&&fields&&fields.length){
+    editBoxes=`<div style="margin-top:16px;border-top:1px solid var(--school-mint2);padding-top:14px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--school-navy);margin-bottom:10px;">✏️ Direct Edit — Apply Corrections Below</div>
+      ${fields.map(f=>`
+        <div style="margin-bottom:12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;">${esc(f.label)}</div>
+          <textarea id="edit-${subId}-${f.key}" style="width:100%;min-height:80px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Lato',sans-serif;resize:vertical;background:#fafaf8;">${esc(f.value)}</textarea>
+        </div>`).join('')}
+      <button onclick="saveProofreadEdits('${subId}')" style="background:var(--school-navy);color:#fff;border:none;padding:10px 22px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;">💾 Save Corrections</button>
+      <span id="saveProofStatus-${subId}" style="font-size:12px;color:var(--green);margin-left:10px;"></span>
     </div>`;
   }
 
-  canvas.style.width = w+'px';
-  canvas.style.height = h+'px';
-  canvas.style.transform = `scale(${scale})`;
-  canvas.innerHTML = inner;
+  panelEl.innerHTML=`<div class="proofread-panel">
+    <div class="proofread-panel-title">✦ AI Proofreading — ${result.includes('Error')?'Error':'Gemini 2.0 Flash'}</div>
+    <div class="proofread-result" style="white-space:pre-line;max-height:400px;overflow-y:auto;">${esc(result)}</div>
+    <p style="font-size:11px;color:var(--ink3);margin-top:10px;font-style:italic;">⚠️ AI suggestions are advisory only. Use the edit boxes below to apply corrections directly.</p>
+    ${editBoxes}
+  </div>`;
+  panelEl.style.display='block';
 }
 
-function updatePageNavUI(){
-  const pi=document.getElementById('pageIndicator');
-  if(pi)pi.textContent=`Page ${magPages.length?currentPageIdx+1:0} of ${magPages.length}`;
-}
-function prevPage(){if(currentPageIdx>0){currentPageIdx--;renderCurrentPage();updatePageNavUI();}}
-function nextPage(){if(currentPageIdx<magPages.length-1){currentPageIdx++;renderCurrentPage();updatePageNavUI();}}
-function wsZoom(val){const canvas=document.getElementById('magCanvas');const{w}=getPageDimensions();const scale=Math.min(val,(window.innerWidth-20)/w);canvas.style.transform=`scale(${scale})`;}
-
-function buildTOCItems(){
-  const items=[];let pageNum=3;
-  sectionOrder.filter(s=>s.visible&&!['cover','toc'].includes(s.key)).forEach(sec=>{
-    const approved=loadAll().filter(sub=>sub.category===sec.key&&(sub.status==='approved'||sub.status==='finalized'));
-    if(!approved.length&&!['editorial-note','appreciation'].includes(sec.key))return;
-    const lbl=getLabel('section_'+sec.key,sec.label);
-    items.push({num:items.length+1,name:lbl,page:pageNum});
-    if(['editorial-note','appreciation','speeches'].includes(sec.key))pageNum+=1;
-    else{const perPage=(sec.key==='teachers')?(parseInt(lsSettings.teachersPerPage)||9):(['primary5','jss3','ss3'].includes(sec.key))?(parseInt(lsSettings.studentsPerPage)||2):1;pageNum+=Math.ceil(approved.length/perPage);}
+async function saveProofreadEdits(subId){
+  const statusEl=document.getElementById(`saveProofStatus-${subId}`);
+  const allSubs=loadAll();
+  const sub=allSubs.find(x=>String(x.id)===String(subId));
+  if(!sub){if(statusEl)statusEl.textContent='Error: submission not found.';return;}
+  /* Find all edit boxes for this submission and update data */
+  Object.keys(sub.data).forEach(k=>{
+    const ta=document.getElementById(`edit-${subId}-${k}`);
+    if(ta&&sub.data[k]){sub.data[k].value=ta.value;}
   });
-  return items;
+  sub.ts=new Date().toLocaleString();/* update timestamp */
+  saveAll(allSubs);
+  if(statusEl)statusEl.textContent='Saving…';
+  await dbSaveSubmission(sub);
+  if(statusEl){statusEl.textContent='✓ Corrections saved!';setTimeout(()=>{statusEl.textContent='';},3000);}
+  /* Refresh the view */
+  if(document.getElementById('viewEditor')?.classList.contains('active'))renderEditor();
+  if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
 }
-function renderTOC(){/* uses logic inside renderCurrentPage */}
 
-/* AI ASSISTANT */
+
+/* AI CHAT HELPERS */
+function addAIChatMessage(role,text,html){
+  aiChatHistory.push({role,text,html,time:new Date().toLocaleTimeString()});
+  renderAIChatHistory();
+}
+function renderAIChatHistory(){
+  const box=document.getElementById('aiChatHistory');if(!box)return;
+  if(!aiChatHistory.length){box.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:2rem 1rem;">Start a conversation with the AI about your magazine design.</div>';return;}
+  box.innerHTML=aiChatHistory.map((m,i)=>{
+    if(m.role==='user')return`<div style="margin-bottom:10px;text-align:right;"><div style="display:inline-block;background:var(--school-navy);color:#fff;padding:8px 12px;border-radius:12px 12px 2px 12px;font-size:13px;max-width:85%;text-align:left;">${m.html||esc(m.text)}</div><div style="font-size:10px;color:var(--ink3);margin-top:2px;">${esc(m.time)}</div></div>`;
+    return`<div style="margin-bottom:10px;"><div style="display:inline-block;background:#f0fdf6;border:1px solid var(--school-mint2);padding:10px 14px;border-radius:12px 12px 12px 2px;font-size:13px;max-width:90%;color:var(--ink);">${m.html||esc(m.text)}</div><div style="font-size:10px;color:var(--ink3);margin-top:2px;">${esc(m.time)}</div></div>`;
+  }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+function clearAIChat(){aiChatHistory=[];aiPendingSuggestion=null;renderAIChatHistory();document.getElementById('aiReviewBox').style.display='none';document.getElementById('aiAssistResult').style.display='none';document.getElementById('btnApplyLayout').style.display='none';}
+function approveAISuggestion(){
+  if(aiPendingSuggestion){applyLayoutFromObject(aiPendingSuggestion,document.getElementById('aiApplyLog'));aiPendingSuggestion=null;document.getElementById('aiReviewBox').style.display='none';}
+}
+function rejectAISuggestion(){aiPendingSuggestion=null;document.getElementById('aiReviewBox').style.display='none';addAIChatMessage('assistant','Suggestion rejected. What would you like to change?');}
+
+/* LAYOUT AI — enhanced conversational with formatting control */
+async function runLayoutAI(){
+  const queryEl=document.getElementById('aiAssistQuery');const resultEl=document.getElementById('aiAssistResult');
+  const applyBtn=document.getElementById('btnApplyLayout');const applyLog=document.getElementById('aiApplyLog');
+  const reviewBox=document.getElementById('aiReviewBox');const reviewText=document.getElementById('aiReviewText');
+  if(!queryEl||!resultEl)return;
+  const query=queryEl.value.trim();
+  if(!query){alert('Please type a message first.');return;}
+  queryEl.value='';
+  const s=loadLsSettings();const apiKey=s.apiKey;const model=s.layoutModel||'google/gemini-2.0-flash-001';const maxTokens=parseInt(s.maxTokens)||2000;
+  if(!apiKey){addAIChatMessage('assistant','<strong style="color:var(--red);">No API key configured.</strong> Go to Design Settings → AI Configuration.');renderAIChatHistory();return;}
+
+  /* Add user message to chat */
+  addAIChatMessage('user',query);
+  if(applyLog){applyLog.style.display='none';applyLog.innerHTML='';}
+
+  /* Show thinking indicator */
+  const thinkingIdx=aiChatHistory.length;
+  aiChatHistory.push({role:'assistant',text:'',html:'<em style="color:var(--ink3);">✦ Thinking…</em>',time:''});
+  renderAIChatHistory();
+
+  subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');
+  const counts=CATEGORY_KEYS.map(k=>`  ${CATEGORIES[k].label}: ${approved.filter(x=>x.category===k).length} approved`).join('\n');
+  const ctx=`MAGAZINE: ${s.magTitle||'The Torch'} | ${s.schoolName||'Way To Success Standard Schools'} | ${s.edition||'1st Edition'} ${s.year||'2025/2026'} | Theme: ${s.theme||'—'}
+APPROVED CONTENT:\n${counts}
+LAYOUT: Page: ${s.pageSize||'A4'} ${s.orientation||'portrait'} | Teachers/page: ${s.teachersPerPage||9} | Students/page: ${s.studentsPerPage||2} | Gallery/page: ${s.galleryPerPage||4} | Speeches/page: ${s.speechesPerPage||1} | Creative/page: ${s.creativePerPage||2}
+COLOURS: Primary: ${s.color1||'#1a2744'} | Accent: ${s.color2||'#7dd4a8'} | Contrast: ${s.color3||'#8b1a1a'} | Page BG: ${s.pageBg||'#ffffff'} | Text: ${s.textColor||'#1c1c1e'}
+TYPOGRAPHY: Heading: ${s.headingFont||'Playfair Display'} | Body: ${s.bodyFont||'Crimson Text'} | Size: ${s.fontSize||'11px'}
+CURRENT STYLES: Headers use heading font. Body uses body font. No special formatting like bold headers or all-caps is currently applied unless you set it.`;
+
+  /* Build messages array with chat history for context */
+  const messages=[];
+  messages.push({role:'system',content:`You are a professional magazine designer and layout AI assistant for a Nigerian school graduation magazine. You have a CONVERSATIONAL style — chat naturally, ask clarifying questions, and build on previous messages.
+
+YOUR CAPABILITIES:
+1. Layout & pagination (items per page, orientation, page size)
+2. Colour scheme design (suggest hex codes for primary, accent, contrast, background, text)
+3. Typography (heading font, body font, size)
+4. FORMATTING & CSS CONTROL — IMPORTANT: You have absolute power over the layout structure using CSS injection!
+   • Use [FORMAT:customCSS:...css...] to inject CSS rules dynamically.
+   • The DOM uses semantic classes: .mag-item, .mag-item-name, .mag-item-subtitle, .mag-item-photo, .mag-item-fields, .mag-item-body.
+   • Target specific sections using the data attribute: .mag-page[data-category="creative"], .mag-page[data-category="teachers"], etc.
+   • Example to hide subtitles on creative page and put name below content: [FORMAT:customCSS:.mag-page[data-category="creative"] .mag-item-subtitle { display: none; } .mag-page[data-category="creative"] .mag-item-creative { display: flex; flex-direction: column-reverse; }]
+   • Reorganize, hide, or restyle elements—you have the power.
+5. Magazine identity (title, school name, edition, theme)
+6. Review submissions and suggest section ordering
+
+FORMATTING COMMANDS (include in your response when user asks for style changes):
+Use these exact commands anywhere in your response:
+• [FORMAT:customCSS:...css string...] — injects arbitrary CSS to restructure or restyle the preview
+• [FORMAT:headerBold:true] — makes section headers bold
+• [FORMAT:headerCaps:true] — makes section headers ALL CAPS
+• [FORMAT:headerColor:#1a2744] — changes header colour
+• [FORMAT:bodyBold:false] — toggles body text bold
+• [FORMAT:bodySize:11px] — changes body font size
+
+SETTINGS JSON: When you recommend specific layout/colour/type changes, end your response with:
+\`\`\`settings
+{"teachersPerPage":9,"color1":"#1a2744","color2":"#7dd4a8",...}
+\`\`\`
+Include ONLY settings you want to change. All available keys: teachersPerPage, studentsPerPage, galleryPerPage, speechesPerPage, creativePerPage, orientation, pageSize, pageNums, autoTrim, color1, color2, color3, pageBg, textColor, headingFont, bodyFont, fontSize, magTitle, schoolName, edition, year, theme.
+
+fontSize options: "10px"|"11px"|"12px"|"13px". pageSize options: "a4"|"a5"|"letter". headingFont options: "'Playfair Display',serif"|"Georgia,serif"|"'Times New Roman',serif"|"'Lato',sans-serif". bodyFont options: "'Crimson Text',serif"|"'Lato',sans-serif"|"Georgia,serif".
+
+BE CONVERSATIONAL: If the user says "remove the headers only shows the title on the top and the writer name below", generate the [FORMAT:customCSS:...] rule to achieve it AND explain what you changed. Do NOT auto-apply JSON settings — wait for user confirmation. (Formatting commands apply instantly).
+
+Context:
+${ctx}`});
+
+  /* Add previous chat history (last 6 exchanges for context) */
+  const recentHistory=aiChatHistory.slice(-12,-1).filter(m=>m.text);
+  recentHistory.forEach(m=>{
+    if(m.role==='user')messages.push({role:'user',content:m.text});
+    else messages.push({role:'assistant',content:m.text});
+  });
+
+  messages.push({role:'user',content:query});
+
+  try{
+    /* Try the selected model first */
+    const models=[model,'google/gemini-2.0-flash-001','anthropic/claude-3-haiku'];
+    let result='';
+    let lastErr;
+    for(const tryModel of models){
+      try{
+        const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+            'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Layout AI'},
+          body:JSON.stringify({model:tryModel,max_tokens:maxTokens,messages})});
+        if(!resp.ok){const txt=await resp.text();throw new Error(`HTTP ${resp.status}: ${txt.substring(0,100)}`);}
+        const data=await resp.json();
+        if(data.error)throw new Error(data.error.message||'API error');
+        result=data.choices?.[0]?.message?.content||'';
+        if(result)break;
+      }catch(e){lastErr=e;if(tryModel===models[models.length-1])throw e;}
+    }
+
+    /* Remove thinking indicator */
+    aiChatHistory.splice(thinkingIdx,1);
+
+    /* Parse formatting commands from response */
+    let displayText=result;
+    const formatCommands={};
+    const fmtRegex=/\[FORMAT:(\w+):([\s\S]*?)\]/g;
+    let fmtMatch;
+    while((fmtMatch=fmtRegex.exec(result))!==null){formatCommands[fmtMatch[1]]=fmtMatch[2];}
+    displayText=displayText.replace(/\[FORMAT:.*?\]/gs,'').trim();
+
+    /* Extract settings JSON block */
+    const settingsMatch=displayText.match(/\`\`\`settings\s*([\s\S]*?)\`\`\`/i);
+    const adviceText=displayText.replace(/\`\`\`settings[\s\S]*?\`\`\`/gi,'').trim();
+
+    /* Store suggestion for review */
+    if(settingsMatch){
+      try{
+        aiPendingSuggestion=JSON.parse(settingsMatch[1].trim());
+        if(reviewBox&&reviewText){
+          reviewText.innerHTML=esc(adviceText).replace(/\n/g,'<br>');
+          reviewBox.style.display='block';
+        }
+        if(applyBtn)applyBtn.style.display='inline-flex';
+      }catch(e){aiPendingSuggestion=null;}
+    }else{aiPendingSuggestion=null;if(reviewBox)reviewBox.style.display='none';}
+
+    /* Apply formatting commands immediately (these are safe styling changes) */
+    const fmtChanges=[];
+    if(Object.keys(formatCommands).length){
+      const s2=loadLsSettings();
+      if(formatCommands.customCSS){
+        const aiStyle = document.getElementById('ai-custom-css');
+        if(aiStyle) aiStyle.textContent = formatCommands.customCSS;
+        fmtChanges.push('Injected Custom CSS structure updates');
+      }
+      if(formatCommands.headerColor&&/^#[0-9a-fA-F]{3,8}$/.test(formatCommands.headerColor)){s2.color1=formatCommands.headerColor;document.getElementById('ls-color1').value=formatCommands.headerColor;fmtChanges.push('Header colour → '+formatCommands.headerColor);}
+      if(formatCommands.bodySize&&['10px','11px','12px','13px'].includes(formatCommands.bodySize)){s2.fontSize=formatCommands.bodySize;document.getElementById('ls-fontSize').value=formatCommands.bodySize;fmtChanges.push('Body size → '+formatCommands.bodySize);}
+      if(fmtChanges.length){
+        saveLsSettingsToStorage(s2);lsSettings=s2;applyLsColors(s2);
+        if(applyLog){applyLog.innerHTML='✅ Applied formatting: '+fmtChanges.join(', ');applyLog.style.display='block';}
+      }
+    }
+
+    window._lastAILayoutResponse=displayText;
+    const htmlResponse=esc(adviceText).replace(/\n/g,'<br>')+(fmtChanges.length?`<br><br><em style="color:var(--green);">✓ Formatting applied: ${fmtChanges.join(', ')}</em>`:'')+(settingsMatch?'<br><br><strong style="color:var(--amber);">⚡ Layout suggestion ready — review below before applying.</strong>':'');
+    addAIChatMessage('assistant',adviceText||result,htmlResponse);
+    renderAIChatHistory();
+
+  }catch(e){
+    aiChatHistory.splice(thinkingIdx,1);
+    addAIChatMessage('assistant','<strong style="color:var(--red);">Error:</strong> '+esc(e.message));
+    renderAIChatHistory();
+  }
+}
+/* Apply directly from a parsed settings object */
+function applyLayoutFromObject(obj,logEl){
+  const s=loadLsSettings();
+  const changes=[];
+  const setIfChanged=(key,uiId,valid,newVal)=>{
+    const snapped=valid?valid.reduce((a,b)=>Math.abs(b-Number(newVal))<Math.abs(a-Number(newVal))?b:a):newVal;
+    if(String(snapped)!==String(s[key])){
+      s[key]=String(snapped);
+      const el=document.getElementById(uiId);if(el)el.value=String(snapped);
+      changes.push(`✅ ${uiId.replace('ls-','')} → ${snapped}`);
+    }
+  };
+  /* Pagination */
+  if(obj.teachersPerPage!=null)setIfChanged('teachersPerPage','ls-teachersPerPage',[6,9,12,15],obj.teachersPerPage);
+  if(obj.studentsPerPage!=null)setIfChanged('studentsPerPage','ls-studentsPerPage',[1,2,3,4],obj.studentsPerPage);
+  if(obj.galleryPerPage!=null)setIfChanged('galleryPerPage','ls-galleryPerPage',[2,4,6,9],obj.galleryPerPage);
+  if(obj.speechesPerPage!=null)setIfChanged('speechesPerPage','ls-speechesPerPage',[1,2],obj.speechesPerPage);
+  if(obj.creativePerPage!=null)setIfChanged('creativePerPage','ls-creativePerPage',[1,2,3],obj.creativePerPage);
+  /* Page format */
+  if(obj.orientation&&['portrait','landscape'].includes(obj.orientation)&&obj.orientation!==s.orientation){
+    s.orientation=obj.orientation;const el=document.getElementById('ls-orientation');if(el)el.value=obj.orientation;
+    changes.push(`✅ Orientation → ${obj.orientation}`);
+  }
+  if(obj.pageSize&&['a4','a5','letter'].includes(obj.pageSize)&&obj.pageSize!==s.pageSize){
+    s.pageSize=obj.pageSize;const el=document.getElementById('ls-pageSize');if(el)el.value=obj.pageSize;
+    changes.push(`✅ Page size → ${obj.pageSize.toUpperCase()}`);
+  }
+  if(obj.pageNums&&obj.pageNums!==s.pageNums){
+    s.pageNums=obj.pageNums;const el=document.getElementById('ls-pageNums');if(el)el.value=obj.pageNums;
+    changes.push(`✅ Page numbers → ${obj.pageNums}`);
+  }
+  if(obj.autoTrim&&obj.autoTrim!==s.autoTrim){
+    s.autoTrim=obj.autoTrim;const el=document.getElementById('ls-autoTrim');if(el)el.value=obj.autoTrim;
+    changes.push(`✅ Auto-trim → ${obj.autoTrim}`);
+  }
+  /* ── COLOURS ── */
+  const colorMap={color1:'ls-color1',color2:'ls-color2',color3:'ls-color3',pageBg:'ls-pageBg',textColor:'ls-textColor'};
+  Object.entries(colorMap).forEach(([key,uiId])=>{
+    if(obj[key]&&/^#[0-9a-fA-F]{3,8}$/.test(obj[key])&&obj[key]!==s[key]){
+      s[key]=obj[key];const el=document.getElementById(uiId);if(el)el.value=obj[key];
+      changes.push(`✅ ${key} → ${obj[key]}`);
+    }
+  });
+  /* ── TYPOGRAPHY ── */
+  const fontOpts=["'Playfair Display',serif","Georgia,serif","'Times New Roman',serif","'Lato',sans-serif"];
+  const bodyFontOpts=["'Crimson Text',serif","'Lato',sans-serif","Georgia,serif"];
+  const fontSizeOpts=["10px","11px","12px","13px"];
+  if(obj.headingFont&&fontOpts.includes(obj.headingFont)&&obj.headingFont!==s.headingFont){
+    s.headingFont=obj.headingFont;const el=document.getElementById('ls-headingFont');if(el)el.value=obj.headingFont;
+    changes.push(`✅ Heading font → ${obj.headingFont}`);
+  }
+  if(obj.bodyFont&&bodyFontOpts.includes(obj.bodyFont)&&obj.bodyFont!==s.bodyFont){
+    s.bodyFont=obj.bodyFont;const el=document.getElementById('ls-bodyFont');if(el)el.value=obj.bodyFont;
+    changes.push(`✅ Body font → ${obj.bodyFont}`);
+  }
+  if(obj.fontSize&&fontSizeOpts.includes(obj.fontSize)&&obj.fontSize!==s.fontSize){
+    s.fontSize=obj.fontSize;const el=document.getElementById('ls-fontSize');if(el)el.value=obj.fontSize;
+    changes.push(`✅ Font size → ${obj.fontSize}`);
+  }
+  /* ── IDENTITY ── */
+  const identityMap={magTitle:'ls-magTitle',schoolName:'ls-schoolName',location:'ls-location',edition:'ls-edition',year:'ls-year',theme:'ls-theme'};
+  Object.entries(identityMap).forEach(([key,uiId])=>{
+    if(obj[key]&&String(obj[key]).trim()&&String(obj[key])!==String(s[key]||'')){
+      s[key]=String(obj[key]);const el=document.getElementById(uiId);if(el)el.value=String(obj[key]);
+      changes.push(`✅ ${key} → ${obj[key]}`);
+    }
+  });
+  if(!changes.length){
+    if(logEl){logEl.innerHTML='ℹ️ Settings already match AI recommendation — no changes needed.';logEl.style.display='block';}
+    return;
+  }
+  saveLsSettingsToStorage(s);lsSettings=s;
+  applyLsColors(s);/* Apply colour changes to UI immediately */
+  if(logEl){
+    logEl.innerHTML=`<strong>⚡ Auto-applied ${changes.length} setting${changes.length>1?'s':''}:</strong><br><br>${changes.join('<br>')}<br><br>🔄 Regenerating preview…`;
+    logEl.style.display='block';
+  }
+  setTimeout(()=>{
+    generateMagPreview();
+    if(logEl)logEl.innerHTML=logEl.innerHTML.replace('🔄 Regenerating preview…','✅ Preview updated!');
+  },500);
+}
+
+/* ── APPLY LAYOUT SUGGESTIONS ENGINE ─────────────────────────────────────────
+   Reads the last AI response, extracts actionable settings using keyword
+   matching and number detection, applies them to lsSettings, updates all
+   UI dropdowns, and regenerates the preview automatically.
+─────────────────────────────────────────────────────────────────────────────── */
+function applyLayoutSuggestions(){
+  /* If there's a pending parsed suggestion, apply it directly */
+  if(aiPendingSuggestion){applyLayoutFromObject(aiPendingSuggestion,document.getElementById('aiApplyLog'));aiPendingSuggestion=null;document.getElementById('aiReviewBox').style.display='none';return;}
+  const text=window._lastAILayoutResponse||'';
+  if(!text){alert('No AI response to apply. Ask the AI a question first.');return;}
+  const logEl=document.getElementById('aiApplyLog');
+  const s=loadLsSettings();
+  const changes=[];
+
+  /* ── Number extractor helper ── */
+  function extractNum(pattern){
+    const m=text.match(pattern);
+    if(m){const n=parseInt(m[1]||m[2]);if(!isNaN(n))return n;}
+    return null;
+  }
+
+  /* ── 1. Teachers per page ── */
+  const teacherMatch=extractNum(/(\d+)[- ]?(?:teachers?|staff|profiles?)\s*(?:per|a|each)?\s*page/i)
+    ||extractNum(/(?:teachers?|staff)\s*(?:per|a|each)\s*page[:\s]+(\d+)/i)
+    ||extractNum(/(\d+)x(\d+)\s*grid/i);
+  if(teacherMatch){
+    const valid=[6,9,12,15];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-teacherMatch)<Math.abs(a-teacherMatch)?b:a);
+    if(String(snapped)!==String(s.teachersPerPage)){
+      s.teachersPerPage=String(snapped);
+      const el=document.getElementById('ls-teachersPerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Teachers per page → ${snapped}`);
+    }
+  }
+
+  /* ── 2. Students per page ── */
+  const studentMatch=extractNum(/(\d+)[- ]?(?:students?|graduates?|pupils?)\s*(?:per|a|each)?\s*page/i)
+    ||extractNum(/(?:students?|graduates?)\s*(?:per|a|each)\s*page[:\s]+(\d+)/i);
+  if(studentMatch){
+    const valid=[1,2,3,4];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-studentMatch)<Math.abs(a-studentMatch)?b:a);
+    if(String(snapped)!==String(s.studentsPerPage)){
+      s.studentsPerPage=String(snapped);
+      const el=document.getElementById('ls-studentsPerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Students per page → ${snapped}`);
+    }
+  }
+
+  /* ── 3. Gallery photos per page ── */
+  const galleryMatch=extractNum(/(\d+)[- ]?(?:photos?|images?|pictures?)\s*(?:per|a|each)?\s*page/i)
+    ||extractNum(/(?:gallery|photos?)\s*(?:per|a|each)\s*page[:\s]+(\d+)/i);
+  if(galleryMatch){
+    const valid=[2,4,6,9];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-galleryMatch)<Math.abs(a-galleryMatch)?b:a);
+    if(String(snapped)!==String(s.galleryPerPage)){
+      s.galleryPerPage=String(snapped);
+      const el=document.getElementById('ls-galleryPerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Gallery photos per page → ${snapped}`);
+    }
+  }
+
+  /* ── 4. Speeches per page ── */
+  const speechMatch=extractNum(/(\d+)[- ]?speeches?\s*(?:per|a|each)?\s*page/i);
+  if(speechMatch){
+    const valid=[1,2];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-speechMatch)<Math.abs(a-speechMatch)?b:a);
+    if(String(snapped)!==String(s.speechesPerPage)){
+      s.speechesPerPage=String(snapped);
+      const el=document.getElementById('ls-speechesPerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Speeches per page → ${snapped}`);
+    }
+  }
+
+  /* ── 5. Creative items per page ── */
+  const creativeMatch=extractNum(/(\d+)[- ]?(?:creative|poem|stor(?:y|ies)|joke|riddle)\s*(?:items?)?\s*(?:per|a|each)?\s*page/i);
+  if(creativeMatch){
+    const valid=[1,2,3];
+    const snapped=valid.reduce((a,b)=>Math.abs(b-creativeMatch)<Math.abs(a-creativeMatch)?b:a);
+    if(String(snapped)!==String(s.creativePerPage)){
+      s.creativePerPage=String(snapped);
+      const el=document.getElementById('ls-creativePerPage');if(el)el.value=String(snapped);
+      changes.push(`✅ Creative items per page → ${snapped}`);
+    }
+  }
+
+  /* ── 6. Page orientation ── */
+  if(/\blandscape\b/i.test(text)&&s.orientation!=='landscape'){
+    s.orientation='landscape';
+    const el=document.getElementById('ls-orientation');if(el)el.value='landscape';
+    changes.push('✅ Orientation → Landscape');
+  } else if(/\bportrait\b/i.test(text)&&s.orientation!=='portrait'){
+    s.orientation='portrait';
+    const el=document.getElementById('ls-orientation');if(el)el.value='portrait';
+    changes.push('✅ Orientation → Portrait');
+  }
+
+  /* ── 7. Page size ── */
+  if(/\bA5\b/i.test(text)&&s.pageSize!=='a5'){
+    s.pageSize='a5';const el=document.getElementById('ls-pageSize');if(el)el.value='a5';
+    changes.push('✅ Page size → A5');
+  } else if(/\bA4\b/i.test(text)&&s.pageSize!=='a4'){
+    s.pageSize='a4';const el=document.getElementById('ls-pageSize');if(el)el.value='a4';
+    changes.push('✅ Page size → A4');
+  } else if(/\b(?:letter|US letter)\b/i.test(text)&&s.pageSize!=='letter'){
+    s.pageSize='letter';const el=document.getElementById('ls-pageSize');if(el)el.value='letter';
+    changes.push('✅ Page size → Letter');
+  }
+
+  /* ── 8. Show/hide page numbers ── */
+  if(/\bpage numbers?\b.*\b(?:hide|remove|off|no)\b|\b(?:hide|remove|turn off|disable)\b.*page numbers?/i.test(text)&&s.pageNums!=='no'){
+    s.pageNums='no';const el=document.getElementById('ls-pageNums');if(el)el.value='no';
+    changes.push('✅ Page numbers → Hidden');
+  } else if(/\b(?:show|add|enable|include)\b.*page numbers?|page numbers?.*\b(?:show|on|yes)\b/i.test(text)&&s.pageNums==='no'){
+    s.pageNums='yes';const el=document.getElementById('ls-pageNums');if(el)el.value='yes';
+    changes.push('✅ Page numbers → Visible');
+  }
+
+  /* ── 9. Auto-trim long text ── */
+  if(/\b(?:full text|no trim|don.t trim|show full|don.t cut|complete text)\b/i.test(text)&&s.autoTrim!=='no'){
+    s.autoTrim='no';const el=document.getElementById('ls-autoTrim');if(el)el.value='no';
+    changes.push('✅ Auto-trim → Off (full text shown)');
+  }
+
+  /* ── Save & regenerate ── */
+  if(!changes.length){
+    if(logEl){
+      logEl.innerHTML='ℹ️ <strong>No specific settings detected</strong> in the AI response.<br>The AI gave general advice. Try asking something more specific like:<br>"How many teachers per page for 30 teachers?" or "Should I use landscape for the gallery?"';
+      logEl.style.display='block';
+    }
+    return;
+  }
+
+  saveLsSettingsToStorage(s);
+  lsSettings=s;
+
+  if(logEl){
+    logEl.innerHTML=`<strong>⚡ Applied ${changes.length} change${changes.length>1?'s':''}:</strong><br><br>${changes.join('<br>')}<br><br>🔄 Regenerating preview…`;
+    logEl.style.display='block';
+  }
+
+  /* Regenerate preview after short delay so user can read the log */
+  setTimeout(()=>{
+    generateMagPreview();
+    if(logEl){
+      logEl.innerHTML=logEl.innerHTML.replace('🔄 Regenerating preview…','✅ Preview updated! Scroll up to see your magazine.');
+    }
+  },600);
+}
+function renderAIContentSummary(){const el=document.getElementById('aiContentSummary');if(!el)return;subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');el.textContent=CATEGORY_KEYS.map(k=>`${CATEGORIES[k].label}: ${approved.filter(x=>x.category===k).length} approved`).join('\n')+`\n\nTotal approved: ${approved.length} | Total submitted: ${subs.length}`;renderAIChatHistory();}
+
+/* EXPORTS */
+function slugify(s){return(s||'unknown').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').substring(0,40)||'unknown';}
+function submissionToText(s,num){const cat=CATEGORIES[s.category]||EDITORIAL_META[s.category]||{label:s.category};let txt=`SUBMISSION${num?' #'+num:''}\nCategory: ${cat.label}\nStatus: ${s.status.toUpperCase()}\nSubmitted: ${s.ts}\n`;if(s.reviewerNote)txt+=`Editor's Note: ${s.reviewerNote}\n`;txt+='\n';Object.entries(s.data).forEach(([,fc])=>{txt+=`${fc.label}: ${fc.value||'Not provided'}\n`;});return txt;}
+function extractAllPhotos(s,prefix){const results=[];const nameSlug=slugify(s.data.name?.value||s.data.eventName?.value||s.data.submitterName?.value||'unknown');if(s.photoData&&!s.photos){const m=/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/.exec(s.photoData);if(m){const ext=m[1].toLowerCase()==='jpeg'?'jpg':m[1].toLowerCase();results.push({filename:`${prefix}_${nameSlug}.${ext}`,base64:m[2]});}}if(Array.isArray(s.photos)&&s.photos.length){s.photos.forEach((p,i)=>{const m=/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/.exec(p.data||'');if(m){const ext=m[1].toLowerCase()==='jpeg'?'jpg':m[1].toLowerCase();results.push({filename:`${prefix}_${nameSlug}_photo${String(i+1).padStart(2,'0')}.${ext}`,base64:m[2]});}});}return results;}
+function exportOneSubmission(id){const s=loadAll().find(x=>String(x.id)===String(id));if(!s)return;if(typeof JSZip==='undefined'){alert('ZIP library not loaded.');return;}const zip=new JSZip();const nameField=s.data.name?.value||s.data.speakerName?.value||s.data.contribName?.value||s.data.reporterName?.value||s.data.authorName?.value||s.data.intervieweeName?.value||s.data.submitterName?.value||s.data.eventName?.value||s.data.title?.value||'unknown';const slug=slugify(nameField);const allPhotos=extractAllPhotos(s,'01');const catLabel=CATEGORIES[s.category]?.label||EDITORIAL_META[s.category]?.label||s.category;let txt=`${catLabel.toUpperCase()} — SINGLE EXPORT\nExported: ${new Date().toLocaleString()}\n\n${'='.repeat(55)}\n\n`;txt+=submissionToText(s);let photoList='(no photo provided)';if(allPhotos.length){photoList=allPhotos.map(p=>p.filename).join(', ');const pf=zip.folder('photos');allPhotos.forEach(p=>pf.file(p.filename,p.base64,{base64:true}));}txt+=`PHOTO FILE(S): ${photoList}\n`;zip.file('submission.txt',txt);zip.generateAsync({type:'blob'}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${s.category}_${slug}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}).catch(err=>alert('Export failed: '+err.message));}
+function exportCurrentCategory(){subs=loadAll();const cat=currentAdminCat==='all'?null:currentAdminCat;let list;if(cat==='editorial')list=subs.filter(s=>s.category==='editorial-note'||s.category==='appreciation');else list=cat?subs.filter(s=>s.category===cat):subs;if(!list.length){alert('Nothing to export.');return;}const catLabel=cat==='editorial'?'EDITORIAL PIECES':cat?(CATEGORIES[cat]?.label||cat).toUpperCase()+' — CATEGORY EXPORT':'ALL SUBMISSIONS EXPORT';exportZip(list,cat?`${cat}_export`:'all_submissions',catLabel);}
+function exportMasterMagazine(){subs=loadAll();const list=subs.filter(s=>s.status==='approved'||s.status==='finalized');if(!list.length){alert('No approved or finalized content yet.');return;}exportZipByCategory(list,'master_magazine','MASTER MAGAZINE EXPORT — Approved & Finalized Content Only');}
+function exportZip(list,filename,heading){if(typeof JSZip==='undefined'){alert('ZIP library not loaded.');return;}const zip=new JSZip();const pf=zip.folder('photos');let txt=`${heading}\nExported: ${new Date().toLocaleString()}\nTotal: ${list.length}\n\n${'='.repeat(55)}\n\n`;let manifest=`MANIFEST — ${heading}\n\n`;list.forEach((s,i)=>{const num=String(i+1).padStart(2,'0');const photos=extractAllPhotos(s,num);let pl='(no photo provided)';if(photos.length){pl=photos.map(p=>p.filename).join(', ');photos.forEach(p=>pf.file(p.filename,p.base64,{base64:true}));}txt+=submissionToText(s,i+1);txt+=`PHOTO FILE(S): ${pl}\n\n${'-'.repeat(40)}\n\n`;manifest+=`#${i+1}  [${s.category}]  →  ${pl}\n`;});zip.file('submissions.txt',txt);zip.file('manifest.txt',manifest);zip.generateAsync({type:'blob'}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${filename}_${new Date().toISOString().slice(0,10)}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}).catch(err=>alert('Export failed: '+err.message));}
+function exportZipByCategory(list,filename,heading){if(typeof JSZip==='undefined'){alert('ZIP library not loaded.');return;}const zip=new JSZip();let overview=`${heading}\nExported: ${new Date().toLocaleString()}\nTotal: ${list.length}\n\n${'='.repeat(55)}\n\n`;const ag=zip.folder('_auto_photo_gallery');let gm='AUTO-GATHERED PHOTO GALLERY\n\n';[...CATEGORY_KEYS,'editorial-note','appreciation'].forEach(ck=>{const cl=list.filter(s=>s.category===ck);if(!cl.length)return;const catLabel=CATEGORIES[ck]?.label||EDITORIAL_META[ck]?.label||ck;const folder=zip.folder(ck);const photos=folder.folder('photos');let catTxt=`${catLabel.toUpperCase()}\nTotal: ${cl.length}\n\n${'='.repeat(55)}\n\n`;cl.forEach((s,i)=>{const num=String(i+1).padStart(2,'0');const allPhotos=extractAllPhotos(s,num);let pl='(no photo provided)';if(allPhotos.length){pl=allPhotos.map(p=>p.filename).join(', ');allPhotos.forEach(p=>{photos.file(p.filename,p.base64,{base64:true});ag.file(`${ck}_${p.filename}`,p.base64,{base64:true});const n=s.data.name?.value||s.data.eventName?.value||'unknown';gm+=`${ck}_${p.filename}  —  ${catLabel}  —  ${n}\n`;});}catTxt+=submissionToText(s,i+1);catTxt+=`PHOTO FILE(S): ${pl}\n\n${'-'.repeat(40)}\n\n`;});folder.file(`${ck}.txt`,catTxt);overview+=`${catLabel}: ${cl.length} submissions\n`;});ag.file('_MANIFEST.txt',gm);zip.file('README.txt',overview);zip.generateAsync({type:'blob'}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${filename}_${new Date().toISOString().slice(0,10)}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}).catch(err=>alert('Export failed: '+err.message));}
+
+/* SHARE LINKS */
+function getBaseUrl(){try{return window.location.origin+window.location.pathname;}catch(e){return'';}}
+function copyShareLink(formKey){const base=getBaseUrl();const url=formKey===''?base:`${base}?form=${formKey}`;try{navigator.clipboard.writeText(url);const btn=document.getElementById('copy-'+(formKey||'landing'));if(btn){const orig=btn.textContent;btn.textContent='✓ Copied!';btn.style.background='var(--green)';btn.style.color='#fff';setTimeout(()=>{btn.textContent=orig;btn.style.background='';btn.style.color='';},1600);}}catch(e){alert('URL: '+url);}}
+function renderShareLinks(){const c=document.getElementById('shareLinksContainer');if(!c)return;const base=getBaseUrl();const entries=[{key:'',label:'Landing Page (all forms)',icon:'🏠',desc:'Full homepage with all category cards'},...CATEGORY_KEYS.map(k=>({key:k,label:getLabel('cat_label_'+k,CATEGORIES[k].label),icon:CATEGORIES[k].icon,desc:`Submission form for ${CATEGORIES[k].label}`}))];c.innerHTML=entries.map(e=>{const url=e.key===''?base:`${base}?form=${e.key}`;return`<div class="share-link-row"><div class="share-link-icon">${e.icon}</div><div class="share-link-body"><div class="share-link-label">${esc(e.label)}</div><div class="share-link-desc">${esc(e.desc)}</div><div class="share-link-url">${esc(url)}</div></div><button class="btn btn-primary" id="copy-${e.key||'landing'}" onclick="copyShareLink('${e.key}')">Copy</button></div>`;}).join('');}
+
+/* ═══════════════════════════════════════════════════════════
+   WORKSPACE ENGINE — VS Code-style Design Studio
+   Only finalized submissions enter the workspace.
+═══════════════════════════════════════════════════════════ */
+let wsPages=[],wsPageIdx=0,wsZoom=100,wsShowGuides=true,wsSpreadMode=false;
+let wsAIChatHistory=[],wsAISampleBase64=null,wsAISampleMime=null;
+let wsUndoStack=[],wsRedoStack=[],wsAutoSaveTimer=null;
+
+/* ── Open / Close ── */
+function openWorkspace(){
+  subs=loadAll();
+  const finalized=subs.filter(s=>s.status==='finalized');
+  const s=lsSettings;
+  document.getElementById('wsProjectTitle').textContent=(s.magTitle||'The Torch')+' — Design Workspace';
+  show('viewWorkspace');
+  wsRenderColorPanel();
+  wsRenderFontPanel();
+  wsRenderAssets();
+  wsGeneratePreview();
+  wsStartAutoSave();
+  document.getElementById('wsStatusFinalized').textContent=finalized.length+' finalized';
+}
+function closeWorkspace(){
+  wsClearAutoSave();
+  show('viewAdmin');
+  renderAdmin();
+}
+
+/* ── Generate Preview (finalized only) ── */
+function wsGeneratePreview(){
+  subs=loadAll();
+  wsPages=[];wsPageIdx=0;
+  const s=lsSettings;
+  const finalized=subs.filter(sub=>sub.status==='approved'||sub.status==='finalized');
+  document.getElementById('wsStatusFinalized').textContent=finalized.length+' approved';
+
+  sectionOrder.filter(sec=>sec.visible).forEach(sec=>{
+    if(sec.key==='cover'){wsPages.push({type:'cover',sec,label:'Cover Page'});return;}
+    if(sec.key==='toc'){wsPages.push({type:'toc',sec,label:'Table of Contents'});return;}
+    const catSubs=finalized.filter(sub=>sub.category===sec.key);
+    if(sec.key==='editorial-note'){const sub=finalized.find(sub=>sub.category==='editorial-note');if(sub)wsPages.push({type:'editorial-note',sub,sec,label:'Editorial Note'});return;}
+    if(sec.key==='appreciation'){const sub=finalized.find(sub=>sub.category==='appreciation');if(sub)wsPages.push({type:'appreciation',sub,sec,label:'Appreciation'});return;}
+    if(!catSubs.length)return;
+    let perPage=1;
+    if(sec.key==='teachers')perPage=parseInt(s.teachersPerPage)||9;
+    else if(['primary5','jss3','ss3'].includes(sec.key))perPage=parseInt(s.studentsPerPage)||2;
+    else if(sec.key==='speeches')perPage=parseInt(s.speechesPerPage)||1;
+    else if(sec.key==='gallery')perPage=parseInt(s.galleryPerPage)||4;
+    else if(sec.key==='creative')perPage=parseInt(s.creativePerPage)||2;
+    for(let i=0;i<catSubs.length;i+=perPage){
+      wsPages.push({type:'section-content',sec,items:catSubs.slice(i,i+perPage),isFirst:i===0,pageInSection:Math.floor(i/perPage)+1,label:getLabel('section_'+sec.key,sec.label)+(i>0?' (p'+(Math.floor(i/perPage)+1)+')':'')});
+    }
+  });
+
+  wsRenderPageList();
+  wsRenderCurrentPage();
+  wsUpdateNavUI();
+  document.getElementById('wsStatusPages').textContent=wsPages.length+' pages';
+}
+
+/* ── Page List (Left Sidebar) ── */
+function wsRenderPageList(){
+  const c=document.getElementById('wsPageList');if(!c)return;
+  if(!wsPages.length){c.innerHTML='<div style="font-size:11px;color:var(--ws-text3);text-align:center;padding:16px;">No finalized content yet.<br>Finalize submissions from the admin panel.</div>';return;}
+  c.innerHTML=wsPages.map((p,i)=>{
+    const icon=p.type==='cover'?'📕':p.type==='toc'?'📑':p.sec?.icon||'📄';
+    return `<div class="ws-page-item${i===wsPageIdx?' active':''}" onclick="wsSelectPage(${i})">
+      <div class="ws-page-thumb">${icon}</div>
+      <div class="ws-page-info">
+        <div class="ws-page-info-name">${esc(p.label||p.type)}</div>
+        <div class="ws-page-info-meta">Page ${i+1}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Page Navigation ── */
+function wsSelectPage(idx){
+  if(idx<0||idx>=wsPages.length)return;
+  wsPageIdx=idx;
+  wsRenderPageList();
+  wsUpdateNavUI();
+  const el = document.getElementById('ws-page-'+idx);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function wsPrevPage(){if(wsPageIdx>0)wsSelectPage(wsPageIdx-1);}
+function wsNextPage(){if(wsPageIdx<wsPages.length-1)wsSelectPage(wsPageIdx+1);}
+function wsUpdateNavUI(){
+  document.getElementById('wsPageNavInfo').textContent=wsPages.length?`${wsPageIdx+1} / ${wsPages.length}`:'— / —';
+  document.getElementById('wsBtnPrev').disabled=wsPageIdx<=0;
+  document.getElementById('wsBtnNext').disabled=wsPageIdx>=wsPages.length-1;
+}
+
+/* ── Render Current Page in Canvas ── */
+function wsRenderCurrentPage(){
+  const container=document.getElementById('wsPageContainer');
+  if(!wsPages.length){
+    container.innerHTML='<div class="ws-empty"><div class="ws-empty-icon">🛠</div><h3>No pages yet</h3><p>Finalize submissions in the Production Admin, then click <strong>Generate</strong> to build your magazine preview.</p></div>';
+    return;
+  }
+  const origIdx=currentPageIdx;const origPages=magPages;
+  magPages=wsPages;
+  const{w,h}=getPageDimensions();
+  const scale=(wsZoom/100);
+
+  const tempCanvas=document.createElement('div');
+  tempCanvas.id='magCanvas';tempCanvas.style.display='none';
+  document.body.appendChild(tempCanvas);
+
+  let allPagesHtml='';
+  const guidesHtml=wsShowGuides?`
+    <div class="ws-bleed"></div>
+    <div class="ws-safe"></div>
+    <div class="ws-crop-tl"></div><div class="ws-crop-tr"></div>
+    <div class="ws-crop-bl"></div><div class="ws-crop-br"></div>
+    <div class="ws-guide-label bleed-label">BLEED 3mm</div>
+    <div class="ws-guide-label safe-label">SAFE AREA</div>
+  `:'';
+
+  for(let i=0;i<wsPages.length;i++){
+    currentPageIdx=i;
+    renderCurrentPage();
+    const pageHtml=tempCanvas.innerHTML;
+    allPagesHtml+=`<div class="ws-mag-page ${wsShowGuides?'ws-guides':''}" id="ws-page-${i}" style="width:${w}px;height:${h}px;transform:scale(${scale}); margin-bottom: 24px;">
+      ${guidesHtml}
+      <div class="ws-mag-page-inner">${pageHtml}</div>
+    </div>`;
+  }
+
+  document.body.removeChild(tempCanvas);
+  magPages=origPages;currentPageIdx=origIdx;
+
+  container.innerHTML=allPagesHtml;
+}
+
+/* ── Zoom ── */
+function wsSetZoom(level){
+  wsZoom=Math.max(25,Math.min(200,level));
+  document.getElementById('wsZoomLevel').textContent=wsZoom+'%';
+  document.getElementById('wsStatusZoom').textContent=wsZoom+'%';
+  wsRenderCurrentPage();
+}
+
+/* ── Guides Toggle ── */
+function wsToggleGuides(){
+  wsShowGuides=!wsShowGuides;
+  document.getElementById('wsGuidesBtn').textContent=wsShowGuides?'☑ Guides':'☐ Guides';
+  wsRenderCurrentPage();
+}
+
+/* ── Spread View ── */
+function wsToggleSpread(){
+  wsSpreadMode=!wsSpreadMode;
+  document.getElementById('wsSpreadBtn').textContent=wsSpreadMode?'⊞ Single':'⊞ Spread';
+  wsRenderCurrentPage();
+}
+
+/* ── Sidebar Panel Toggle ── */
+function wsTogglePanel(id){document.getElementById(id)?.classList.toggle('collapsed');}
+
+/* ── Assets Panel ── */
+function wsRenderAssets(){
+  const grid=document.getElementById('wsAssetGrid');if(!grid)return;
+  const empty=document.getElementById('wsAssetEmpty');
+  const finalized=loadAll().filter(s=>s.status==='finalized');
+  const photos=[];
+  finalized.forEach(s=>{
+    if(s.photoData)photos.push(s.photoData);
+    if(Array.isArray(s.photos))s.photos.forEach(p=>{if(p.data)photos.push(p.data);});
+  });
+  if(!photos.length){grid.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  grid.innerHTML=photos.slice(0,30).map((url,i)=>`<div class="ws-asset-thumb" title="Asset ${i+1}"><img src="${url}" alt="Asset ${i+1}"/></div>`).join('');
+}
+
+/* ── Color Panel ── */
+function wsRenderColorPanel(){
+  if(!document.getElementById('wsColorPanel'))return;
+  const c=document.getElementById('wsColorPanel');if(!c)return;
+  const s=lsSettings;
+  const colors=[
+    {key:'color1',label:'Primary',val:s.color1||'#1a2744'},
+    {key:'color2',label:'Accent',val:s.color2||'#7dd4a8'},
+    {key:'color3',label:'Highlight',val:s.color3||'#8b1a1a'},
+    {key:'pageBg',label:'Page Background',val:s.pageBg||'#ffffff'},
+    {key:'textColor',label:'Text Color',val:s.textColor||'#1c1c1e'}
+  ];
+  c.innerHTML=colors.map(cl=>`<div class="ws-color-row">
+    <input type="color" class="ws-color-swatch" value="${cl.val}" onchange="wsUpdateColor('${cl.key}',this.value)" style="background:${cl.val};"/>
+    <span class="ws-color-label">${cl.label}</span>
+    <span class="ws-color-val">${cl.val}</span>
+  </div>`).join('');
+}
+function wsUpdateColor(key,val){
+  wsUndoPush();
+  lsSettings[key]=val;
+  saveLsSettingsToStorage(lsSettings);
+  applyLsColors(lsSettings);
+  wsRenderColorPanel();
+  wsRenderCurrentPage();
+  wsMarkDirty();
+}
+
+/* ── Font Panel ── */
+function wsRenderFontPanel(){
+  if(!document.getElementById('wsFontSize'))return;
+  const s=lsSettings;
+  const hf=document.getElementById('wsHeadingFont');if(hf)hf.value=s.headingFont||"'Playfair Display',serif";
+  const bf=document.getElementById('wsBodyFont');if(bf)bf.value=s.bodyFont||"'Crimson Text',serif";
+  const fs=document.getElementById('wsFontSize');if(fs)fs.value=s.fontSize||'11px';
+}
+function wsUpdateFont(key,val){
+  wsUndoPush();
+  lsSettings[key]=val;
+  saveLsSettingsToStorage(lsSettings);
+  wsRenderCurrentPage();
+  wsMarkDirty();
+}
+
+/* ── Undo / Redo ── */
+function wsUndoPush(){wsUndoStack.push(JSON.stringify(lsSettings));if(wsUndoStack.length>30)wsUndoStack.shift();wsRedoStack=[];}
+function wsUndo(){
+  if(!wsUndoStack.length)return;
+  wsRedoStack.push(JSON.stringify(lsSettings));
+  lsSettings=JSON.parse(wsUndoStack.pop());
+  saveLsSettingsToStorage(lsSettings);
+  applyLsColors(lsSettings);
+  wsRenderColorPanel();wsRenderFontPanel();wsRenderCurrentPage();
+}
+function wsRedo(){
+  if(!wsRedoStack.length)return;
+  wsUndoStack.push(JSON.stringify(lsSettings));
+  lsSettings=JSON.parse(wsRedoStack.pop());
+  saveLsSettingsToStorage(lsSettings);
+  applyLsColors(lsSettings);
+  wsRenderColorPanel();wsRenderFontPanel();wsRenderCurrentPage();
+}
+
+/* ── Autosave ── */
+function wsStartAutoSave(){wsClearAutoSave();wsAutoSaveTimer=setInterval(()=>{wsAutoSave();},30000);}
+function wsClearAutoSave(){if(wsAutoSaveTimer){clearInterval(wsAutoSaveTimer);wsAutoSaveTimer=null;}}
+function wsAutoSave(){
+  saveLsSettingsToStorage(lsSettings);
+  dbSaveSettings('ls_settings',lsSettings);
+  const ind=document.getElementById('wsSaveIndicator');
+  if(ind){ind.textContent='● Saved';ind.style.color='var(--ws-green)';ind.style.animation='none';setTimeout(()=>{ind.style.animation='';},100);}
+}
+function wsMarkDirty(){
+  const ind=document.getElementById('wsSaveIndicator');
+  if(ind){ind.textContent='○ Unsaved';ind.style.color='var(--ws-yellow)';}
+}
+
+/* ── AI Terminal ── */
+function wsAIAddMsg(role,text,html){
+  wsAIChatHistory.push({role,text:text||'',html:html||'',time:new Date().toLocaleTimeString()});
+  wsAIRenderChat();
+}
+function wsAIRenderChat(){
+  const box=document.getElementById('wsAIChat');if(!box)return;
+  if(!wsAIChatHistory.length){box.innerHTML='<div class="ws-ai-msg system">Start a conversation — describe what you want to change.</div>';return;}
+  box.innerHTML=wsAIChatHistory.map(m=>{
+    const content=m.html||esc(m.text);
+    if(m.role==='system')return `<div class="ws-ai-msg system">${content}</div>`;
+    return `<div class="ws-ai-msg ${m.role}">${content}<div class="ws-ai-msg-time">${m.time}</div></div>`;
+  }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+function wsAIQuick(cmd){document.getElementById('wsAIInput').value=cmd;wsAISend();}
+
+/* ── AI Sample Upload ── */
+function wsAIUploadSample(event){
+  const file=event.target.files?.[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    wsAISampleBase64=e.target.result.split(',')[1];
+    wsAISampleMime=file.type||'image/jpeg';
+    document.getElementById('wsAISampleImg').src=e.target.result;
+    document.getElementById('wsAISamplePreview').style.display='block';
+    wsAIAddMsg('system','📎 Design sample uploaded — reference it with "Match the uploaded sample style"');
+  };
+  reader.readAsDataURL(file);
+  event.target.value='';
+}
+
+/* ── AI Send Message ── */
 async function wsAISend(){
-  const input=document.getElementById('wsAIInput');const text=input.value.trim();if(!text)return;
-  wsAIAddMsg('user',text);input.value='';
-  const statusEl=wsAIAddMsg('assistant','Thinking…',null,true);
+  const input=document.getElementById('wsAIInput');
+  const query=(input?.value||'').trim();if(!query)return;
+  input.value='';
+  const s=lsSettings;
+  const apiKey=s.apiKey;
+  const model=document.getElementById('wsAIModel')?.value||'google/gemini-2.0-flash-001';
+  const task=document.getElementById('wsAITask')?.value||'design';
+
+  if(!apiKey){wsAIAddMsg('assistant','','<strong style="color:var(--ws-red);">No API key.</strong> Configure it in Production Admin → Settings → Layout Studio → AI Configuration.');return;}
+
+  wsAIAddMsg('user',query);
+
+  /* Thinking indicator */
+  const thinkIdx=wsAIChatHistory.length;
+  wsAIChatHistory.push({role:'assistant',text:'',html:'<em style="color:var(--ws-text3);">✦ Thinking…</em>',time:''});
+  wsAIRenderChat();
+
+  /* Build context */
+  const finalized=loadAll().filter(x=>x.status==='finalized');
+  const counts=CATEGORY_KEYS.map(k=>`  ${CATEGORIES[k].label}: ${finalized.filter(x=>x.category===k).length}`).join('\n');
+  const ctx=`MAGAZINE: ${s.magTitle||'The Torch'} | ${s.schoolName||'Way To Success Standard Schools'} | ${s.edition||'1st Edition'} ${s.year||'2025/2026'}
+FINALIZED CONTENT:\n${counts}
+TOTAL FINALIZED: ${finalized.length}
+COLOURS: Primary:${s.color1||'#1a2744'} Accent:${s.color2||'#7dd4a8'} Highlight:${s.color3||'#8b1a1a'} PageBG:${s.pageBg||'#fff'} Text:${s.textColor||'#1c1c1e'}
+TYPOGRAPHY: Heading:${s.headingFont||'Playfair Display'} Body:${s.bodyFont||'Crimson Text'} Size:${s.fontSize||'11px'}
+CURRENT PAGE: ${wsPageIdx+1} of ${wsPages.length} — ${wsPages[wsPageIdx]?.label||'none'}`;
+
+  const taskPrompts={
+    design:`You are an AGENT controlling a magazine design system. You MUST directly implement changes by outputting [FORMAT:customCSS:...] and settings JSON blocks in EVERY response. Do NOT just suggest — EXECUTE.
+
+RULES:
+1. ALWAYS include a [FORMAT:customCSS:...] block with CSS that directly implements your design changes.
+2. ALWAYS include a settings JSON block to change colours, fonts, spacing.
+3. Explain what you changed BRIEFLY, then show the implementation.
+4. You are the sole design controller — the user has no manual design tools.
+5. Make designs PREMIUM: rich colours, elegant typography, professional spacing.
+6. For print magazines use CMYK-friendly colours, high contrast, proper margins.`,
+    reasoning:'You are a production strategist. Analyze the magazine structure, content balance, page count, and help optimize the overall layout for cost-effective printing. Output settings JSON to implement any changes.',
+    proofread:'You are a professional proofreader for a Nigerian school graduation magazine. Check grammar, spelling, punctuation across all finalized content.',
+    image:`You are a design analyst AND agent. Analyze the uploaded design sample image, describe its style, then REPLICATE it by outputting [FORMAT:customCSS:...] and settings JSON blocks. Do not just describe — implement the style directly.`
+  };
+
+  const messages=[{role:'system',content:`${taskPrompts[task]||taskPrompts.design}
+
+FORMATTING COMMANDS (you MUST include these in every design response):
+\u2022 [FORMAT:customCSS:...css...] \u2014 inject CSS to restyle the magazine preview. This is MANDATORY for design tasks.
+\u2022 [FORMAT:action:approveAll] \u2014 Approve all pending submissions
+\u2022 [FORMAT:action:finalizeCategory:teachers] \u2014 Finalize approved submissions in a category (e.g. teachers, primary5, gallery)
+\u2022 [FORMAT:action:setSectionOrder:cover,toc,editorial-note,teachers,...] \u2014 Reorder the magazine sections
+\u2022 Target sections: .mag-page[data-category="teachers"], .mag-page[data-category="creative"], etc.
+\u2022 Classes: .mag-item, .mag-item-name, .mag-item-subtitle, .mag-item-photo, .mag-item-fields, .mag-item-body
+\u2022 Page structure: .mag-page > .mag-page-inner contains all content
+
+SETTINGS JSON (you MUST include this to change layout settings):
+\`\`\`settings
+{"color1":"#hex","teachersPerPage":9,...}
+\`\`\`
+Available keys: teachersPerPage, studentsPerPage, galleryPerPage, speechesPerPage, creativePerPage, orientation, pageSize, pageNums, autoTrim, color1, color2, color3, pageBg, textColor, headingFont, bodyFont, fontSize, magTitle, schoolName, edition, year, theme.
+
+You are an AGENT. Every response MUST contain at least one [FORMAT:customCSS:...] or settings block. Never respond with only text suggestions.
+
+Context:\n${ctx}`}];
+
+  /* Add recent chat history */
+  wsAIChatHistory.slice(-10,-1).filter(m=>m.text&&m.role!=='system').forEach(m=>{
+    messages.push({role:m.role,content:m.text});
+  });
+
+  /* Build user message — include image if available and task is image analysis */
+  if(wsAISampleBase64&&(task==='image'||query.toLowerCase().includes('sample')||query.toLowerCase().includes('match'))){
+    messages.push({role:'user',content:[
+      {type:'image_url',image_url:{url:`data:${wsAISampleMime};base64,${wsAISampleBase64}`}},
+      {type:'text',text:query}
+    ]});
+  } else {
+    messages.push({role:'user',content:query});
+  }
+
   try{
-    const s=lsSettings;const approved=loadAll().filter(sub=>sub.status==='approved'||sub.status==='finalized');
-    const systemPrompt=`You are MagicEditor Layout Assistant. You help the production team build a school magazine.
-Current Project: ${s.magTitle} for ${s.schoolName} (${s.edition}, ${s.year}).
-Approved submissions: ${approved.length}.
-Sections: ${sectionOrder.map(so=>so.label).join(', ')}.
-Key Settings: Theme=${s.theme}, Colors=${s.color1}/${s.color2}, Page Size=${s.pageSize}.
-
-Rules:
-1. Be professional, creative, and concise.
-2. If asked to summarize content for a foreword, use the approved submissions.
-3. If asked to suggest a color palette or font, provide specific hex codes or font names.
-4. If asked to help with section ordering, suggest a logical flow.
-5. Provide actionable advice for print quality.`;
-    const response=await callAI(systemPrompt,text);
-    statusEl.innerHTML=esc(response).replace(/\n/g,'<br>');
-    aiChatHistory.push({role:'assistant',content:response});
-  }catch(e){statusEl.innerHTML='<span style="color:var(--ws-red);">Error: '+esc(e.message)+'</span>';}
-}
-function wsAIAddMsg(role,content,html,isPending){
-  const chat=document.getElementById('wsAIChat');
-  const div=document.createElement('div');
-  div.className='ws-ai-msg '+role;
-  if(html)div.innerHTML=html;else div.textContent=content;
-  chat.appendChild(div);chat.scrollTop=chat.scrollHeight;
-  if(!isPending)aiChatHistory.push({role,content});
-  return div;
-}
-function renderAIChatHistory(){const chat=document.getElementById('wsAIChat');chat.innerHTML='<div class="ws-ai-msg system">✦ I am your Layout Assistant. I can help you organize sections, summarize content for the foreword, or proofread submissions.</div>';aiChatHistory.forEach(m=>wsAIAddMsg(m.role,m.content));}
-async function callAI(sys,prompt){
-  const key=lsSettings.apiKey;if(!key)throw new Error('API Key missing. Add it in Production Admin -> Settings.');
-  const model=lsSettings.layoutModel||'google/gemini-2.0-flash-001';
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-  const body={contents:[{role:'user',parts:[{text:sys+'\n\nUser request: '+prompt}]}],generationConfig:{maxOutputTokens:parseInt(lsSettings.maxTokens)||1000}};
-  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const json=await res.json();if(json.error)throw new Error(json.error.message);
-  return json.candidates[0].content.parts[0].text;
-}
-async function proofreadSubmission(id){
-  const s=loadAll().find(x=>x.id===id);if(!s)return;
-  const panelEl=document.getElementById('proof-result-'+id);
-  panelEl.style.display='block';panelEl.innerHTML='<div class="spinner-mini"></div> Proofreading with AI…';
-  const textToProof=Object.entries(s.data).filter(([,f])=>f.type==='textarea').map(([k,f])=>`${f.label}: ${f.value}`).join('\n\n');
-  if(!textToProof){panelEl.innerHTML='<div style="font-size:11px;color:var(--ink3);">No long-text fields to proofread.</div>';return;}
-  try{
-    const model=lsSettings.proofModel||'google/gemini-flash-1.5';
-    const sys=`You are a professional editorial proofreader for a school magazine.
-Proofread the following submission for grammar, spelling, punctuation, and tone.
-Provide:
-1. "Corrected Version" (the full text with improvements).
-2. "Key Changes" (briefly list what you fixed).
-Keep the original meaning and student's voice intact, just polish it for print.`;
-    const response=await callAI(sys,textToProof);
-    panelEl.innerHTML=`<div class="proof-box"><div class="proof-title">✦ AI Editorial Suggestion</div><div class="proof-body">${esc(response).replace(/\n/g,'<br>')}</div><button class="btn btn-mini" onclick="this.parentElement.parentElement.style.display='none'">Dismiss</button></div>`;
-  }catch(e){panelEl.innerHTML='<div style="color:var(--red);font-size:11px;">Proofread failed: '+esc(e.message)+'</div>';}
-}
-async function proofreadWithAI(text,panelEl,subId,fields){
-  panelEl.style.display='block';panelEl.innerHTML='<div class="spinner-mini"></div> Proofreading with AI…';
-  try{
-    const model=lsSettings.proofModel||'google/gemini-flash-1.5';
-    const sys=`You are a professional editorial proofreader for a school magazine.
-Proofread the following text for grammar, spelling, punctuation, and tone.
-Provide:
-1. "Corrected Version" (the full text with improvements).
-2. "Key Changes" (briefly list what you fixed).
-Keep the original meaning intact, just polish it for professional print.`;
-    const response=await callAI(sys,text);
-    panelEl.innerHTML=`<div class="proof-box"><div class="proof-title">✦ AI Editorial Suggestion</div><div class="proof-body">${esc(response).replace(/\n/g,'<br>')}</div><button class="btn btn-mini" onclick="this.parentElement.parentElement.style.display='none'">Dismiss</button></div>`;
-  }catch(e){panelEl.innerHTML='<div style="color:var(--red);font-size:11px;">Proofread failed: '+esc(e.message)+'</div>';}
-}
-
-function renderAIContentSummary(){/* can show summary of all submissions for the foreword */}
-
-/* ── Bulk Gallery Support ── */
-function buildGalleryTabs(){return`<div class="f-card"><div class="f-card-title">Photo Submission</div><div class="f-tabs"><button class="f-tab active" id="gtab-single" onclick="setGalleryTab('single')">Single Photo</button><button class="f-tab" id="gtab-bulk" onclick="setGalleryTab('bulk')">Bulk Upload</button></div><div id="gpane-single" class="gpane active"><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()"><input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/><div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>Select photo</h3><p>Click or drag & drop</p></div><div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><button class="photo-change" onclick="resetPhoto(event)">Change</button></div></div></div><div id="gpane-bulk" class="gpane" style="display:none;"><div class="photo-drop" id="photoDropBulk" onclick="document.getElementById('bulkInput').click()"><input type="file" id="bulkInput" accept=".jpg,.jpeg,.png,.webp" multiple onchange="handleBulkSelect(event)"/><div id="bulkPlaceholder"><span class="photo-drop-icon">📸</span><h3>Select multiple photos</h3><p>Tap to choose up to 10 photos</p></div><div id="bulkGrid" class="multi-photo-grid"></div></div><div class="photo-reqs"><p>Upload up to 10 photos at once. Captions can be added later in Admin.</p></div><button class="submit-btn" onclick="submitBulkGallery()" style="margin-top:1rem;">Upload All</button></div><div class="photo-err-msg" id="photoErrMsg"></div></div>`;}
-function setGalleryTab(tab){document.querySelectorAll('.f-tab').forEach(t=>t.classList.remove('active'));document.getElementById('gtab-'+tab).classList.add('active');document.querySelectorAll('.gpane').forEach(p=>p.style.display='none');document.getElementById('gpane-'+tab).style.display='block';const mainBtn=document.getElementById('mainSubmitBtn');if(mainBtn)mainBtn.style.display=tab==='bulk'?'none':'block';}
-function handleBulkSelect(e){const files=Array.from(e.target.files||[]);if(!files.length)return;bulkPhotos=files.slice(0,10);const grid=document.getElementById('bulkGrid');const ph=document.getElementById('bulkPlaceholder');ph.style.display='none';grid.innerHTML=bulkPhotos.map((f,i)=>`<div class="multi-photo-thumb"><div class="bulk-num">${i+1}</div><div style="font-size:10px;color:var(--ink3);">${esc(f.name)}</div></div>`).join('');}
-async function submitBulkGallery(){if(!bulkPhotos.length){alert('Select photos first.');return;}document.getElementById('gpane-bulk').style.display='none';document.getElementById('successWrap').style.display='block';document.getElementById('successUploading').style.display='block';const bar=document.getElementById('uploadProgressBar');const txt=document.getElementById('uploadProgressText');for(let i=0;i<bulkPhotos.length;i++){const f=bulkPhotos[i];const pct=Math.round(((i)/bulkPhotos.length)*100);if(bar)bar.style.width=pct+'%';if(txt)txt.textContent=`Uploading ${i+1} of ${bulkPhotos.length}: ${f.name}…`;const subId=genId();let url=null;try{url=await uploadToStorage(f,subId);}catch(e){console.warn('Bulk fail:',f.name);}const sub={id:subId,category:'gallery',ts:new Date().toLocaleString(),createdAt:Date.now(),status:'pending',reviewerNote:'',reviewedAt:null,data:{submitterName:{label:'Submitted by',value:'Bulk Upload'},photoCaption:{label:'Photo caption',value:f.name},photoCategory:{label:'Category',value:'Other'}},photoData:url,photoName:f.name};await dbSaveSubmission(sub);}if(bar)bar.style.width='100%';if(txt)txt.textContent='✓ All photos uploaded successfully!';setTimeout(()=>{document.getElementById('successUploading').style.display='none';document.getElementById('successDone').style.display='block';},800);}
-
-/* ── OCR Panel ── */
-function buildOCRPanel(k){
-  const ocrCats=['speeches','academic','motivational','creative'];
-  if(!ocrCats.includes(k))return'';
-  return`<div class="f-card ocr-card"><div class="f-card-title">✦ AI Text Assistant</div><p style="font-size:11px;color:var(--ink3);margin-bottom:12px;">Have a physical copy? Take a photo and let AI extract the text for you.</p><div style="display:flex;gap:10px;"><button class="btn btn-mini" onclick="document.getElementById('ocrInput').click()">📷 Snap / Upload Photo</button><input type="file" id="ocrInput" accept="image/*" style="display:none;" onchange="runOCR(event)"></div><div id="ocrStatus" style="font-size:11px;margin-top:8px;color:var(--school-mint);display:none;"></div></div>`;
-}
-async function runOCR(e){const file=e.target.files[0];if(!file)return;const st=document.getElementById('ocrStatus');st.textContent='✦ Reading text with AI…';st.style.display='block';try{const reader=new FileReader();reader.onload=async()=>{const base64=reader.result.split(',')[1];const key=lsSettings.apiKey;if(!key){st.textContent='✗ API key missing in Admin -> Settings';return;}const url=`https://generativelanguage.googleapis.com/v1beta/models/google/gemini-1.5-flash:generateContent?key=${key}`;const body={contents:[{parts:[{text:"Extract all text from this image. Return ONLY the extracted text, no commentary."},{inline_data:{mime_type:file.type,data:base64}}]}]};const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const json=await res.json();const text=json.candidates[0].content.parts[0].text;/* Auto-fill the largest textarea */const ta=document.querySelector('textarea.long');if(ta){ta.value=text;st.textContent='✓ Text extracted and filled!';}else{st.textContent='✓ Text extracted (see console)';console.log('OCR Result:',text);}};reader.readAsDataURL(file);}catch(e){st.textContent='✗ Extraction failed.';}}
-
-/* ── Labels System ── */
-function loadLabels(){try{return JSON.parse(localStorage.getItem('me_labels')||'{}');}catch(e){return{};}}
-function saveLabels(l){dbSaveSettings('labels',l);}
-let labelOverrides=loadLabels();
-function getLabel(key,fallback){return labelOverrides[key]||fallback;}
-
-/* ── Async init: pull cloud data on page load ── */
-async function initCloudSync(){
-  const statusEl = document.getElementById('bootLoadingStatus');
-  if(statusEl) statusEl.textContent = 'Syncing settings…';
-  showSync('syncing','Connecting to cloud…');
-  try{
-    /* Start Realtime listeners early */
-    initRealtime();
-
-    /* Pull settings first */
-    const settingsToLoad = ['cfg','ls_settings','labels','section_order','form_config'];
-    const results = await Promise.allSettled(settingsToLoad.map(k => dbLoadSettings(k)));
+    const modelsToTry = [model, 'google/gemini-2.0-flash-lite-001', 'anthropic/claude-3-haiku'];
+    let result = '';
+    let lastErr = null;
     
-    results.forEach((res, i) => {
-      const key = settingsToLoad[i];
-      if(res.status === 'fulfilled' && res.value){
-        const val = res.value;
-        if(key === 'cfg') cfg = val;
-        if(key === 'ls_settings') {
-          lsSettings = val;
-          applyLsColors(val);
-          applyCustomCategories(val);
-        }
-        if(key === 'labels') {
-          labelOverrides = val;
-          localStorage.setItem('me_labels', JSON.stringify(val));
-        }
-        if(key === 'section_order') {
-          sectionOrder = val;
-          localStorage.setItem('me_section_order', JSON.stringify(val));
-        }
-        if(key === 'form_config') {
-          formConfig = val;
-          localStorage.setItem('me_form_config', JSON.stringify(val));
+    for(const tryModel of modelsToTry){
+      try{
+        const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+            'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor Workspace AI'},
+          body:JSON.stringify({model:tryModel,max_tokens:4000,messages})
+        });
+        if(resp.status===504||resp.status===503){throw new Error('timeout_'+resp.status);}
+        if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.substring(0,120)}`);}
+        const data=await resp.json();
+        if(data.error)throw new Error(data.error.message||'API error');
+        result=data.choices?.[0]?.message?.content||'No response.';
+        if(result)break;
+      }catch(e){
+        lastErr = e;
+        if(tryModel===modelsToTry[modelsToTry.length-1] || !e.message.startsWith('timeout_')){
+          throw e;
         }
       }
-    });
+    }
 
-    /* Pull submissions */
-    if(statusEl) statusEl.textContent = 'Fetching submissions…';
-    subs=await dbLoadAll();
-    
-    console.log('[BOOT] Success. Settings and', subs.length, 'submissions loaded.');
+    /* Remove thinking indicator */
+    wsAIChatHistory.splice(thinkIdx,1);
+
+    /* Parse formatting commands */
+    const fmtCommands={};
+    const fmtRegex=/\[FORMAT:(\w+):([\s\S]*?)\]/g;
+    let fmtMatch;
+    while((fmtMatch=fmtRegex.exec(result))!==null)fmtCommands[fmtMatch[1]]=fmtMatch[2];
+    let displayText=result.replace(/\[FORMAT:.*?\]/gs,'').trim();
+
+    /* Extract settings JSON */
+    const settingsMatch=displayText.match(/```settings\s*([\s\S]*?)```/i);
+    const adviceText=displayText.replace(/```settings[\s\S]*?```/gi,'').trim();
+
+    /* Apply formatting commands */
+    const fmtChanges=[];
+    if(fmtCommands.customCSS){
+      const aiStyle=document.getElementById('ai-custom-css');
+      if(aiStyle)aiStyle.textContent=fmtCommands.customCSS;
+      fmtChanges.push('Injected CSS');
+    }
+
+    /* Process Action Commands */
+    if(fmtCommands.action){
+      const action = fmtCommands.action.trim();
+      if(action === 'approveAll'){
+        const allSubs = loadAll();
+        let changed = 0;
+        allSubs.forEach(s => { if(s.status==='pending'){ s.status='approved'; changed++; }});
+        if(changed){ saveAll(allSubs); fmtChanges.push(`Approved ${changed} submissions`); }
+      } else if(action.startsWith('finalizeCategory:')){
+        const cat = action.split(':')[1].trim();
+        const allSubs = loadAll();
+        let changed = 0;
+        allSubs.forEach(s => { if((s.category===cat || cat==='all') && s.status==='approved'){ s.status='finalized'; changed++; }});
+        if(changed){ saveAll(allSubs); fmtChanges.push(`Finalized ${changed} submissions in ${cat}`); }
+      } else if(action.startsWith('setSectionOrder:')){
+        const keys = action.split(':')[1].split(',').map(k=>k.trim());
+        const oldOrder = [...sectionOrder];
+        sectionOrder = keys.map(k => oldOrder.find(o => o.key === k)).filter(Boolean);
+        oldOrder.forEach(o => { if(!sectionOrder.find(s=>s.key===o.key)) sectionOrder.push(o); });
+        saveLsSettingsToStorage(lsSettings);
+        dbSaveSettings('section_order', sectionOrder);
+        fmtChanges.push('Reordered sections');
+      }
+    }
+
+    /* Apply settings if present */
+    if(settingsMatch){
+      try{
+        const obj=JSON.parse(settingsMatch[1].trim());
+        wsUndoPush();
+        applyLayoutFromObject(obj,null);
+        wsRenderColorPanel();wsRenderFontPanel();
+        fmtChanges.push('Applied '+Object.keys(obj).length+' settings');
+      }catch(e){}
+    }
+
+    if(fmtChanges.length){wsGeneratePreview();wsRenderCurrentPage();}
+
+    const htmlResp=esc(adviceText).replace(/\n/g,'<br>')+(fmtChanges.length?`<br><br><em style="color:var(--ws-green);">✓ ${fmtChanges.join(', ')}</em>`:'');
+    wsAIAddMsg('assistant',adviceText,htmlResp);
+
   }catch(e){
-    console.warn('[BOOT] Sync Error:',e.message);
-    throw e; /* rethrow for Promise.race */
+    wsAIChatHistory.splice(thinkIdx,1);
+    wsAIAddMsg('assistant','','<strong style="color:var(--ws-red);">Error:</strong> '+esc(e.message));
   }
 }
 
-function slugify(s){return s.toString().toLowerCase().trim().replace(/\s+/g,'-').replace(/[^\w-]+/g,'').replace(/--+/g,'-');}
+/* ── Export: Print-Ready PDF ── */
+function wsExportPrintPDF(){
+  /* Temporarily set magPages to workspace pages and use existing openPrintView */
+  const origPages=magPages;const origIdx=currentPageIdx;
+  magPages=wsPages;currentPageIdx=0;
+  openPrintView();
+  magPages=origPages;currentPageIdx=origIdx;
+}
 
-/* ── Export One (ZIP with JSON + Photo) ── */
-function exportOneSubmission(id){const s=loadAll().find(x=>x.id===id);if(!s)return;if(typeof JSZip==='undefined'){alert('ZIP library not loaded.');return;}const zip=new JSZip();zip.file('submission.json',JSON.stringify(s,null,2));const name=slugify(s.data.name?.value||s.id);if(s.photoData&&s.photoData.startsWith('data:')){const parts=s.photoData.split(',');const mime=parts[0].match(/:(.*?);/)[1];const ext=mime.split('/')[1];zip.file(`photo.${ext}`,parts[1],{base64:true});}zip.generateAsync({type:'blob'}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${s.category}_${name}.zip`;a.click();});}
+/* ── Export: Editable Package (SVG + JSON) ── */
+function wsExportEditable(){
+  if(typeof JSZip==='undefined'){alert('ZIP library not loaded.');return;}
+  const zip=new JSZip();
+  const s=lsSettings;
 
-/* ── Workspace / Layout Studio ── */
-let wsPages=[],wsZoomLevel=1.0,wsChatHistory=[];
-function openWorkspace(){enterAdmin();show('viewWorkspace');lsTab('preview');generateMagPreview();}
+  /* Project JSON */
+  const project={
+    version:'1.0',
+    title:s.magTitle||'The Torch',
+    school:s.schoolName||'Way To Success Standard Schools',
+    edition:s.edition||'1st Edition',
+    year:s.year||'2025/2026',
+    settings:s,
+    sectionOrder:sectionOrder,
+    pageCount:wsPages.length,
+    exportedAt:new Date().toISOString()
+  };
+  zip.file('project.json',JSON.stringify(project,null,2));
 
-/* ── AI Layout Assistant (Mock/Stub for logic) ── */
-function wsGeneratePreview(){generateMagPreview();}
+  /* Page data */
+  const pagesFolder=zip.folder('pages');
+  wsPages.forEach((p,i)=>{
+    const num=String(i+1).padStart(3,'0');
+    pagesFolder.file(`page_${num}.json`,JSON.stringify({
+      index:i,type:p.type,label:p.label||'',
+      section:p.sec?.key||'',
+      items:p.items?.map(it=>({id:it.id,category:it.category,data:it.data}))||[]
+    },null,2));
+  });
+
+  /* Finalized submissions */
+  const subsFolder=zip.folder('submissions');
+  const finalized=loadAll().filter(x=>x.status==='finalized');
+  finalized.forEach(sub=>{
+    subsFolder.file(`${sub.category}_${slugify(sub.data.name?.value||sub.id)}.json`,JSON.stringify(sub,null,2));
+  });
+
+  /* Labels & config */
+  zip.file('labels.json',JSON.stringify(labelOverrides,null,2));
+  zip.file('README.txt',`MagicEditor Editable Package\n${project.title} — ${project.school}\n${project.edition} ${project.year}\nExported: ${project.exportedAt}\n\nThis package contains:\n- project.json: Full project settings\n- pages/: Individual page data\n- submissions/: All finalized submissions\n- labels.json: Custom label overrides\n\nRe-import this package or edit submissions for manual press adjustments.`);
+
+  zip.generateAsync({type:'blob'}).then(blob=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`${slugify(s.magTitle||'magazine')}_editable_${new Date().toISOString().slice(0,10)}.zip`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  }).catch(err=>alert('Export failed: '+err.message));
+}
 
 /* UTILITY */
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -1563,46 +2832,36 @@ function purgeLocalCache(){
   },500);
 }
 
-/* HIDE BOOT OVERLAY — Guaranteed removal */
-function removeBootOverlay() {
-  const overlay = document.getElementById('bootLoadingOverlay');
-  if(!overlay) return;
-  console.log('[BOOT] Removing overlay...');
-  overlay.style.opacity = '0';
-  setTimeout(() => {
-    overlay.style.visibility = 'hidden';
-    overlay.style.display = 'none';
-  }, 500);
-}
-
 /* INIT */
 renderLandingCards();
 applyLsColors(lsSettings);
 const _pendingFormKey=checkUrlRouting();
 
-/* Boot cloud sync — forms from external links open AFTER settings are fetched */
+/* Boot cloud sync — waits for async Supabase CDN, then syncs settings & data */
 setTimeout(async () => {
-  console.log('[BOOT] Starting cloud sync...');
-  
-  // Show "Force Open" button after 5 seconds if still loading
-  const forceBtnTimer = setTimeout(() => {
-    const btn = document.getElementById('bootForceOpen');
-    if(btn) btn.style.display = 'block';
-  }, 5000);
+  console.log('[BOOT] Waiting for Supabase CDN...');
+  const statusEl = document.getElementById('bootLoadingStatus');
+  if(statusEl) statusEl.textContent = 'Loading libraries…';
 
   try {
-    /* Set a strict timeout for the entire boot process */
-    await Promise.race([
-      initCloudSync(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Boot timeout')), 8000))
-    ]);
-    console.log('[BOOT] Cloud sync finished.');
+    /* Wait for the async-loaded Supabase CDN (max 6s) */
+    const supaReady = await waitForSupabase(6000);
+    if(!supaReady){
+      console.warn('[BOOT] Supabase CDN did not load in time');
+      if(statusEl) statusEl.textContent = 'Cloud unavailable — opening offline';
+    } else {
+      console.log('[BOOT] Supabase CDN loaded. Starting cloud sync...');
+      /* Strict timeout for the entire sync process */
+      await Promise.race([
+        initCloudSync(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Boot timeout')), 8000))
+      ]);
+      console.log('[BOOT] Cloud sync finished.');
+    }
   } catch (e) {
     console.warn('[BOOT] Sync failed or timed out:', e.message);
     showSync('err', 'Running offline — check internet');
   } finally {
-    clearTimeout(forceBtnTimer);
-    
     try {
       /* If a ?form= link was shared externally, open it now with up-to-date cloud settings */
       if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey]){
@@ -1614,8 +2873,8 @@ setTimeout(async () => {
       console.error('[BOOT] Render error:', err.message);
     }
     
-    /* REMOVE OVERLAY REGARDLESS OF ERRORS */
-    removeBootOverlay();
+    /* REMOVE OVERLAY REGARDLESS OF ERRORS — uses the inline function from HTML */
+    if(typeof removeBootOverlay === 'function') removeBootOverlay();
   }
 }, 100);
 
