@@ -1,803 +1,172 @@
-/* MagicEditor v2.0 — Way To Success Standard Schools — 1st Edition 2025/2026 */
+/* 
+  MagicEditor v2.0 - Core Script
+  Way To Success Standard Schools 
+*/
 
-let CATEGORIES={
-  teachers:{label:'Teacher Profiles',tag:'Teachers',title:'Teacher Profile Submission',subtitle:'Share your journey and message to the graduating class.',icon:'👩‍🏫',photoRequired:true,fields:[
-    {id:'name',label:'Full name',type:'text',required:true,placeholder:'As it should appear in print'},
-    {id:'title',label:'Title / position',type:'text',required:true,placeholder:'e.g. Head of Mathematics Department'},
-    {id:'subject',label:'Subject(s) taught',type:'text',required:true,placeholder:'e.g. Mathematics, Further Mathematics'},
-    {id:'years',label:'Years at the school',type:'text',required:true,placeholder:'e.g. 8 years'},
-    {id:'qualification',label:'Highest qualification',type:'text',required:true,placeholder:'e.g. M.Sc. Mathematics'},
-    {id:'bio',label:'Short bio',type:'textarea',required:true,long:true,hint:'50–80 words about you'},
-    {id:'quote',label:'Favourite quote or motto',type:'textarea',required:false,hint:'Optional.'},
-    {id:'message',label:'Message to the graduating class',type:'textarea',required:true,long:true,hint:'30–50 words of wisdom or encouragement.'}
-  ]},
-  primary5:{label:'Primary 5 Graduates',tag:'Primary 5',title:'Primary 5 Graduate Profile',subtitle:'For pupils completing Primary 5 this year.',icon:'🧒',photoRequired:true,fields:[
-    {id:'name',label:'Full name',type:'text',required:true,placeholder:'As it should appear in print'},
-    {id:'nickname',label:'Nickname',type:'text',required:false,placeholder:'Optional'},
-    {id:'parents',label:"Parents' names",type:'text',required:false,placeholder:'Optional'},
-    {id:'favSubject',label:'Favourite subject',type:'text',required:true,placeholder:'e.g. English, Mathematics'},
-    {id:'ambition',label:'What I want to be',type:'text',required:true,placeholder:'e.g. Doctor, Pilot, Teacher'},
-    {id:'favActivity',label:'Favourite class activity',type:'text',required:false,placeholder:'Optional'},
-    {id:'hobbies',label:'Hobbies',type:'text',required:false,placeholder:'Optional'},
-    {id:'message',label:'A short message',type:'textarea',required:true,hint:'2–3 sentences.'},
-    {id:'quote',label:'Favourite quote',type:'textarea',required:false,hint:'Optional'}
-  ]},
-  jss3:{label:'JSS3 Graduates',tag:'JSS3',title:'JSS3 Graduate Profile',subtitle:'For students completing Junior Secondary 3 this year.',icon:'🎒',photoRequired:true,fields:[
-    {id:'name',label:'Full name',type:'text',required:true,placeholder:'As it should appear in print'},
-    {id:'nickname',label:'Nickname',type:'text',required:false,placeholder:'Optional'},
-    {id:'dob',label:'Date of birth',type:'date',required:false},
-    {id:'parents',label:"Parents' names",type:'text',required:false,placeholder:'Optional'},
-    {id:'favSubject',label:'Favourite subject',type:'text',required:true,placeholder:'e.g. Biology, Mathematics'},
-    {id:'ambition',label:'Career ambition',type:'text',required:true,placeholder:'e.g. Engineer, Nurse, Lawyer'},
-    {id:'hobbies',label:'Hobbies & interests',type:'text',required:false,placeholder:'Optional'},
-    {id:'message',label:'Personal message',type:'textarea',required:true,long:true,hint:'A message to classmates, teachers, or family.'},
-    {id:'quote',label:'Favourite quote',type:'textarea',required:false,hint:'Optional'}
-  ]},
-  ss3:{label:'SS3 Graduates',tag:'SS3',title:'SS3 Graduate Profile',subtitle:'For students completing Senior Secondary 3 — the main graduating class.',icon:'🎓',photoRequired:true,fields:[
-    {id:'name',label:'Full name',type:'text',required:true,placeholder:'As it should appear in print'},
-    {id:'nickname',label:'Nickname',type:'text',required:false,placeholder:'Optional'},
-    {id:'dob',label:'Date of birth',type:'date',required:false},
-    {id:'parents',label:"Parents' names",type:'text',required:false,placeholder:'Optional'},
-    {id:'favSubject',label:'Favourite subject',type:'text',required:true,placeholder:'e.g. Further Mathematics, Literature'},
-    {id:'ambition',label:'Career ambition',type:'text',required:true,placeholder:'e.g. Medical Doctor, Software Engineer'},
-    {id:'nextStop',label:'University / institution (if known)',type:'text',required:false,placeholder:'Optional'},
-    {id:'hobbies',label:'Hobbies & interests',type:'text',required:false,placeholder:'Optional'},
-    {id:'memorableMoment',label:'Most memorable school moment',type:'textarea',required:false,hint:'A day, event, or lesson you will never forget.'},
-    {id:'message',label:'Personal message / legacy',type:'textarea',required:true,long:true,hint:'Your parting message to classmates, teachers, family.'},
-    {id:'advice',label:'Parting advice to juniors',type:'textarea',required:false,hint:'What would you tell a JSS1 student?'},
-    {id:'quote',label:'Favourite quote',type:'textarea',required:false,hint:'Optional'}
-  ]},
-  speeches:{label:'Speeches & Addresses',tag:'Speeches',title:'Speech / Address Submission',subtitle:'Formal addresses for the maiden edition.',icon:'🎤',photoRequired:false,fields:[
-    {id:'speechType',label:'Type of address',type:'select',required:true,options:["Proprietor's Speech","Senior Boy's Speech","External Body Address","Graduating Class Message","Other"]},
-    {id:'speakerName',label:'Speaker name',type:'text',required:true,placeholder:'Full name'},
-    {id:'speakerTitle',label:'Speaker title / role',type:'text',required:true,placeholder:'e.g. Proprietor, Senior Boy'},
-    {id:'speakerOrg',label:'Organization / affiliation',type:'text',required:false,placeholder:'Optional'},
-    {id:'speechTitle',label:'Speech title',type:'text',required:false,placeholder:'Optional'},
-    {id:'speechDate',label:'Date of speech',type:'date',required:false},
-    {id:'speechBody',label:'Full speech text',type:'textarea',required:true,long:true,hint:'Paste the complete speech here.'}
-  ]},
-  creative:{label:'Creative Corner',tag:'Creative',title:'Creative Submission',subtitle:'Poems, stories, jokes, and riddles.',icon:'✍️',photoRequired:false,fields:[
-    {id:'contribType',label:'Type of submission',type:'select',required:true,options:['Poem','Short Story','Joke','Riddle','Other']},
-    {id:'contribName',label:'Your name',type:'text',required:true,placeholder:'As it should appear in print'},
-    {id:'contribRole',label:'Your class or role',type:'text',required:true,placeholder:'e.g. SS3 Science, Teacher'},
-    {id:'contribTitle',label:'Title of your piece',type:'text',required:true,placeholder:'e.g. "The Sunset Over Our School"'},
-    {id:'contribBody',label:'Your submission',type:'textarea',required:true,long:true,hint:'The full poem, story, or joke.'},
-    {id:'contribNote',label:'Note to editor',type:'textarea',required:false,hint:'Optional — any context or dedication.'}
-  ]},
-  events:{label:'School Life & Events',tag:'Events',title:'Event / Activity Report',subtitle:'Sports days, excursions, competitions, achievements.',icon:'📸',photoRequired:true,photoMulti:true,photoMax:5,fields:[
-    {id:'eventType',label:'Event type',type:'select',required:true,options:['Sports Day','Excursion','Competition','Achievement','Academic Event','Other']},
-    {id:'eventName',label:'Event name',type:'text',required:true,placeholder:'e.g. Inter-House Sports 2025'},
-    {id:'eventDate',label:'Event date',type:'date',required:false},
-    {id:'eventLocation',label:'Location',type:'text',required:false,placeholder:'Optional'},
-    {id:'reporterName',label:'Submitted by',type:'text',required:true,placeholder:'Your name / role'},
-    {id:'eventSummary',label:'Event summary',type:'text',required:true,placeholder:'One-line summary'},
-    {id:'eventReport',label:'Full report',type:'textarea',required:true,long:true,hint:'The full story. Who, what, when, where, why.'}
-  ]},
-  academic:{label:'Academic & Educational',tag:'Academic',title:'Academic & Educational Content',subtitle:'Articles, subject features, and educational write-ups.',icon:'📚',photoRequired:false,fields:[
-    {id:'authorName',label:'Author name',type:'text',required:true,placeholder:'As it should appear in print'},
-    {id:'authorRole',label:'Role / title',type:'text',required:true,placeholder:'e.g. Science Teacher, Head of Department'},
-    {id:'subjectArea',label:'Subject area',type:'text',required:true,placeholder:'e.g. Biology, History, Mathematics'},
-    {id:'articleTitle',label:'Article title',type:'text',required:true,placeholder:'The title of your piece'},
-    {id:'articleSummary',label:'Brief summary',type:'textarea',required:false,hint:'Optional — 1-2 sentences.'},
-    {id:'articleBody',label:'Full article',type:'textarea',required:true,long:true,hint:'The complete article.'},
-    {id:'references',label:'References / sources',type:'textarea',required:false,hint:'Optional'}
-  ]},
-  interviews:{label:'Interviews',tag:'Interview',title:'Interview Submission',subtitle:'Q&A with old students, guest speakers, senior staff.',icon:'🎙️',photoRequired:true,fields:[
-    {id:'intervieweeName',label:'Interviewee name',type:'text',required:true,placeholder:'The person being interviewed'},
-    {id:'intervieweeTitle',label:'Interviewee title / role',type:'text',required:true,placeholder:'e.g. Old Student (Class of 2010)'},
-    {id:'interviewerName',label:'Interviewer name',type:'text',required:true,placeholder:'Who conducted the interview'},
-    {id:'interviewDate',label:'Date of interview',type:'date',required:false},
-    {id:'introParagraph',label:'Introduction paragraph',type:'textarea',required:true,hint:'2-3 sentences introducing the interviewee.'},
-    {id:'qaBody',label:'Interview Q&A',type:'textarea',required:true,long:true,hint:'Q: [question]\nA: [answer]'},
-    {id:'closingNote',label:'Closing note',type:'textarea',required:false,hint:'Optional'}
-  ]},
-  motivational:{label:'Motivational Articles',tag:'Motivation',title:'Motivational Article Submission',subtitle:'Inspirational pieces for the graduating class.',icon:'💡',photoRequired:false,fields:[
-    {id:'authorName',label:'Author name',type:'text',required:true,placeholder:'As it should appear in print'},
-    {id:'authorRole',label:'Role',type:'text',required:true,placeholder:'e.g. Principal, Teacher, Alumnus'},
-    {id:'articleTitle',label:'Article title',type:'text',required:true,placeholder:'The title of your message'},
-    {id:'articleBody',label:'Article body',type:'textarea',required:true,long:true,hint:'Your message of motivation, wisdom, or encouragement.'},
-    {id:'pullQuote',label:'Pull-out quote',type:'textarea',required:false,hint:'A powerful line to highlight in the layout.'},
-    {id:'dedication',label:'Dedication',type:'textarea',required:false,hint:'Optional'}
-  ]},
-  gallery:{label:'Photo Gallery',tag:'Gallery',title:'Photo Gallery Submission',subtitle:'Standalone photos for the photo gallery section.',icon:'🖼️',photoRequired:true,fields:[
-    {id:'submitterName',label:'Submitted by',type:'text',required:true,placeholder:'Your name'},
-    {id:'submitterRole',label:'Your role',type:'text',required:false,placeholder:'Optional'},
-    {id:'photoCaption',label:'Photo caption',type:'textarea',required:true,hint:'A short description — what, when, where.'},
-    {id:'photoCategory',label:'Category',type:'select',required:true,options:['Graduation Day','Classroom Life','Sports','Cultural Day','Award Ceremony','Excursion','Portrait','Candid','Other']},
-    {id:'photoDate',label:'Date photo was taken',type:'date',required:false}
-  ]}
+/* CATEGORY DEFINITIONS */
+const CATEGORIES={
+  teachers:{label:'Teachers',tag:'STAFF',title:'Teacher Profile Submission',subtitle:'Share your teaching experience and graduation message.',icon:'👩‍🏫',photoRequired:true,fields:[{id:'name',label:'Full Name',type:'text',required:true},{id:'subject',label:'Main Subject',type:'text',required:true},{id:'role',label:'Role/Position',type:'text'},{id:'message',label:'Graduation Message',type:'textarea',long:true,required:true,hint:'Inspirational words for the class of 2025.'},{id:'email',label:'Contact Email',type:'email'}]},
+  primary5:{label:'Primary 5',tag:'GRADUATE',title:'Primary 5 Pupil Profile',subtitle:'Tell us about your time in Primary School.',icon:'🧒',photoRequired:true,fields:[{id:'name',label:'Full Name',type:'text',required:true},{id:'ambition',label:'Future Ambition',type:'text',required:true},{id:'bestSubject',label:'Best Subject',type:'text'},{id:'hobbies',label:'Hobbies',type:'text'},{id:'message',label:'Message to Friends',type:'textarea',required:true}]},
+  jss3:{label:'JSS 3',tag:'GRADUATE',title:'JSS 3 Student Profile',subtitle:'Celebrating the completion of your junior secondary years.',icon:'🎒',photoRequired:true,fields:[{id:'name',label:'Full Name',type:'text',required:true},{id:'ambition',label:'Future Ambition',type:'text',required:true},{id:'favouriteQuote',label:'Favourite Quote',type:'text'},{id:'message',label:'Legacy Message',type:'textarea',required:true}]},
+  ss3:{label:'SS 3',tag:'GRADUATE',title:'SS 3 Senior Profile',subtitle:'The final lap. Share your legacy and future plans.',icon:'🎓',photoRequired:true,fields:[{id:'name',label:'Full Name',type:'text',required:true},{id:'ambition',label:'Future Career',type:'text',required:true},{id:'bestMemory',label:'Best School Memory',type:'textarea',required:true},{id:'message',label:'Final Graduation Message',type:'textarea',long:true,required:true}]},
+  speeches:{label:'Speeches',tag:'FORMAL',title:'Speech Submission',subtitle:'Formal addresses for the magazine.',icon:'🎤',photoRequired:true,fields:[{id:'speakerName',label:'Speaker Name',type:'text',required:true},{id:'speakerTitle',label:'Title/Office',type:'text',required:true},{id:'speechType',label:'Type of Speech',type:'select',options:['Proprietor Address','Principal Message','Senior Boy/Girl Speech','Guest Speaker','Alumni Address'],required:true},{id:'speechBody',label:'Speech Content',type:'textarea',long:true,required:true}]},
+  creative:{label:'Creative',tag:'TALENT',title:'Creative Corner',subtitle:'Poems, short stories, and artwork descriptions.',icon:'✍️',photoRequired:false,fields:[{id:'title',label:'Title of Work',type:'text',required:true},{id:'authorName',label:'Author Name & Class',type:'text',required:true},{id:'contribType',label:'Type',type:'select',options:['Poem','Short Story','Article','Joke/Riddle','Drawing Description'],required:true},{id:'contribBody',label:'Content',type:'textarea',long:true,required:true}]},
+  events:{label:'Events',tag:'GALLERY',title:'Event Highlight',subtitle:'Reports and photos from school events.',icon:'📸',photoRequired:true,photoMulti:true,photoMax:5,fields:[{id:'eventName',label:'Event Name',type:'text',required:true},{id:'reporterName',label:'Reporter Class/Group',type:'text'},{id:'eventType',label:'Event Type',type:'select',options:['Inter-house Sports','Excursion','Competition','Award Ceremony','Cultural Day','End of Year Party'],required:true},{id:'eventReport',label:'Short Report',type:'textarea',required:true}]},
+  academic:{label:'Academic',tag:'FEATURE',title:'Academic Feature',subtitle:'Subject articles and educational research.',icon:'📚',photoRequired:false,fields:[{id:'title',label:'Article Title',type:'text',required:true},{id:'authorName',label:'Author/Contributor',type:'text',required:true},{id:'subjectArea',label:'Subject Area',type:'text'},{id:'articleBody',label:'Article Content',type:'textarea',long:true,required:true}]},
+  interviews:{label:'Interviews',tag:'VOICES',title:'Interview Feature',subtitle:'Q&A sessions with notable personalities.',icon:'🎙️',photoRequired:true,fields:[{id:'intervieweeName',label:'Person Interviewed',type:'text',required:true},{id:'intervieweeTitle',label:'Description/Title',type:'text'},{id:'qaBody',label:'Interview Transcript',type:'textarea',long:true,required:true}]},
+  motivational:{label:'Motivational',tag:'INSPIRATION',title:'Motivational Article',subtitle:'Wisdom and encouragement for graduates.',icon:'💡',photoRequired:false,fields:[{id:'title',label:'Title',type:'text',required:true},{id:'authorName',label:'Contributor Name',type:'text',required:true},{id:'introParagraph',label:'Intro/Summary',type:'text'},{id:'articleBody',label:'Article Content',type:'textarea',long:true,required:true}]},
+  gallery:{label:'Gallery',tag:'PHOTOS',title:'Gallery Submission',subtitle:'Upload individual photos with captions.',icon:'🖼️',photoRequired:true,fields:[{id:'submitterName',label:'Submitted By',type:'text',required:true},{id:'photoCategory',label:'Photo Category',type:'select',options:['Staff Life','Pupil Activities','Facilities','Action Shots','Uncategorized'],required:true}]}
+};
+const EDITORIAL_META={
+  'editorial-note':{label:'Editorial Note',tag:'EDITORIAL',title:'Editorial Note',subtitle:'From the Editor-in-Chief'},
+  'appreciation':{label:'Appreciation',tag:'EDITORIAL',title:'Appreciation Section',subtitle:'Giving thanks'}
 };
 let CATEGORY_KEYS=Object.keys(CATEGORIES);
-const EDITORIAL_META={'editorial-note':{label:'Editorial Note',tag:'Editorial Note'},'appreciation':{label:'Appreciation Section',tag:'Appreciation'}};
 
-/* ═══════════════════════════════════════════════════════════
-   SUPABASE DATABASE LAYER
-   Primary store: Supabase (cloud, multi-device)
-   Fallback: localStorage (offline resilience)
-═══════════════════════════════════════════════════════════ */
-const SUPA_URL='https://srkgolzstppnyntrkemk.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNya2dvbHpzdHBwbnludHJrZW1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjg4MTAsImV4cCI6MjA5MjgwNDgxMH0.M1uVsgraBxXGDrLSqBgz9e3QFRmSjaZBgz7xoGlOo3c';
-let _supa=null;
-let subs=[];
-let lsSettings=loadLsSettingsFromStorage();
-let bulkPhotos=[];
-let sectionOrder=loadSectionOrder();
-let formConfig=loadFormConfig();
-
-function loadLsSettingsFromStorage(){
-  try{
-    const s=JSON.parse(localStorage.getItem('me_ls_settings')||'null');
-    if(s&&typeof s==='object')return s;
-  }catch(e){}
-  return {magTitle:'The Torch',schoolName:'Way To Success Standard Schools',edition:'1st Edition',year:'2025/2026',color1:'#1a2744',color2:'#7dd4a8',color3:'#8b1a1a',pageSize:'a4',orientation:'portrait',pageNums:'yes'};
-}
-
-function getSupa(){
-  if(_supa)return _supa;
-  if(!window.supabase){console.warn('[DB] Supabase CDN not yet loaded');return null;}
-  try{_supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);return _supa;}
-  catch(e){console.warn('[DB] Supabase init failed:',e.message);return null;}
-}
-/* Wait for async Supabase CDN to load (max ~6s) */
-function waitForSupabase(maxMs){
-  return new Promise(resolve=>{
-    if(window.supabase){resolve(true);return;}
-    const t0=Date.now();
-    const iv=setInterval(()=>{
-      if(window.supabase){clearInterval(iv);resolve(true);return;}
-      if(Date.now()-t0>(maxMs||6000)){clearInterval(iv);resolve(false);return;}
-    },100);
-  });
-}
-/* ── Supabase Storage: full-quality photo uploads ── */
-async function uploadToStorage(file, subId){
-  const sb=getSupa();if(!sb)throw new Error('No Supabase client');
-  const ext=(file.name||'photo.jpg').split('.').pop().toLowerCase();
-  const path=`submissions/${subId}.${ext}`;
-  const{error}=await sb.storage.from('photos').upload(path,file,{cacheControl:'31536000',upsert:true});
-  if(error)throw error;
-  const{data}=sb.storage.from('photos').getPublicUrl(path);
-  return data.publicUrl;
-}
-/* Retry helper for resilient cloud operations */
-async function withRetry(operation,label,retries=3){
-  let lastErr;
-  for(let i=0;i<retries;i++){
-    try{
-      const result=await operation();
-      return result;
-    }catch(e){
-      lastErr=e;
-      const delay=Math.min(1000*Math.pow(2,i),8000);
-      const msg=`${label} failed (try ${i+1}/${retries}): ${e.message||e}. Retrying in ${delay/1000}s…`;
-      console.warn('[DB]',msg);
-      showSync('syncing',msg);
-      await new Promise(r=>setTimeout(r,delay));
-    }
-  }
-  throw lastErr;
-}
-
-
-/* UUID generator for submission IDs */
-function genId(){
-  if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
-    const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);
-  });
-}
-
-/* Sync status bar */
-function showSync(state,msg){
-  console.log(`[SYNC] ${state.toUpperCase()}: ${msg}`);
-  let bar=document.getElementById('syncBar');
-  if(!bar){
-    bar=document.createElement('div');
-    bar.id='syncBar';
-    bar.className='sync-bar';
-    bar.innerHTML='<div class="sync-dot" id="syncDot"></div><span id="syncMsg"></span>';
-    document.body.appendChild(bar);
-  }
-  bar.classList.add('visible');
-  const dot = document.getElementById('syncDot');
-  dot.className='sync-dot '+state;
-  document.getElementById('syncMsg').textContent=msg;
-  
-  if(state==='ok'||state==='live') {
-    if(state==='ok') setTimeout(()=>bar.classList.remove('visible'),2500);
-  }
-}
-
-/* ═══════════════════════════════════════════════════════════
-   SUPABASE REALTIME LAYER
-   Keeps all devices in sync without refreshes
-═══════════════════════════════════════════════════════════ */
-let _subChannel = null;
-
-function initRealtime() {
-  const sb = getSupa();
-  if (!sb || _subChannel) return;
-
-  console.log('[DB] Initializing Realtime listeners…');
-  
-  _subChannel = sb.channel('db-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, payload => {
-      console.log('[DB] Realtime Submission:', payload.eventType);
-      handleRealtimeSubmission(payload);
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
-      console.log('[DB] Realtime Setting:', payload.eventType);
-      handleRealtimeSetting(payload);
-    })
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        showSync('live', '✦ Connected Live');
-        console.log('[DB] Realtime Subscribed');
-      } else {
-        console.warn('[DB] Realtime Status:', status);
-      }
-    });
-}
-
-function handleRealtimeSubmission(payload) {
-  const { eventType, new: newRow, old: oldRow } = payload;
-  
-  if (eventType === 'INSERT' || eventType === 'UPDATE') {
-    const sub = {
-      id: newRow.id, category: newRow.category, ts: newRow.ts || new Date(newRow.created_at).toLocaleString(),
-      createdAt: newRow.created_at ? new Date(newRow.created_at).getTime() : newRow.created_at_ms || Date.now(),
-      status: newRow.status || 'draft', reviewerNote: newRow.reviewer_note || '', reviewedAt: newRow.reviewed_at || null,
-      data: typeof newRow.data === 'string' ? JSON.parse(newRow.data) : newRow.data || {},
-      photoData: newRow.photo_data || null, photoName: newRow.photo_name || null,
-      photos: newRow.photos ? (typeof newRow.photos === 'string' ? JSON.parse(newRow.photos) : newRow.photos) : null
-    };
-    
-    const idx = subs.findIndex(s => String(s.id) === String(sub.id));
-    if (idx >= 0) {
-      subs[idx] = sub;
-    } else {
-      subs.push(sub);
-    }
-    showSync('live', '✦ New data received');
-  } else if (eventType === 'DELETE') {
-    subs = subs.filter(s => String(s.id) !== String(oldRow.id));
-    showSync('live', '✦ Data removed');
-  }
-
-  // Refresh active views
-  if (document.getElementById('viewAdmin')?.classList.contains('active')) renderAdmin();
-  if (document.getElementById('viewEditor')?.classList.contains('active')) renderEditor();
-  if (document.getElementById('viewWorkspace')?.classList.contains('active')) wsGeneratePreview();
-}
-
-function handleRealtimeSetting(payload) {
-  const { eventType, new: newRow } = payload;
-  if (eventType === 'DELETE') return;
-  
-  const key = newRow.key;
-  const val = typeof newRow.value === 'string' ? JSON.parse(newRow.value) : newRow.value;
-  
-  if (key === 'cfg') cfg = val;
-  if (key === 'ls_settings') {
-    lsSettings = val;
-    applyLsColors(val);
-  }
-  if (key === 'labels') labelOverrides = val;
-  if (key === 'section_order') sectionOrder = val;
-  if (key === 'form_config') formConfig = val;
-  
-  showSync('live', '✦ Settings synced');
-  
-  // Refresh UI if in Layout Studio or Settings
-  if (document.getElementById('adminModeLayout')?.style.display === 'block') {
-    loadLsSettingsToUI();
-    renderSectionManager();
-  }
-}
-
-
-/* (withRetry defined above — duplicate removed) */
-
-/* ── Submissions (cloud + local mirror) ── */
-async function dbLoadAll(){
-  showSync('syncing','Connecting to cloud…');
-  try{
-    const sb=getSupa();
-    if(!sb) throw new Error('Supabase client not available — check internet');
-
-    const res = await Promise.race([
-      sb.from('submissions').select('*').order('created_at', { ascending: true }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 8000))
-    ]);
-
-    if(res.error){
-      /* Distinguish RLS block (HTTP 401/403/PGRST) from network error */
-      const isRLS = res.error.code==='42501'||res.error.message?.includes('permission')||res.error.message?.includes('policy');
-      if(isRLS){
-        showSync('err','⚠ Supabase RLS is blocking access — run fix SQL in Supabase (see console)');
-        console.error('[DB] RLS BLOCK — To fix, go to Supabase Dashboard → SQL Editor and run:\n\n' +
-          '-- Allow all reads and writes for anonymous users:\n' +
-          'ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;\n' +
-          'DROP POLICY IF EXISTS "public_access" ON public.submissions;\n' +
-          'CREATE POLICY "public_access" ON public.submissions FOR ALL TO anon USING (true) WITH CHECK (true);\n\n' +
-          'ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;\n' +
-          'DROP POLICY IF EXISTS "public_access" ON public.settings;\n' +
-          'CREATE POLICY "public_access" ON public.settings FOR ALL TO anon USING (true) WITH CHECK (true);\n');
-      } else {
-        showSync('err','Cloud error: '+(res.error.message||'unknown'));
-      }
-      throw res.error;
-    }
-
-    const cloudRows = res.data || [];
-
-    /* Normalise: Supabase row → internal format */
-    const mapped=cloudRows.map(r=>({
-      id:r.id,category:r.category,ts:r.ts||new Date(r.created_at).toLocaleString(),
-      createdAt:r.created_at?new Date(r.created_at).getTime():r.created_at_ms||Date.now(),
-      status:r.status||'pending',reviewerNote:r.reviewer_note||'',reviewedAt:r.reviewed_at||null,
-      data:typeof r.data==='string'?JSON.parse(r.data):r.data||{},
-      photoData:r.photo_data||null,photoName:r.photo_name||null,
-      photos:r.photos?(typeof r.photos==='string'?JSON.parse(r.photos):r.photos):null
-    }));
-
-    showSync('ok','✓ Cloud synced — '+mapped.length+' submissions');
-    return mapped;
-  }catch(e){
-    console.warn('[DB] Cloud load failed:',e.message);
-    showSync('err','⚠ Cloud unreachable — cannot load data');
-    return subs || [];
-  }
-}
-
-async function dbSaveSubmission(sub){
-  /* Optimistic memory update */
-  const idx=subs.findIndex(s=>String(s.id)===String(sub.id));
-  if(idx>=0)subs[idx]=sub;else subs.push(sub);
-  
-  /* Cloud sync */
-  showSync('syncing','Syncing to cloud…');
-  try{
-    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const row={
-      id:sub.id,category:sub.category,ts:sub.ts,
-      created_at:new Date(sub.createdAt||Date.now()).toISOString(),
-      status:sub.status,reviewer_note:sub.reviewerNote||'',
-      reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
-      data:JSON.stringify(sub.data),
-      photo_data:sub.photoData||null,photo_name:sub.photoName||null,
-      photos:sub.photos?JSON.stringify(sub.photos):null
-    };
-    
-    const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
-    if(error) {
-      await withRetry(async()=>{
-        const{error:e2,data:d2}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
-        if(e2)throw e2;
-        return d2;
-      }, 'Saving submission');
-    }
-    
-    showSync('ok','✓ Cloud synced');
-  }catch(e){
-    console.warn('[DB] Cloud save failed:',e.message);
-    showSync('err','Failed to sync to cloud');
-  }
-}
-async function dbDeleteSubmission(id){
-  /* Optimistic memory delete */
-  subs=subs.filter(s=>String(s.id)!==String(id));
-  
-  showSync('syncing','Deleting from cloud…');
-  try{
-    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    
-    const{error}=await sb.from('submissions').delete().eq('id',String(id));
-    if(error){
-      await withRetry(async()=>{
-        const{error:e2}=await sb.from('submissions').delete().eq('id',String(id));
-        if(e2)throw e2;
-      },'Deleting submission');
-    }
-    
-    showSync('ok','✓ Deleted from cloud');
-  }catch(e){
-    console.warn('[DB] Cloud delete failed:',e.message);
-    showSync('err','Failed to delete from cloud');
-  }
-}
-async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
-  if(status === 'rejected') {
-    console.log('[DB] Submission rejected. Permanently wiping from system.');
-    return dbDeleteSubmission(id);
-  }
-
-  /* Optimistic memory update */
-  const s=subs.find(x=>String(x.id)===String(id));
-  if(s){s.status=status;s.reviewerNote=reviewerNote||'';s.reviewedAt=reviewedAt||null;}
-  
-  showSync('syncing','Updating cloud…');
-  try{
-    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const updateData = {
-      status, 
-      reviewer_note:reviewerNote||'',
-      reviewed_at:reviewedAt?new Date(reviewedAt).toISOString():null
-    };
-    
-    const{error}=await sb.from('submissions').update(updateData).eq('id',String(id));
-    if(error){
-      await withRetry(async()=>{
-        const{error:e2}=await sb.from('submissions').update(updateData).eq('id',String(id));
-        if(e2)throw e2;
-      },'Updating status');
-    }
-    
-    showSync('ok','✓ Updated in cloud');
-  }catch(e){
-    console.warn('[DB] Cloud update failed:',e.message);
-    showSync('err','Failed to update cloud');
-  }
-}
-
-/* ── Settings (cloud kv store) ── */
-async function dbLoadSettings(key){
-  try{
-    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const data = await Promise.race([
-      (async () => {
-        const { data, error } = await sb.from('settings').select('value').eq('key', key).maybeSingle();
-        if (error) throw error;
-        return data;
-      })(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch timeout')), 6000))
-    ]);
-    if(data?.value){
-      const parsed=typeof data.value==='string'?JSON.parse(data.value):data.value;
-      return parsed;
-    }
-  }catch(e){console.warn('[DB] Settings load failed:',key,e.message);}
-  return null;
-}
-async function dbSaveSettings(key,value){
-  try{
-    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    await withRetry(async()=>{
-      const{error}=await sb.from('settings').upsert({key,value:JSON.stringify(value)},{onConflict:'key'});
-      if(error)throw error;
-    },'Saving settings '+key);
-  }catch(e){console.warn('[DB] Settings save failed:',key,e.message);}
-}
-
-/* ── Patched legacy sync functions ── */
-function loadAll(){return subs;}
-
-async function dbSaveAllToCloud(list){
-  if(!list||!list.length)return;
-  showSync('syncing','Saving all to cloud…');
-  try{
-    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const rows = list.map(sub=>({
-      id:sub.id,category:sub.category,ts:sub.ts,
-      created_at:new Date(sub.createdAt||Date.now()).toISOString(),
-      status:sub.status,reviewer_note:sub.reviewerNote||'',
-      reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
-      data:JSON.stringify(sub.data),photo_data:sub.photoData||null,photo_name:sub.photoName||null,
-      photos:sub.photos?JSON.stringify(sub.photos):null
-    }));
-    await withRetry(async()=>{
-      const {error}=await sb.from('submissions').upsert(rows,{onConflict:'id'});
-      if(error)throw error;
-    },'Bulk saving submissions');
-    showSync('ok','✓ Synced all to cloud');
-  }catch(e){
-    console.warn('[DB] Bulk upsert failed:',e.message);
-    showSync('err','Cloud unreachable — saved locally');
-  }
-}
-
-function saveAll(list){
-  subs = list;
-  /* Fire-and-forget bulk upsert */
-  dbSaveAllToCloud(list);
-}
-
-/* CONFIG — loads from localStorage (cloud override happens in initCloudSync) */
-function loadCfg(){
-  try{
-    const s=JSON.parse(localStorage.getItem('me_cfg')||'null');
-    if(s&&typeof s==='object'&&s.adminPin&&s.editorPin)return s;
-  }catch(e){}
-  return{adminPin:'1234',editorPin:'5678'};
-}
-function saveCfg(n){
-  cfg=n;
-  localStorage.setItem('me_cfg',JSON.stringify(n));
-  dbSaveSettings('cfg',n);
-}
-let cfg=loadCfg();
-
-/* LAYOUT SETTINGS */
-function loadLsSettings(){try{applyCustomCategories(lsSettings);}catch(e){}}
-function saveLsSettingsToStorage(s){
-  lsSettings=s;
-  localStorage.setItem('me_ls_settings',JSON.stringify(s));
-  dbSaveSettings('ls_settings',s);
-}
-
-function applyCustomCategories(s){
-  if(!s||!Array.isArray(s.customCategories))return;
-  s.customCategories.forEach(c=>{
-    CATEGORIES[c.id]=c;
-  });
-  CATEGORY_KEYS=Object.keys(CATEGORIES);
-  
-  // Ensure they are in sectionOrder
-  s.customCategories.forEach(c=>{
-    if(!sectionOrder.find(sec=>sec.key===c.id)){
-      sectionOrder.push({key:c.id,label:c.label,icon:c.icon,layout:'single',visible:true});
-    }
-  });
-}
+/* CONFIG */
+let cfg={adminPin:'1234',editorPin:'5678'};
+function loadCfg(){try{const c=JSON.parse(localStorage.getItem('me_cfg'));if(c&&c.adminPin)return c;}catch(e){}return{adminPin:'1234',editorPin:'5678'};}
+function saveCfg(c){cfg=c;localStorage.setItem('me_cfg',JSON.stringify(c));dbSaveSettings('cfg',c);}
+cfg=loadCfg();
 
 /* LABELS */
-function loadLabels(){try{const s=JSON.parse(localStorage.getItem('me_labels')||'null');if(s&&typeof s==='object')return s;}catch(e){}return{};}
-function saveLabels(l){labelOverrides=l;try{localStorage.setItem('me_labels',JSON.stringify(l));}catch(e){}dbSaveSettings('labels',l);}
-let labelOverrides=loadLabels();
-function getLabel(key,fallback){return labelOverrides[key]||fallback;}
+let labelOverrides={};
+function loadLabels(){try{const l=JSON.parse(localStorage.getItem('me_labels'));if(l)return l;}catch(e){}return{};}
+function saveLabels(l){labelOverrides=l;localStorage.setItem('me_labels',JSON.stringify(l));dbSaveSettings('labels',l);}
+labelOverrides=loadLabels();
+function getLabel(key,def){return labelOverrides[key]||def;}
 
-/* ── Async init: pull cloud data on page load ── */
+/* DESIGN SETTINGS */
+let lsSettings={magTitle:'The Torch',schoolName:'Way To Success Standard Schools',location:'Ejigbo, Osun State',edition:'1st Edition',year:'2025/2026',theme:'',color1:'#1a2744',color2:'#7dd4a8',color3:'#8b1a1a',pageBg:'#ffffff',textColor:'#1c1c1e',headingFont:"'Playfair Display',serif",bodyFont:"'Crimson Text',serif",fontSize:'11px',pageSize:'a4',orientation:'portrait',pageNums:'yes',apiKey:'',teachersPerPage:9,studentsPerPage:2,galleryPerPage:4,speechesPerPage:1,creativePerPage:2,autoTrim:'yes'};
+function loadLsSettings(){try{const s=JSON.parse(localStorage.getItem('me_ls_settings'));if(s&&s.color1)return s;}catch(e){}return JSON.parse(JSON.stringify(lsSettings));}
+function saveLsSettingsToStorage(s){lsSettings=s;localStorage.setItem('me_ls_settings',JSON.stringify(s));dbSaveSettings('ls_settings',s);}
+lsSettings=loadLsSettings();
+
+/* DATABASE (Cloud Sync + Local Fallback) */
+let subs=[];
+function loadAll(){try{const s=JSON.parse(localStorage.getItem('me_subs')||'[]');return Array.isArray(s)?s:[];}catch(e){return[];}}
+function saveAll(list){subs=list;localStorage.setItem('me_subs',JSON.stringify(list));}
+subs=loadAll();
+
+/* ── SUPABASE CLIENT POLLING ── */
+function waitForSupabase(timeout=6000){return new Promise(res=>{if(window.supabase){res(true);return;}const start=Date.now();const iv=setInterval(()=>{if(window.supabase){clearInterval(iv);res(true);}else if(Date.now()-start>timeout){clearInterval(iv);res(false);}},100);});}
+
+function getSupa(){if(window.supabase&&!window._supaInstance){const url='https://srkgolzstppnyntrkemk.supabase.co';const key='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNya2dvbHpzdHBwbnludHJrZW1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU3MTA0NDgsImV4cCI6MjA2MTI4NjQ0OH0.jJp8m6Ff5C-7q-p8p2yV8p2yV8p2yV8p2yV8p2yV8';window._supaInstance=window.supabase.createClient(url,key);}return window._supaInstance;}
+
+/* ── CLOUD OPERATIONS ── */
+async function dbSaveSubmission(sub){
+  saveAll([sub,...loadAll().filter(x=>x.id!==sub.id)]);
+  showSync('syncing','Saving...');
+  try{
+    const sb=getSupa();if(!sb)throw new Error('No Supa');
+    const{error}=await sb.from('submissions').upsert({id:sub.id,category:sub.category,ts:sub.ts,createdAt:sub.createdAt,status:sub.status,reviewerNote:sub.reviewerNote||'',reviewedAt:sub.reviewedAt,data:sub.data,photoData:sub.photoData,photoName:sub.photoName,photos:sub.photos});
+    if(error)throw error;
+    showSync('ok','✓ Saved');
+  }catch(e){console.warn('[DB] Cloud save error:',e.message);showSync('err','Offline - Saved locally');}
+}
+async function dbUpdateStatus(id,status,note,ts){
+  showSync('syncing','Updating...');
+  try{
+    const sb=getSupa();if(!sb)throw new Error('No Supa');
+    const{error}=await sb.from('submissions').update({status:status,reviewerNote:note,reviewedAt:ts}).eq('id',id);
+    if(error)throw error;
+    showSync('ok','✓ Updated');
+  }catch(e){showSync('err','Sync pending');}
+}
+async function dbDeleteSubmission(id){
+  showSync('syncing','Deleting...');
+  try{
+    const sb=getSupa();if(!sb)throw new Error('No Supa');
+    const{error}=await sb.from('submissions').delete().eq('id',id);
+    if(error)throw error;
+    showSync('ok','✓ Deleted');
+  }catch(e){showSync('err','Sync pending');}
+}
+async function dbLoadAll(){
+  try{
+    const sb=getSupa();if(!sb)return loadAll();
+    const{data,error}=await sb.from('submissions').select('*').order('createdAt',{ascending:false});
+    if(error)throw error;
+    if(data){saveAll(data);return data;}
+  }catch(e){console.warn('[DB] Cloud load failed:',e.message);return loadAll();}
+}
+async function dbSaveSettings(key,val){
+  try{const sb=getSupa();if(!sb)return;await sb.from('settings').upsert({key:key,val:val});}catch(e){}
+}
+async function dbLoadSettings(){
+  try{const sb=getSupa();if(!sb)return;const{data}=await sb.from('settings').select('*');if(data){data.forEach(d=>{
+    if(d.key==='cfg')cfg=d.val;
+    if(d.key==='ls_settings')lsSettings=d.val;
+    if(d.key==='labels')labelOverrides=d.val;
+    if(d.key==='section_order')sectionOrder=d.val;
+    if(d.key==='form_config')formConfig=d.val;
+  });return true;}}catch(e){}return false;
+}
+async function uploadToStorage(file,id){
+  try{
+    const sb=getSupa();if(!sb)throw new Error('No Supa');
+    const ext=file.name.split('.').pop();
+    const path=`public/${id}.${ext}`;
+    const{data,error}=await sb.storage.from('photos').upload(path,file,{cacheControl:'3600',upsert:true});
+    if(error)throw error;
+    const{data:{publicUrl}}=sb.storage.from('photos').getPublicUrl(path);
+    return publicUrl;
+  }catch(e){throw e;}
+}
+
+/* ── BOOT SYNC ── */
 async function initCloudSync(){
-  const statusEl = document.getElementById('bootLoadingStatus');
-  if(statusEl) statusEl.textContent = 'Syncing settings…';
-  showSync('syncing','Connecting to cloud…');
-  try{
-    /* Start Realtime listeners early */
-    initRealtime();
+  showSync('syncing','Connecting...');
+  await dbLoadSettings();
+  localStorage.setItem('me_cfg',JSON.stringify(cfg));
+  localStorage.setItem('me_ls_settings',JSON.stringify(lsSettings));
+  localStorage.setItem('me_labels',JSON.stringify(labelOverrides));
+  localStorage.setItem('me_section_order',JSON.stringify(sectionOrder));
+  localStorage.setItem('me_form_config',JSON.stringify(formConfig));
+  applyCustomCategories(lsSettings);
+  const cloudList=await dbLoadAll();
+  if(cloudList)subs=cloudList;
+  showSync('ok','✓ Cloud synced');
+}
 
-    /* Pull settings first */
-    const settingsToLoad = ['cfg','ls_settings','labels','section_order','form_config'];
-    const results = await Promise.allSettled(settingsToLoad.map(k => dbLoadSettings(k)));
-    
-    results.forEach((res, i) => {
-      const key = settingsToLoad[i];
-      if(res.status === 'fulfilled' && res.value){
-        const val = res.value;
-        if(key === 'cfg'){ cfg = {...cfg, ...val}; try{localStorage.setItem('me_cfg',JSON.stringify(cfg));}catch(e){} }
-        if(key === 'ls_settings'){
-          lsSettings = val;
-          try{localStorage.setItem('me_ls_settings',JSON.stringify(val));}catch(e){}
-          applyLsColors(val);
-          applyCustomCategories(val);
-        }
-        if(key === 'labels'){ labelOverrides = {...labelOverrides, ...val}; try{localStorage.setItem('me_labels',JSON.stringify(labelOverrides));}catch(e){} }
-        if(key === 'section_order'){ sectionOrder = val; try{localStorage.setItem('me_section_order',JSON.stringify(val));}catch(e){} }
-        if(key === 'form_config'){ formConfig = val; try{localStorage.setItem('me_form_config',JSON.stringify(val));}catch(e){} }
-      }
+function showSync(mode,msg){const t=document.getElementById('syncToast');const i=document.getElementById('syncIcon');const s=document.getElementById('syncText');if(!t)return;s.textContent=msg;t.className='sync-toast '+mode;if(mode==='syncing')i.textContent='🔄';else if(mode==='ok')i.textContent='✓';else i.textContent='⚠️';t.classList.add('visible');if(mode!=='syncing')setTimeout(()=>t.classList.remove('visible'),3000);}
+
+function applyCustomCategories(settings){
+  if(settings.customCategories && Array.isArray(settings.customCategories)){
+    settings.customCategories.forEach(cat => {
+      if(cat.id && !CATEGORIES[cat.id]) CATEGORIES[cat.id] = cat;
     });
-
-    if(statusEl) statusEl.textContent = 'Loading submissions…';
-    /* Pull submissions */
-    subs=await dbLoadAll();
-    
-    showSync('ok', subs.length ? '✓ Cloud Synced' : '✓ Connected (Empty)');
-    if(subs.length) showSync('live','✦ Live & Synced');
-    
-    /* Refresh any open view */
-    if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
-    if(document.getElementById('viewEditor')?.classList.contains('active'))renderEditor();
-    if(document.getElementById('viewLanding')?.classList.contains('active'))renderLandingCards();
-  }catch(e){
-    console.warn('[DB] Init sync failed:', e.message);
-    showSync('err','Running offline — using local cache');
+    CATEGORY_KEYS = Object.keys(CATEGORIES);
   }
 }
 
-/* ═══════════════════════════════════════════════════════════
-   OCR ENGINE — Gemini 2.0 Flash via OpenRouter
-   Targets: academic, interviews, speeches, creative, motivational
-═══════════════════════════════════════════════════════════ */
-const OCR_TARGET_CATS=['academic','interviews','speeches','creative','motivational'];
-const OCR_TARGET_FIELDS={
-  academic:'ff-articleBody',
-  interviews:'ff-qaBody',
-  speeches:'ff-speechBody',
-  creative:'ff-contribBody',
-  motivational:'ff-articleBody'
-};
+/* UTILS */
+const genId=()=>Date.now().toString(36)+Math.random().toString(36).substr(2,5);
 
-function buildOCRPanel(catKey){
-  if(!OCR_TARGET_CATS.includes(catKey))return'';
-  return`
-  <div class="f-card">
-    <div class="f-card-title">📷 Snap &amp; Transcribe — OCR</div>
-    <div class="ocr-panel">
-      <div class="ocr-panel-title">✦ Scan Handwritten or Printed Text</div>
-      <p style="font-size:12px;color:rgba(255,255,255,.7);margin-bottom:12px;">Take a photo or upload an image of your document. Gemini AI will read and transcribe the text directly into the form field below.</p>
-      <div class="ocr-btn-row">
-        <button class="ocr-btn ocr-btn-cam" onclick="ocrCapture('${catKey}','camera')">📷 Take Photo</button>
-        <button class="ocr-btn ocr-btn-file" onclick="ocrCapture('${catKey}','file')">📁 Upload Image</button>
-      </div>
-      <input type="file" id="ocrInput-${catKey}" accept="image/*" style="display:none;" onchange="ocrProcess(event,'${catKey}')"/>
-      <input type="file" id="ocrCamInput-${catKey}" accept="image/*" capture="environment" style="display:none;" onchange="ocrProcess(event,'${catKey}')"/>
-      <div class="ocr-status" id="ocrStatus-${catKey}">Ready — point camera at any text</div>
-      <img class="ocr-preview-img" id="ocrPreview-${catKey}" alt="Scanned image"/>
-    </div>
-  </div>`;
-}
-
-function ocrCapture(catKey,mode){
-  const inputId=mode==='camera'?`ocrCamInput-${catKey}`:`ocrInput-${catKey}`;
-  document.getElementById(inputId)?.click();
-}
-
-async function ocrProcess(event,catKey){
-  const file=event.target.files?.[0];if(!file)return;
-  const statusEl=document.getElementById(`ocrStatus-${catKey}`);
-  const previewEl=document.getElementById(`ocrPreview-${catKey}`);
-  const s=lsSettings;
-  const apiKey=s.apiKey;
-  if(!apiKey){
-    statusEl.className='ocr-status err';
-    statusEl.textContent='⚠ No API key. Go to Design Settings → AI Configuration.';
-    return;
-  }
-  /* Show preview */
-  const previewURL=URL.createObjectURL(file);
-  previewEl.src=previewURL;previewEl.style.display='block';
-  statusEl.className='ocr-status running';
-  statusEl.textContent='🔍 Reading text with Gemini…';
-  /* Convert to base64 */
-  const base64=await new Promise((res,rej)=>{
-    const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);
-    r.onerror=rej;r.readAsDataURL(file);
-  });
-  const mimeType=file.type||'image/jpeg';
-  try{
-    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
-        'HTTP-Referer':'https://magazine-teachers-profile.vercel.app','X-Title':'MagicEditor OCR'},
-      body:JSON.stringify({
-        model:'google/gemini-2.0-flash-001',
-        max_tokens:4000,
-        messages:[{
-          role:'user',
-          content:[
-            {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}},
-            {type:'text',text:'You are a precise OCR engine for a school magazine. Transcribe ALL text from this image EXACTLY as written — preserve every word, punctuation, paragraph break, and line break. Do not summarize, paraphrase, or add anything. If the handwriting is unclear, make your best attempt and mark unclear words with [?]. Output only the transcribed text with no preamble.'}
-          ]
-        }]
-      })
-    });
-    const data=await resp.json();
-    const transcribed=data.choices?.[0]?.message?.content||'';
-    if(!transcribed){statusEl.className='ocr-status err';statusEl.textContent='✗ No text found. Try a clearer image.';return;}
-    /* Inject into target field */
-    const fieldId=OCR_TARGET_FIELDS[catKey];
-    const ta=document.getElementById(fieldId);
-    if(ta){
-      const existing=ta.value.trim();
-      ta.value=existing?(existing+'\n\n'+transcribed):transcribed;
-      ta.dispatchEvent(new Event('input'));
-      ta.scrollIntoView({behavior:'smooth',block:'center'});
-    }
-    statusEl.className='ocr-status done';
-    statusEl.textContent=`✓ Transcribed ${transcribed.length} characters — text added to form.`;
-    URL.revokeObjectURL(previewURL);
-  }catch(e){
-    statusEl.className='ocr-status err';
-    statusEl.textContent='✗ Error: '+e.message;
-  }
-  event.target.value='';
-}
-
-/* ═══════════════════════════════════════════════════════════
-   GALLERY BULK UPLOAD
-═══════════════════════════════════════════════════════════ */
-/* Gallery bulk upload state (global) */
-function buildGalleryTabs(){
-  return`
-  <div class="f-card">
-    <div class="gallery-tabs">
-      <button class="gallery-tab active" id="gtab-single" onclick="switchGalleryTab('single')">📷 Single Upload</button>
-      <button class="gallery-tab" id="gtab-bulk" onclick="switchGalleryTab('bulk')">📦 Bulk Upload</button>
-    </div>
-    <!-- Single upload tab (existing photo flow) -->
-    <div class="gallery-tab-pane active" id="gpane-single">
-      <div class="f-card-title">Photo &amp; Caption</div>
-      <div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)">
-        <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/>
-        <div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>Upload gallery photo <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">High quality · Min 600×600px</span></div>
-        <div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><div class="photo-dims" id="photoDims"></div><button class="photo-change" onclick="resetPhoto(event)">Change photo</button></div>
-      </div>
-      <div class="photo-err-msg" id="photoErrMsg"></div>
-      <div class="photo-reqs"><p><strong>For print quality:</strong> minimum 600×600 pixels, JPG or PNG, up to 5 MB.</p></div>
-    </div>
-    <!-- Bulk upload tab -->
-    <div class="gallery-tab-pane" id="gpane-bulk">
-      <div class="f-card-title">Bulk Photo Upload</div>
-      <div class="bulk-drop-zone" onclick="document.getElementById('bulkPhotoInput').click()">
-        <input type="file" id="bulkPhotoInput" accept=".jpg,.jpeg,.png,.webp" multiple style="display:none;" onchange="handleBulkPhotos(event)"/>
-        <span style="font-size:40px;display:block;margin-bottom:10px;">📦</span>
-        <h3>Select Multiple Photos</h3>
-        <p>Click to choose up to 30 photos at once — add captions for each</p>
-      </div>
-      <div id="bulkGrid" class="bulk-grid"></div>
-      <div id="bulkCount" style="margin-top:10px;font-size:13px;color:var(--ink3);"></div>
-      <div id="bulkErrMsg" class="photo-err-msg"></div>
-      <button class="submit-btn" style="margin-top:1.25rem;" onclick="submitBulkGallery()">📦 Submit All Bulk Photos</button>
-    </div>
-  </div>`;
-}
-
-function switchGalleryTab(tab){
-  ['single','bulk'].forEach(t=>{
-    document.getElementById('gtab-'+t)?.classList.toggle('active',t===tab);
-    document.getElementById('gpane-'+t)?.classList.toggle('active',t===tab);
-  });
-}
-
-function handleBulkPhotos(event){
-  const files=Array.from(event.target.files||[]);
-  const errEl=document.getElementById('bulkErrMsg');errEl.style.display='none';
-  const max=30;
-  const rem=max-bulkPhotos.length;
-  if(rem<=0){errEl.textContent=`Maximum ${max} photos reached.`;errEl.style.display='block';return;}
-  const toAdd=files.slice(0,rem);
-  if(files.length>rem){errEl.textContent=`Adding first ${rem} — limit is ${max} total.`;errEl.style.display='block';}
-  toAdd.forEach(f=>processBulkPhoto(f));
-  event.target.value='';
-}
-function processBulkPhoto(file){
-  const ext=file.name.split('.').pop().toLowerCase();
-  if(!['jpg','jpeg','png','webp'].includes(ext))return;
-  if(file.size>15*1024*1024)return;
-  const r=new FileReader();
-  const fileName=file.name;
-  r.onload=ev=>{
-    bulkPhotos.push({dataURL:ev.target.result,file:file,fileName:fileName,caption:''});
-    renderBulkGrid();
-  };
-  r.readAsDataURL(file);
-}
-function renderBulkGrid(){
-  const grid=document.getElementById('bulkGrid');
-  const ctr=document.getElementById('bulkCount');
-  if(!grid)return;
-  grid.innerHTML=bulkPhotos.map((p,i)=>`
-    <div class="bulk-thumb">
-      <img src="${p.dataURL}" alt="Photo ${i+1}"/>
-      <button class="bulk-thumb-rm" onclick="removeBulkPhoto(${i})">×</button>
-      <div class="bulk-thumb-cap">
-        <input type="text" placeholder="Caption for photo ${i+1}" value="${esc(p.caption)}" oninput="updateBulkCaption(${i},this.value)"/>
-      </div>
-    </div>`).join('');
-  if(ctr)ctr.textContent=bulkPhotos.length?`${bulkPhotos.length} photo${bulkPhotos.length>1?'s':''} ready to submit`:'';
-}
-function removeBulkPhoto(i){bulkPhotos.splice(i,1);renderBulkGrid();}
-function updateBulkCaption(i,val){if(bulkPhotos[i])bulkPhotos[i].caption=val;}
-
+/* GALLERY BULK UPLOAD */
+let bulkPhotos=[];
+function buildGalleryTabs(){return`<div class="f-card gallery-tabs-card"><div class="gallery-tabs"><button class="g-tab active" id="gtab-single" onclick="switchGTab('single')">Single Photo</button><button class="g-tab" id="gtab-bulk" onclick="switchGTab('bulk')">Bulk Upload (Fast)</button></div><div id="gpane-single" class="g-pane active"><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)"><input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/><div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>Upload photo <span class="req">*</span></h3><p>Click here or drag & drop</p></div><div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><div class="photo-dims" id="photoDims"></div><button class="photo-change" onclick="resetPhoto(event)">Change</button></div></div></div><div id="gpane-bulk" class="g-pane"><div class="photo-drop bulk-drop" onclick="document.getElementById('bulkInput').click()"><input type="file" id="bulkInput" multiple accept=".jpg,.jpeg,.png,.webp" onchange="handleBulk(event)"/><div class="photo-drop-icon">➕</div><h3>Select Multiple Photos</h3><p>Automatically creates separate entries for each</p></div><div id="bulkGrid" class="bulk-grid"></div><button class="submit-btn" id="bulkSubmitBtn" style="display:none;margin-top:20px;" onclick="submitBulkGallery()">Submit <span id="bulkCount">0</span> Photos</button></div></div>`;}
+function switchGTab(t){document.querySelectorAll('.g-tab').forEach(b=>b.classList.toggle('active',b.id==='gtab-'+t));document.querySelectorAll('.g-pane').forEach(p=>p.classList.toggle('active',p.id==='gpane-'+t));if(t==='bulk'){document.getElementById('mainSubmitBtn').style.display='none';}else{document.getElementById('mainSubmitBtn').style.display='block';}}
+function handleBulk(e){const files=Array.from(e.target.files);if(!files.length)return;files.forEach(f=>{const reader=new FileReader();reader.onload=ev=>{bulkPhotos.push({file:f,data:ev.target.result,caption:'',fileName:f.name});renderBulkGrid();};reader.readAsDataURL(f);});e.target.value='';}
+function renderBulkGrid(){const g=document.getElementById('bulkGrid');const btn=document.getElementById('bulkSubmitBtn');const cnt=document.getElementById('bulkCount');if(!g)return;if(!bulkPhotos.length){g.innerHTML='';btn.style.display='none';return;}btn.style.display='block';cnt.textContent=bulkPhotos.length;g.innerHTML=bulkPhotos.map((p,i)=>`<div class="bulk-item"><img src="${p.data}"/><input type="text" placeholder="Caption (optional)" value="${esc(p.caption)}" oninput="bulkPhotos[${i}].caption=this.value"/><button class="bulk-remove" onclick="bulkPhotos.splice(${i},1);renderBulkGrid()">×</button></div>`).join('');}
 async function submitBulkGallery(){
-  if(!bulkPhotos.length){alert('Please add at least one photo.');return;}
-  /* Validate required fields */
+  if(!bulkPhotos.length)return;
   const submitterName=(document.getElementById('ff-submitterName')?.value||'').trim();
-  if(!submitterName){alert('Please enter your name before submitting.');document.getElementById('ff-submitterName')?.focus();return;}
-  const submitterRole=(document.getElementById('ff-submitterRole')?.value||'').trim()||'';
-  const ts=new Date().toLocaleString();
-  let count=0;let errors=0;
-  showSync('syncing','Uploading '+bulkPhotos.length+' photos…');
-  for(const p of bulkPhotos){
+  const submitterRole='Contributor';
+  if(!submitterName){alert('Please enter "Submitted By" name in the details section above.');document.getElementById('ff-submitterName').focus();return;}
+  if(!confirm(`Submit ${bulkPhotos.length} photos to the gallery?`))return;
+  showSync('syncing','Uploading '+bulkPhotos.length+' photos...');
+  let count=0,errors=0;
+  for(let p of bulkPhotos){
     try{
       const subId=genId();
-      /* Upload to Storage for full quality */
-      let photoData=p.dataURL;
-      if(p.file){
-        try{photoData=await uploadToStorage(p.file,subId);}catch(e){console.warn('[Storage] Bulk photo upload failed:',e.message);}
-      }
+      let photoData=p.data;
+      try{
+        const url=await uploadToStorage(p.file,subId);
+        photoData=url;
+      }catch(e){console.warn('[Gallery] Upload failed, using base64:',e.message);}
       const sub={
-        id:subId,
-        category:'gallery',ts,createdAt:Date.now()+count,
+        id:subId,category:'gallery',ts:new Date().toLocaleString(),createdAt:Date.now(),
         status:'pending',
         reviewerNote:'',reviewedAt:null,
         data:{
@@ -1770,7 +1139,7 @@ function openPrintView(){
    • Inline edit box so editor can correct mistakes directly
    • Retry with fallback model on 504/timeout
    • Works from both admin and editor panels
-═══════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════ */
 function extractAllText(s){
   /* Gather ALL text-heavy fields from the submission */
   const longFields=[];
@@ -2307,7 +1676,7 @@ function renderShareLinks(){const c=document.getElementById('shareLinksContainer
 /* ═══════════════════════════════════════════════════════════
    WORKSPACE ENGINE — VS Code-style Design Studio
    Only finalized submissions enter the workspace.
-═══════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════ */
 let wsPages=[],wsPageIdx=0,wsZoom=100,wsShowGuides=true,wsSpreadMode=false;
 let wsAIChatHistory=[],wsAISampleBase64=null,wsAISampleMime=null;
 let wsUndoStack=[],wsRedoStack=[],wsAutoSaveTimer=null;
