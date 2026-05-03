@@ -872,8 +872,8 @@ function getEffectiveFields(catKey){const cat=CATEGORIES[catKey];if(!cat)return[
 function getAllFieldsForEditing(catKey){const cat=CATEGORIES[catKey];if(!cat)return[];const ov=(formConfig[catKey]&&formConfig[catKey].overrides)||{};const cf=(formConfig[catKey]&&formConfig[catKey].customFields)||[];const bi=cat.fields.map((f,i)=>{const o=ov[f.id]||{};return{...f,_isBuiltIn:true,required:o.required!==undefined?!!o.required:!!f.required,hidden:!!o.hidden,order:o.order!==undefined?Number(o.order):i};});const cu=cf.map((c,i)=>({...c,_isBuiltIn:false,hidden:!!c.hidden,order:c.order!==undefined?Number(c.order):(1000+i)}));return[...bi,...cu].sort((a,b)=>(a.order||0)-(b.order||0));}
 
 /* STATE */
-let currentFormCategory=null,photoFile=null,photoDataURL=null,photoFilesMulti=[],photoDataURLsMulti=[];
-let pinBuf='',pinMode=null,currentAdminCat='all',currentEditorCat='pending';
+let photoFile=null,photoDataURL=null,photoFilesMulti=[],photoDataURLsMulti=[];
+let pinBuf='',pinMode=null;
 let reviewingId=null,reviewingDecision=null,currentLsTab='preview';
 let magPages=[],currentPageIdx=0,renamingKey=null,dragSrcIdx=null;
 let currentCustCat=null,editingCustomFieldId=null;
