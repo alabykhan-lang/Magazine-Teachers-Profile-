@@ -1,657 +1,407 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>MagicEditor v2.0 — Way To Success Standard Schools</title>
-  
-  <!-- CSS Failsafe: Ensures loading overlay disappears after 12s even if JS stalls -->
-  <style>
-    @keyframes fadeOutOverlay { from { opacity: 1; visibility: visible; } to { opacity: 0; visibility: hidden; } }
-    #bootOverlay { animation: fadeOutOverlay 0.5s forwards; animation-delay: 12s; }
-  </style>
-
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪄</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Lato:wght@300;400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-  
-  <!-- Supabase CDN (Async to prevent blocking) -->
-  <script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <!-- JSZip for exports -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MagicEditor v2.0 | Way To Success Standard Schools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="style.css">
+  <style id="ai-custom-css"></style>
 </head>
 <body>
+<!-- GLOBAL BOOT LOADING OVERLAY -->
+<div id="bootLoadingOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#1a2744;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;transition:opacity .5s ease,visibility .5s;">
+  <div style="width:48px;height:48px;border:4px solid rgba(255,255,255,.1);border-top-color:#7dd4a8;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:20px;"></div>
+  <div style="font-family:'Playfair Display',serif;font-size:24px;margin-bottom:8px;">MagicEditor</div>
+  <div id="bootLoadingStatus" style="font-family:'Lato',sans-serif;font-size:14px;color:rgba(255,255,255,.7);margin-bottom:20px;">Connecting to Cloud...</div>
+  <button id="bootForceOpen" onclick="removeBootOverlay()" style="display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 24px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Lato',sans-serif;">Force Open Dashboard</button>
+</div>
+<script>
+/* Failsafe: remove boot overlay within 10s no matter what */
+window.__bootOverlayTimer = setTimeout(removeBootOverlay, 10000);
+/* Show force-open button at 5s if still loading */
+setTimeout(function(){ 
+  var b = document.getElementById('bootForceOpen');
+  if(b) b.style.display='block';
+}, 5000);
 
-  <!-- BOOT LOADING OVERLAY -->
-  <div id="bootOverlay" class="boot-overlay">
-    <div class="boot-content">
-      <div class="boot-logo">🪄</div>
-      <div class="boot-spinner"></div>
-      <h2 class="boot-title">MagicEditor v2.0</h2>
-      <p class="boot-subtitle" id="bootLoadingStatus">Connecting to cloud sync...</p>
-      
-      <div class="boot-tips">
-        <p>Tip: Submissions are saved locally and synced to the cloud automatically.</p>
-      </div>
-      
-      <!-- EMERGENCY BYPASS: Shown after 5 seconds of hanging -->
-      <button id="bootBypass" class="boot-bypass" onclick="removeBootOverlay()" style="display:none;">Force Open Portal</button>
+function removeBootOverlay(){
+  clearTimeout(window.__bootOverlayTimer);
+  var ov = document.getElementById('bootLoadingOverlay');
+  if(!ov) return;
+  ov.style.opacity='0';
+  ov.style.pointerEvents='none';
+  setTimeout(function(){ 
+    ov.style.visibility='hidden'; 
+    ov.style.display='none'; 
+  }, 600);
+}
+</script>
+
+<div id="viewLanding" class="view active">
+  <div class="land-hero">
+    <div class="land-hero-inner">
+      <span class="land-logo">MagicEditor</span>
+      <h1>The <span class="me-magic">Magic</span> Behind Every Edition</h1>
+      <div class="land-hero-school">Way To Success Standard Schools · Ejigbo, Osun State</div>
+      <p>A magazine production pipeline for the Editorial Committee. Submit content — all in one place.</p>
     </div>
   </div>
-  
-  <script>
-    /* BOOT FAILSAFE: Guarantees the overlay is removed even if network stalls */
-    function removeBootOverlay() {
-      const overlay = document.getElementById('bootOverlay');
-      if(overlay) {
-        overlay.classList.add('fade-out');
-        setTimeout(() => overlay.remove(), 600);
-      }
-    }
-    /* Auto-show bypass button after 5 seconds */
-    setTimeout(() => {
-      const btn = document.getElementById('bootBypass');
-      if(btn) btn.style.display = 'block';
-    }, 5000);
-    /* Hard failsafe: remove after 10 seconds total */
-    setTimeout(removeBootOverlay, 10000);
-  </script>
+  <div class="land-body">
+    <div class="land-section-title">Submission Portals</div>
+    <h2 class="land-section-h" id="landingHeading">Choose a content category</h2>
+    <div class="form-grid" id="formGrid"></div>
+    <div class="land-footer" onclick="handleFooterClick()">
+      <p>MagicEditor · Way To Success Standard Schools</p>
+      <p style="margin-top:6px;">1st Edition · 2025/2026 Graduation</p>
+    </div>
+  </div>
+</div>
+
+<!-- FORM VIEW -->
+<div id="viewForm" class="view">
+  <div class="form-hero">
+    <button class="form-hero-back" onclick="goLanding()">← Back</button>
+    <div class="form-hero-inner">
+      <span class="form-hero-tag" id="formTag">—</span>
+      <h1 id="formTitle">—</h1>
+      <p id="formSubtitle">—</p>
+    </div>
+  </div>
+  <div id="formContainer" class="form-body"></div>
+  <div id="successWrap" class="success-wrap" style="display:none;">
+    <div id="successUploading" style="display:none;text-align:center;">
+      <div style="font-size:56px;margin-bottom:1rem;">⏳</div>
+      <h2 style="color:#1a2744;">Saving your submission…</h2>
+      <p style="margin-bottom:1rem;">Please wait while we upload your content to the cloud.</p>
+      <div style="width:100%;max-width:280px;height:6px;background:#e0e0d8;border-radius:3px;margin:0 auto;overflow:hidden;">
+        <div id="uploadProgressBar" style="height:100%;background:#4ab883;width:0%;border-radius:3px;transition:width .4s;"></div>
+      </div>
+      <p id="uploadProgressText" style="font-size:12px;color:#8e8e93;margin-top:8px;">Connecting to cloud…</p>
+    </div>
+    <div id="successDone" style="display:none;">
+      <div class="success-icon">🎉</div>
+      <h2>Submission Received!</h2>
+      <p>Thank you. Your submission has been sent to the Editor-in-Chief for review.</p>
+      <p style="font-size:12px;color:#4ab883;font-weight:700;margin-bottom:1.5rem;">✓ Saved to cloud — visible to editors on all devices</p>
+      <button onclick="goLanding()">Back to Home</button>
+    </div>
+  </div>
+</div>
+
+<div class="pin-overlay" id="pinOverlay">
+  <div class="pin-box">
+    <h2 id="pinTitle">Enter PIN</h2>
+    <p class="pin-sub" id="pinSub">Please enter your 4-digit access code</p>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pressPin(1)">1</button><button class="pin-key" onclick="pressPin(2)">2</button><button class="pin-key" onclick="pressPin(3)">3</button>
+      <button class="pin-key" onclick="pressPin(4)">4</button><button class="pin-key" onclick="pressPin(5)">5</button><button class="pin-key" onclick="pressPin(6)">6</button>
+      <button class="pin-key" onclick="pressPin(7)">7</button><button class="pin-key" onclick="pressPin(8)">8</button><button class="pin-key" onclick="pressPin(9)">9</button>
+      <button class="pin-key zero" onclick="pressPin(0)">0</button>
+      <button class="pin-key" style="background:transparent;font-size:14px;color:#8e8e93;" onclick="closePin()">Cancel</button>
+      <button class="pin-key" style="background:transparent;font-size:14px;color:#8e8e93;" onclick="clearPin()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN VIEW -->
+<div id="viewAdmin" class="view">
+  <div class="admin-layout">
+    <div class="admin-sidebar">
+      <div class="admin-topbar" style="background:#1a2744;">
+        <div class="admin-topbar-left">
+          <span class="admin-logo">Admin Panel</span>
+          <h1>Editorial Portal</h1>
+        </div>
+      </div>
+      <div class="admin-tabs" id="adminTabs">
+        <!-- Built dynamically -->
+      </div>
+      <div class="admin-topbar-right">
+        <button class="btn" style="background:#f8f9fa;margin-bottom:8px;" onclick="openLayoutStudio()">🎨 Layout Studio</button>
+        <button class="admin-exit" onclick="goLanding()">Log Out</button>
+      </div>
+    </div>
+    <div class="admin-main">
+      <div id="adminModeSubs">
+        <div class="admin-body">
+          <div class="stats-row" id="adminStats"></div>
+          <div class="action-row">
+            <span class="action-row-label">Filters:</span>
+            <select class="filter-select" id="adminStatusFilter" onchange="renderAdmin()">
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="finalized">Finalized</option>
+            </select>
+          </div>
+          <div class="sub-list" id="adminList"></div>
+        </div>
+      </div>
+      <div id="adminModeEditorial" style="display:none;">
+        <div class="admin-body">
+          <div class="editor-intro">
+            <h2>Editorial Control</h2>
+            <p>Compose official notes, appreciations, and front-matter content for the magazine.</p>
+          </div>
+          <div id="editorialComposeWrap"></div>
+        </div>
+      </div>
+      <div id="adminModeLayout" style="display:none;">
+        <div class="ls-tabs">
+          <button class="ls-tab active" id="lsTabSections" onclick="showLsTab('sections')">Sections & Order</button>
+          <button class="ls-tab" id="lsTabSettings" onclick="showLsTab('settings')">Title & Colors</button>
+          <button class="ls-tab" id="lsTabLabels" onclick="showLsTab('labels')">Labels & Terms</button>
+          <button class="ls-tab" id="lsTabAI" onclick="showLsTab('ai')">AI Tools</button>
+          <button class="ls-tab" id="lsTabPreview" onclick="showLsTab('preview')">Live Preview</button>
+        </div>
+        <div class="ls-body">
+          <div id="lsPanelSections" class="ls-panel">
+            <div class="settings-section">
+              <h3>Section Management</h3>
+              <p class="desc">Drag to reorder sections as they will appear in the printed magazine.</p>
+              <div class="section-list" id="lsSectionList"></div>
+            </div>
+            <div class="settings-section">
+              <h3>Custom Forms</h3>
+              <p class="desc">Add or remove custom submission categories.</p>
+              <button class="btn btn-primary" onclick="openAddField()">+ Add New Category</button>
+            </div>
+          </div>
+          <div id="lsPanelSettings" class="ls-panel" style="display:none;">
+            <div class="ls-settings-grid">
+              <div class="ls-setting-card">
+                <h4>Magazine Identity</h4>
+                <div class="ls-field"><label>Magazine Title</label><input type="text" id="lsMagTitle"></div>
+                <div class="ls-field"><label>School Name</label><input type="text" id="lsSchoolName"></div>
+                <div class="ls-field"><label>Edition (e.g. 1st Edition)</label><input type="text" id="lsEdition"></div>
+                <div class="ls-field"><label>Year</label><input type="text" id="lsYear"></div>
+              </div>
+              <div class="ls-setting-card">
+                <h4>Visual Theme</h4>
+                <div class="ls-field"><label>Primary Color (Navy)</label><input type="color" id="lsColor1"></div>
+                <div class="ls-field"><label>Accent Color (Mint)</label><input type="color" id="lsColor2"></div>
+                <div class="ls-field"><label>Danger Color (Red)</label><input type="color" id="lsColor3"></div>
+              </div>
+              <div class="ls-setting-card">
+                <h4>Print Setup</h4>
+                <div class="ls-field"><label>Paper Size</label><select id="lsPageSize"><option value="a4">A4 Standard</option><option value="a5">A5 Booklet</option><option value="letter">Letter</option></select></div>
+                <div class="ls-field"><label>Orientation</label><select id="lsOrientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div>
+                <div class="ls-field"><label>Show Page Numbers</label><select id="lsPageNums"><option value="yes">Yes</option><option value="no">No</option></select></div>
+              </div>
+            </div>
+            <button class="btn btn-mint" style="width:100%;padding:14px;border-radius:12px;" onclick="saveLsSettings()">Save Theme & Identity</button>
+          </div>
+          <div id="lsPanelLabels" class="ls-panel" style="display:none;">
+            <div class="settings-section">
+              <h3>UI Text & Labels</h3>
+              <p class="desc">Rename system headings, buttons, and form labels.</p>
+              <div id="lsLabelList" class="sub-list"></div>
+            </div>
+          </div>
+          <div id="lsPanelAI" class="ls-panel" style="display:none;">
+            <div class="ls-ai-panel">
+              <h4>AI Content Summary</h4>
+              <p style="font-size:12px;color:#1a5a35;margin-bottom:1rem;">Generate a professional summary or introduction based on received submissions.</p>
+              <select id="lsAiSource"><option value="all">All Submissions</option></select>
+              <input type="text" id="lsAiPrompt" placeholder="Extra instructions for AI (optional)...">
+              <button class="btn btn-ai" style="width:100%;" onclick="runAISummary()">✨ Generate Summary</button>
+              <div id="lsAiResult" class="ls-ai-result"></div>
+            </div>
+          </div>
+          <div id="lsPanelPreview" class="ls-panel" style="display:none;">
+            <div class="mag-preview-toolbar">
+              <button class="btn btn-primary" onclick="enterWorkspace()">🛠 Open Workspace Design Studio</button>
+              <div class="page-nav">
+                <button onclick="prevPreviewPage()">‹</button>
+                <span class="page-nav-info" id="previewPageInfo">Page 1 of 1</span>
+                <button onclick="nextPreviewPage()">›</button>
+              </div>
+              <button class="btn" onclick="printMagazine()">🖨 Print / PDF</button>
+            </div>
+            <div class="mag-canvas">
+              <div class="mag-page" id="magPreviewPage">
+                <div class="mag-page-inner" id="magPreviewContent"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDITOR VIEW -->
+<div id="viewEditor" class="view">
+  <div class="admin-layout">
+    <div class="admin-sidebar" style="background:#f0f0ed;">
+      <div class="admin-topbar" style="background:#2d1b4e;">
+        <div class="admin-topbar-left">
+          <span class="admin-logo">Editor-in-Chief</span>
+          <h1>Production Grid</h1>
+        </div>
+      </div>
+      <div class="admin-tabs" id="editorTabs"></div>
+      <div class="admin-topbar-right">
+        <button class="admin-exit" onclick="goLanding()">Log Out</button>
+      </div>
+    </div>
+    <div class="admin-main">
+      <div class="admin-body">
+        <div class="stats-row" id="editorStats"></div>
+        <div class="action-row">
+          <span class="action-row-label">Production Filter:</span>
+          <select class="filter-select" id="editorStatusFilter" onchange="renderEditor()">
+            <option value="all">All Submissions</option>
+            <option value="pending">Needs Review</option>
+            <option value="approved">Approved</option>
+          </select>
+        </div>
+        <div class="sub-list" id="editorList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- WORKSPACE VIEW -->
+<div id="viewWorkspace" class="view">
+  <div class="ws-layout">
+    <div class="ws-topbar">
+      <div class="ws-topbar-logo">MagicEditor Studio</div>
+      <div class="ws-topbar-title" id="wsMagTitle">Magazine Edition 2025</div>
+      <div class="ws-topbar-controls">
+        <span class="ws-topbar-save" id="wsSaveStatus">✓ Saved</span>
+        <div class="ws-topbar-divider"></div>
+        <button class="ws-topbar-btn" onclick="wsToggleSidebar()">📂 Panels</button>
+        <button class="ws-topbar-btn" onclick="wsToggleAI()">✨ AI Assistant</button>
+        <div class="ws-topbar-divider"></div>
+        <button class="ws-topbar-btn accent" onclick="wsExportPDF()">Export PDF</button>
+        <button class="ws-topbar-btn danger" onclick="exitWorkspace()">Exit</button>
+      </div>
+    </div>
+    
+    <div class="ws-sidebar" id="wsSidebar">
+      <div class="ws-panel">
+        <div class="ws-panel-header" onclick="wsTogglePanel(this)">
+          <span>Pages & Spreads</span>
+          <span class="ws-chevron">▼</span>
+        </div>
+        <div class="ws-panel-body">
+          <div id="wsPageList"></div>
+          <button class="ws-topbar-btn" style="width:100%;margin-top:8px;justify-content:center;" onclick="wsAddPage()">+ Add Page</button>
+        </div>
+      </div>
+      <div class="ws-panel">
+        <div class="ws-panel-header" onclick="wsTogglePanel(this)">
+          <span>Assets & Submissions</span>
+          <span class="ws-chevron">▼</span>
+        </div>
+        <div class="ws-panel-body">
+          <div class="ws-asset-grid" id="wsAssetList"></div>
+        </div>
+      </div>
+      <div class="ws-panel">
+        <div class="ws-panel-header" onclick="wsTogglePanel(this)">
+          <span>Global Style</span>
+          <span class="ws-chevron">▼</span>
+        </div>
+        <div class="ws-panel-body">
+          <div class="ws-color-row">
+            <div class="ws-color-swatch" id="wsColor1Swatch" style="background:#1a2744;"></div>
+            <div class="ws-color-label">Primary Color</div>
+          </div>
+          <div class="ws-color-row">
+            <div class="ws-color-swatch" id="wsColor2Swatch" style="background:#7dd4a8;"></div>
+            <div class="ws-color-label">Accent Color</div>
+          </div>
+          <div class="ws-font-label">Heading Font</div>
+          <select class="ws-font-select" onchange="wsSetHeadingFont(this.value)">
+            <option value="'Playfair Display', serif">Playfair Display</option>
+            <option value="'Crimson Text', serif">Crimson Text</option>
+            <option value="'Lato', sans-serif">Lato</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="ws-canvas" id="wsCanvas">
+      <div class="ws-page-nav">
+        <button class="ws-page-nav-btn" onclick="wsPrevPage()">‹</button>
+        <span class="ws-page-nav-info" id="wsPageInfo">Page 1 of 1</span>
+        <button class="ws-page-nav-btn" onclick="wsNextPage()">›</button>
+      </div>
+      <div id="wsMainPage" class="ws-mag-page">
+        <div class="ws-guides">
+          <div class="ws-bleed"></div>
+          <div class="ws-safe"></div>
+          <div class="ws-crop-tl"></div><div class="ws-crop-tr"></div>
+          <div class="ws-crop-bl"></div><div class="ws-crop-br"></div>
+          <div class="ws-guide-label bleed-label">Bleed Edge</div>
+          <div class="ws-guide-label safe-label">Safe Margin</div>
+        </div>
+        <div class="ws-mag-page-inner" id="wsPageContent"></div>
+      </div>
+      <div class="ws-zoom-bar">
+        <button class="ws-zoom-btn" onclick="wsZoomOut()">-</button>
+        <span class="ws-zoom-level" id="wsZoomLevel">85%</span>
+        <button class="ws-zoom-btn" onclick="wsZoomIn()">+</button>
+      </div>
+    </div>
+
+    <div class="ws-ai" id="wsAI">
+      <div class="ws-ai-header">
+        <div class="ws-ai-title">✨ Design Assistant</div>
+        <div class="ws-ai-selectors">
+          <select class="ws-ai-select"><option>Gemini 2.0 Flash</option></select>
+          <select class="ws-ai-select" id="wsAiMode"><option value="layout">Layout Help</option><option value="copy">Copywriting</option></select>
+        </div>
+      </div>
+      <div class="ws-ai-chat" id="wsAiChat">
+        <div class="ws-ai-msg assistant">
+          Hello! I'm your MagicEditor design assistant. I can help you arrange pages, proofread content, or generate layout suggestions. How can I help today?
+        </div>
+      </div>
+      <div class="ws-ai-quick">
+        <button class="ws-ai-quick-btn" onclick="wsAiCommand('auto-layout')">Auto-Layout Page</button>
+        <button class="ws-ai-quick-btn" onclick="wsAiCommand('proofread')">Proofread Current</button>
+      </div>
+      <div class="ws-ai-input">
+        <textarea class="ws-ai-textarea" id="wsAiInput" placeholder="Ask AI to help with your design..."></textarea>
+        <button class="ws-ai-send" onclick="wsAiSend()">↑</button>
+      </div>
+    </div>
+
+    <div class="ws-statusbar">
+      <div class="ws-statusbar-item">
+        <div class="ws-statusbar-dot ok"></div>
+        <span>Cloud Connected</span>
+      </div>
+      <div class="ws-statusbar-sep"></div>
+      <div class="ws-statusbar-item">
+        <span id="wsStatusPageCount">1 Page</span>
+      </div>
+      <div class="ws-statusbar-sep"></div>
+      <div class="ws-statusbar-item">
+        <span id="wsStatusSelection">No Selection</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box" id="modalContent"></div>
+</div>
 
   <!-- SYNC INDICATOR -->
-  <div id="syncToast" class="sync-toast">
-    <span id="syncIcon">🔄</span>
-    <span id="syncText">Syncing...</span>
+  <div id="syncBar" class="sync-bar">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncMsg"></span>
   </div>
-
-  <!-- NAVIGATION -->
-  <nav class="nav-bar">
-    <div class="nav-container">
-      <div class="nav-brand" onclick="goLanding()">
-        <span class="nav-brand-icon">🪄</span>
-        <div class="nav-brand-text">
-          <h1>MagicEditor <span>v2.0</span></h1>
-          <p>Way To Success Standard Schools</p>
-        </div>
-      </div>
-      <div class="nav-actions">
-        <button class="nav-btn btn-admin" onclick="openPIN('unified')">
-          <span class="btn-icon">🔒</span> Portal Access
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <main class="content">
-    
-    <!-- LANDING VIEW -->
-    <section id="viewLanding" class="view active">
-      <header class="view-header">
-        <h2 id="landingHeading">Choose a content category</h2>
-        <p>Submit your entries for the 2025/2026 Graduation Magazine</p>
-      </header>
-      
-      <div class="form-grid" id="formGrid">
-        <!-- Cards injected by JS -->
-      </div>
-      
-      <footer class="landing-footer">
-        <p>© 2025 Way To Success Standard Schools. All entries are subject to review by the Editor-in-Chief.</p>
-        <div style="font-size: 10px; color: var(--ink3); cursor: pointer;" onclick="handleFooterClick()">v2.0.4 Hardened</div>
-      </footer>
-    </section>
-
-    <!-- SUBMISSION FORM VIEW -->
-    <section id="viewForm" class="view">
-      <div class="form-wrap">
-        <button class="back-link" onclick="goLanding()">← Back to categories</button>
-        
-        <div class="form-header-card">
-          <span class="form-tag" id="formTag">CATEGORY</span>
-          <h2 id="formTitle">Submission Form</h2>
-          <p id="formSubtitle">Please fill in all required fields accurately.</p>
-        </div>
-
-        <div id="formContainer">
-          <!-- Fields injected by JS -->
-        </div>
-
-        <!-- SUCCESS SCREEN -->
-        <div id="successWrap" style="display: none;" class="success-screen">
-          <div id="successUploading">
-            <div class="success-spinner"></div>
-            <h3>Syncing to Cloud...</h3>
-            <p id="uploadProgressText">Optimizing and securing your submission.</p>
-            <div class="progress-bar-wrap"><div id="uploadProgressBar" class="progress-bar"></div></div>
-          </div>
-          <div id="successDone" style="display: none;">
-            <div class="success-icon">✓</div>
-            <h3>Submission Successful!</h3>
-            <p>Your entry has been sent to the Editor-in-Chief for review.</p>
-            <div class="success-actions">
-              <button class="btn btn-primary" onclick="goLanding()">Submit another entry</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- EDITOR-IN-CHIEF VIEW -->
-    <section id="viewEditor" class="view">
-      <div class="admin-container">
-        <header class="admin-header">
-          <div class="admin-header-title">
-            <span class="admin-badge editor">✎ Editor-in-Chief</span>
-            <h2>Editorial Dashboard</h2>
-          </div>
-          <div class="admin-header-actions">
-            <button class="btn btn-icon-only" onclick="editorRefresh()" title="Refresh from cloud">↻</button>
-            <button class="btn btn-outline" onclick="goLanding()">Exit Portal</button>
-          </div>
-        </header>
-
-        <nav class="admin-nav">
-          <button class="editor-tab active" id="etab-pending" onclick="setEditorCategory('pending')">Inbox <span class="tab-count" id="ecount-pending">0</span></button>
-          <button class="editor-tab" id="etab-approved" onclick="setEditorCategory('approved')">Approved <span class="tab-count" id="ecount-approved">0</span></button>
-          <button class="editor-tab" id="etab-rejected" onclick="setEditorCategory('rejected')">Rejected <span class="tab-count" id="ecount-rejected">0</span></button>
-          <button class="editor-tab" id="etab-all" onclick="setEditorCategory('all')">All History <span class="tab-count" id="ecount-all">0</span></button>
-          <button class="editor-tab" id="etab-editorial" onclick="setEditorCategory('editorial')" style="color:var(--purple);font-weight:700;">📜 Editorial Note</button>
-        </nav>
-
-        <!-- Editor Content List -->
-        <div id="editorModeList">
-          <div class="admin-controls">
-            <div class="search-wrap">
-              <span class="search-icon">🔍</span>
-              <input type="text" placeholder="Search by name or content..." id="editorSearch" oninput="renderEditor()"/>
-            </div>
-          </div>
-          <div id="editorSubList" class="sub-list">
-            <!-- Subs injected by JS -->
-          </div>
-        </div>
-
-        <!-- Editorial Note Mode -->
-        <div id="editorModeNote" style="display:none;">
-          <div class="f-card">
-            <div class="f-card-title">Editorial Note for Magazine</div>
-            <p style="font-size:12px;color:var(--ink3);margin-bottom:1rem;">This note will appear at the beginning of the magazine. Use the AI tool to polish your writing.</p>
-            <div class="field">
-              <label>Title</label>
-              <input type="text" id="edNoteTitle" placeholder="e.g. From the Editor's Desk"/>
-            </div>
-            <div class="field">
-              <label>Body Content</label>
-              <textarea id="edNoteBody" style="min-height:300px;" placeholder="Write your editorial message here..."></textarea>
-            </div>
-            <div style="display:flex;gap:10px;margin-top:10px;">
-              <button class="btn btn-primary" onclick="saveEditorialNote()">Save to Cloud</button>
-              <button class="btn btn-ai" onclick="proofreadText('edNoteBody')">✦ AI Polish & Proofread</button>
-              <span id="edNoteStatus" style="font-size:12px;color:var(--green);align-self:center;"></span>
-            </div>
-            <div id="proofread-edNoteBody" class="proofread-panel" style="display:none;margin-top:1.5rem;"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- PRODUCTION ADMIN VIEW -->
-    <section id="viewAdmin" class="view">
-      <div class="admin-container">
-        <header class="admin-header">
-          <div class="admin-header-title">
-            <span class="admin-badge">⚙ Production Admin</span>
-            <h2>Magazine Infrastructure</h2>
-          </div>
-          <div class="admin-header-actions">
-            <button class="btn btn-icon-only" onclick="adminRefresh()" title="Refresh from cloud">↻</button>
-            <button class="btn btn-outline" onclick="goLanding()">Exit Portal</button>
-          </div>
-        </header>
-
-        <nav class="admin-nav" id="dynamicAdminTabs">
-          <!-- Populated by JS -->
-        </nav>
-
-        <div class="admin-main">
-          <!-- SUBMISSIONS MODE -->
-          <div id="adminModeSubs">
-            <div class="admin-stats">
-              <div class="stat-card">
-                <div class="stat-val" id="statTotal">0</div>
-                <div class="stat-lbl">Total Submissions</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-val" id="statPending">0</div>
-                <div class="stat-lbl">Pending Review</div>
-              </div>
-              <div class="stat-card approved">
-                <div class="stat-val" id="statApproved">0</div>
-                <div class="stat-lbl">Approved</div>
-              </div>
-              <div class="stat-card finalized">
-                <div class="stat-val" id="statFinalized">0</div>
-                <div class="stat-lbl">Finalized</div>
-              </div>
-            </div>
-
-            <div class="admin-controls">
-              <div class="search-wrap">
-                <span class="search-icon">🔍</span>
-                <input type="text" placeholder="Search entries..." id="adminSearch" oninput="renderAdmin()"/>
-              </div>
-              <select class="filter-select" id="filterStatus" onchange="renderAdmin()">
-                <option value="all">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="finalized">Finalized</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              <button class="btn btn-outline" onclick="exportCurrentCategory()">⬇ Export Category</button>
-              <button class="btn btn-primary" onclick="exportMasterMagazine()">📦 Master Export</button>
-            </div>
-
-            <div id="adminSubList" class="sub-list">
-              <!-- Subs injected by JS -->
-            </div>
-          </div>
-
-          <!-- EDITORIAL MODE -->
-          <div id="adminModeEditorial" style="display:none;">
-            <div class="editorial-grid">
-              <div class="editorial-main">
-                <div class="f-card">
-                  <div class="f-card-title">Appreciation Section</div>
-                  <div class="field">
-                    <label>Title</label>
-                    <input type="text" id="apprTitle" placeholder="e.g. Heartfelt Thanks"/>
-                  </div>
-                  <div class="field">
-                    <label>Content</label>
-                    <textarea id="apprBody" style="min-height:200px;" placeholder="List your appreciations here..."></textarea>
-                  </div>
-                  <button class="btn btn-primary" onclick="saveAppreciation()">Save Appreciation</button>
-                  <span id="apprStatus" style="font-size:12px;color:var(--green);margin-left:10px;"></span>
-                </div>
-              </div>
-              <div class="editorial-side">
-                <div class="f-card">
-                  <div class="f-card-title">Editorial Preview</div>
-                  <div id="edNotePreview" class="ed-preview">No editorial note yet.</div>
-                </div>
-                <div class="f-card">
-                  <div class="f-card-title">Current Entries</div>
-                  <div id="editorialList" class="sub-list condensed"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- LAYOUT STUDIO (Workspace) -->
-          <div id="adminModeLayout" style="display:none;">
-            <!-- Legacy layout UI replaced by Workspace button -->
-            <div class="f-card" style="text-align:center;padding:3rem;">
-              <div style="font-size:48px;margin-bottom:1rem;">🛠</div>
-              <h2>MagicEditor Workspace v2.0</h2>
-              <p style="max-width:500px;margin:0 auto 1.5rem;color:var(--ink3);">Access the professional design studio to arrange finalized content, manage sections, and generate print-ready PDFs.</p>
-              <button class="btn btn-primary btn-lg" onclick="openWorkspace()">Open Design Workspace</button>
-            </div>
-          </div>
-
-          <!-- SHARE LINKS MODE -->
-          <div id="adminModeShareLinks" style="display:none;">
-            <div class="f-card">
-              <div class="f-card-title">Category Submission Links</div>
-              <p style="font-size:13px;color:var(--ink3);margin-bottom:1.5rem;">Copy these links and share them with teachers, students, or contributors to collect content for specific sections.</p>
-              <div id="shareLinksContainer" class="share-links-list">
-                <!-- Links injected by JS -->
-              </div>
-            </div>
-          </div>
-
-          <!-- SETTINGS MODE -->
-          <div id="adminModeSettings" style="display:none;">
-            <div class="settings-grid">
-              <div class="f-card">
-                <div class="f-card-title">Access Security</div>
-                <div class="field">
-                  <label>Production Admin PIN (4 digits)</label>
-                  <input type="password" id="setAdminPin" maxlength="4" placeholder="****"/>
-                </div>
-                <div class="field">
-                  <label>Editor-in-Chief PIN (4 digits)</label>
-                  <input type="password" id="setEditorPin" maxlength="4" placeholder="****"/>
-                </div>
-                <button class="btn btn-primary" onclick="savePins()">Save PINs</button>
-                <button class="btn btn-outline" onclick="resetPinsToDefault()">Reset to Default</button>
-                <div id="pinSaveStatus" style="font-size:12px;margin-top:10px;"></div>
-              </div>
-
-              <div class="f-card">
-                <div class="f-card-title">AI & Layout Configuration</div>
-                <div class="field">
-                  <label>OpenRouter API Key</label>
-                  <input type="password" id="settingsApiKey" placeholder="sk-or-..."/>
-                  <div class="field-hint">Required for AI Proofreading and Layout Assistant.</div>
-                </div>
-                <button class="btn btn-primary" onclick="saveApiKeyFromSettings()">Save API Key</button>
-                <div id="apiKeySaveStatus" style="font-size:12px;margin-top:10px;"></div>
-                <hr style="margin:1.5rem 0;opacity:.1;">
-                <div class="field">
-                  <label>Form Customization</label>
-                  <select id="custCatPicker" class="filter-select" onchange="renderFieldCustomizer()" style="width:100%;margin-bottom:12px;">
-                    <option value="">— Select a category —</option>
-                  </select>
-                </div>
-                <div id="custFieldsList" class="cust-fields-list">
-                  <!-- Custom fields injected here -->
-                </div>
-                <div id="custActions" style="display:none;gap:10px;margin-top:15px;">
-                  <button class="btn btn-outline btn-sm" onclick="openCustomFieldModal()">+ Add Field</button>
-                  <button class="btn btn-outline btn-sm" onclick="resetCategoryToDefaults()">Reset to Defaults</button>
-                </div>
-                <hr style="margin:1.5rem 0;opacity:.1;">
-                <button class="btn btn-outline btn-sm" onclick="openCreateFormModal()">Create New Custom Category</button>
-              </div>
-
-              <div class="f-card danger">
-                <div class="f-card-title">System & Maintenance</div>
-                <p style="font-size:12px;margin-bottom:15px;">Tools for troubleshooting and clearing the system database.</p>
-                <button class="btn btn-danger" onclick="wipeAllData()">WIPE ALL SUBMISSIONS</button>
-                <button class="btn btn-outline" onclick="purgeLocalCache()">Purge Local Cache</button>
-                <div id="purgeStatus" style="font-size:11px;margin-top:8px;color:var(--green);"></div>
-                <hr style="margin:1.5rem 0;opacity:.1;">
-                <div class="f-card-title">System Diagnostics</div>
-                <pre id="diagOutput" style="font-size:10px;background:#1a1a1c;color:#0f0;padding:12px;border-radius:6px;max-height:150px;overflow-y:auto;"></pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- WORKSPACE (DESIGN STUDIO) -->
-    <section id="viewWorkspace" class="view">
-      <div class="ws-container">
-        <!-- Sidebar Left: Navigation -->
-        <aside class="ws-sidebar-left">
-          <div class="ws-side-header">
-            <span class="ws-side-icon">📑</span>
-            <h3>Pages</h3>
-            <button class="ws-mini-btn" onclick="wsGeneratePreview()" title="Refresh Layout">↻</button>
-          </div>
-          <div id="wsPageList" class="ws-page-list">
-            <!-- Pages injected here -->
-          </div>
-          <div class="ws-side-footer">
-            <div id="wsStatusPages">0 pages</div>
-            <div id="wsStatusFinalized">0 finalized</div>
-          </div>
-        </aside>
-
-        <!-- Main Workspace Area -->
-        <div class="ws-main">
-          <!-- Toolbar -->
-          <div class="ws-toolbar">
-            <div class="ws-tool-group">
-              <button class="ws-tool-btn" onclick="closeWorkspace()" title="Back to Admin">✕</button>
-              <div class="ws-divider"></div>
-              <h2 id="wsProjectTitle">The Torch — Magazine Studio</h2>
-            </div>
-            <div class="ws-tool-group">
-              <button class="ws-tool-btn" onclick="wsUndo()" title="Undo">↶</button>
-              <button class="ws-tool-btn" onclick="wsRedo()" title="Redo">↷</button>
-              <div class="ws-divider"></div>
-              <button class="ws-tool-btn" onclick="wsSetZoom(wsZoom-10)">−</button>
-              <span id="wsZoomLevel" class="ws-zoom-val">100%</span>
-              <button class="ws-tool-btn" onclick="wsSetZoom(wsZoom+10)">+</button>
-              <div class="ws-divider"></div>
-              <button class="ws-tool-btn" id="wsGuidesBtn" onclick="wsToggleGuides()" title="Toggle Guides">☑ Guides</button>
-              <button class="ws-tool-btn" id="wsSpreadBtn" onclick="wsToggleSpread()" title="Toggle Spread View">⊞ Spread</button>
-            </div>
-            <div class="ws-tool-group">
-              <div class="ws-save-indicator" id="wsSaveIndicator">● Saved</div>
-              <button class="btn btn-primary btn-sm" onclick="wsExportPrintPDF()">Export PDF</button>
-              <button class="btn btn-outline btn-sm" onclick="wsExportEditable()">Package</button>
-            </div>
-          </div>
-
-          <!-- Canvas -->
-          <div class="ws-canvas">
-            <div id="wsPageContainer" class="ws-page-container">
-              <!-- Rendered magazine sheets injected here -->
-            </div>
-          </div>
-
-          <!-- Bottom Bar -->
-          <div class="ws-bottom-bar">
-            <div class="ws-status-item">A4 Portrait · 3mm Bleed · CMYK Simulation</div>
-            <div class="ws-status-item" id="wsStatusZoom">100%</div>
-            <div class="ws-status-item">Ready</div>
-          </div>
-        </div>
-
-        <!-- Sidebar Right: Design & AI -->
-        <aside class="ws-sidebar-right">
-          <div class="ws-side-tabs">
-            <button class="ws-tab-btn active" onclick="wsTogglePanel('wsPanelDesign')">Design</button>
-            <button class="ws-tab-btn" onclick="wsTogglePanel('wsPanelAI')">AI Assistant</button>
-          </div>
-
-          <div class="ws-side-panels">
-            <!-- Design Panel -->
-            <div id="wsPanelDesign" class="ws-side-panel">
-              <div class="ws-panel-group">
-                <div class="ws-panel-head" onclick="wsTogglePanel('wsPanelColors')"><span>🎨</span> Color Palette</div>
-                <div id="wsPanelColors" class="ws-panel-body">
-                  <div id="wsColorPanel" class="ws-color-grid"></div>
-                </div>
-              </div>
-              <div class="ws-panel-group">
-                <div class="ws-panel-head" onclick="wsTogglePanel('wsPanelTypography')"><span>Aa</span> Typography</div>
-                <div id="wsPanelTypography" class="ws-panel-body">
-                  <div class="field">
-                    <label>Heading Font</label>
-                    <select id="wsHeadingFont" onchange="wsUpdateFont('headingFont',this.value)">
-                      <option value="'Playfair Display',serif">Playfair Display</option>
-                      <option value="Georgia,serif">Georgia</option>
-                      <option value="'Times New Roman',serif">Times New Roman</option>
-                      <option value="'Lato',sans-serif">Lato Bold</option>
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label>Body Font</label>
-                    <select id="wsBodyFont" onchange="wsUpdateFont('bodyFont',this.value)">
-                      <option value="'Crimson Text',serif">Crimson Text</option>
-                      <option value="'Lato',sans-serif">Lato Light</option>
-                      <option value="Georgia,serif">Georgia</option>
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label>Base Font Size</label>
-                    <select id="wsFontSize" onchange="wsUpdateFont('fontSize',this.value)">
-                      <option value="10px">10px</option>
-                      <option value="11px">11px</option>
-                      <option value="12px">12px</option>
-                      <option value="13px">13px</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div class="ws-panel-group">
-                <div class="ws-panel-head" onclick="wsTogglePanel('wsPanelAssets')"><span>🖼️</span> Assets</div>
-                <div id="wsPanelAssets" class="ws-panel-body">
-                  <div id="wsAssetGrid" class="ws-asset-grid"></div>
-                  <div id="wsAssetEmpty" style="font-size:10px;color:var(--ws-text3);text-align:center;padding:1rem;">No images available in finalized content.</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- AI Panel -->
-            <div id="wsPanelAI" class="ws-side-panel">
-              <div class="ws-ai-terminal">
-                <div class="ws-ai-head">
-                  <span>✦</span> MagicEditor Layout AI
-                  <select id="wsAIModel" class="ws-mini-select">
-                    <option value="google/gemini-2.0-flash-001">Gemini 2.0</option>
-                    <option value="anthropic/claude-3-haiku">Claude Haiku</option>
-                  </select>
-                </div>
-                <div id="wsAIChat" class="ws-ai-chat">
-                  <div class="ws-ai-msg system">Ready for design instructions. Try "Make the teacher profiles use a 4x4 grid" or "Suggest a modern color scheme".</div>
-                </div>
-                <div id="wsAISamplePreview" style="display:none;padding:10px;border-top:1px solid var(--ws-border);">
-                  <div style="font-size:9px;text-transform:uppercase;color:var(--ws-text3);margin-bottom:5px;">Design Reference:</div>
-                  <img id="wsAISampleImg" src="" style="width:100%;height:60px;object-fit:cover;border-radius:4px;"/>
-                </div>
-                <div class="ws-ai-input-wrap">
-                  <textarea id="wsAIInput" placeholder="Command the layout..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();wsAISend();}"></textarea>
-                  <div class="ws-ai-controls">
-                    <button class="ws-icon-btn" title="Upload Reference Sample" onclick="document.getElementById('wsAIUpload').click()">📎</button>
-                    <input type="file" id="wsAIUpload" hidden accept="image/*" onchange="wsAIUploadSample(event)"/>
-                    <button class="ws-ai-send" onclick="wsAISend()">Execute ↵</button>
-                  </div>
-                </div>
-              </div>
-              <div class="ws-ai-quick-actions">
-                <button onclick="wsAIQuick('Fix layout overflows')">⚡ Fix Overflows</button>
-                <button onclick="wsAIQuick('Optimize image placement')">🖼️ Optimize Photos</button>
-                <button onclick="wsAIQuick('Check typography consistency')">Aa Consistency</button>
-                <button onclick="wsAIQuick('Match uploaded sample style')">🎨 Match Sample</button>
-              </div>
-            </div>
-          </div>
-        </aside>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- MODALS -->
-  <div id="pinOverlay" class="modal-overlay">
-    <div class="pin-card">
-      <div class="pin-header">
-        <div id="pinModeBadge" class="pin-badge">Admin</div>
-        <button class="pin-close" onclick="closePIN()">✕</button>
-      </div>
-      <h2 id="pinTitle">Portal Access</h2>
-      <p id="pinSub">Enter your security PIN</p>
-      
-      <div class="pin-dots">
-        <div class="pin-dot" id="pd0"></div>
-        <div class="pin-dot" id="pd1"></div>
-        <div class="pin-dot" id="pd2"></div>
-        <div class="pin-dot" id="pd3"></div>
-      </div>
-      
-      <div class="pin-pad">
-        <button onclick="pinKey(1)">1</button><button onclick="pinKey(2)">2</button><button onclick="pinKey(3)">3</button>
-        <button onclick="pinKey(4)">4</button><button onclick="pinKey(5)">5</button><button onclick="pinKey(6)">6</button>
-        <button onclick="pinKey(7)">7</button><button onclick="pinKey(8)">8</button><button onclick="pinKey(9)">9</button>
-        <button onclick="pinDel()">⌫</button><button onclick="pinKey(0)">0</button>
-      </div>
-      <div id="pinErr" class="pin-error"></div>
-    </div>
-  </div>
-
-  <div id="reviewModal" class="modal-overlay">
-    <div class="review-card">
-      <h2 id="reviewTitle">Review Submission</h2>
-      <p id="reviewSub">Add a note or correction for the contributor.</p>
-      <textarea id="reviewNote" placeholder="e.g. Please re-upload a clearer photo..."></textarea>
-      <div class="review-actions">
-        <button class="btn btn-outline" onclick="closeReviewModal()">Cancel</button>
-        <button class="btn btn-primary" id="reviewConfirm">Approve</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="renameModal" class="modal-overlay">
-    <div class="review-card">
-      <h2>Rename Section</h2>
-      <p id="renameModalSub"></p>
-      <input type="text" id="renameInput" placeholder="New section name"/>
-      <div class="review-actions">
-        <button class="btn btn-outline" onclick="closeRenameModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="confirmRename()">Save Change</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="customFieldModal" class="modal-overlay">
-    <div class="review-card">
-      <h2 id="cfmTitle">Custom Field</h2>
-      <div class="field">
-        <label>Label</label>
-        <input type="text" id="cfmLabel" placeholder="e.g. Favourite Quote"/>
-      </div>
-      <div class="field">
-        <label>Type</label>
-        <select id="cfmType" onchange="updateCustomFieldModalOptions()">
-          <option value="text">Short Text</option>
-          <option value="textarea">Long Text</option>
-          <option value="select">Dropdown</option>
-          <option value="date">Date</option>
-          <option value="checkbox">Yes/No</option>
-          <option value="number">Number</option>
-        </select>
-      </div>
-      <div class="field" id="cfmOptionsWrap" style="display:none;">
-        <label>Options (one per line)</label>
-        <textarea id="cfmOptions" placeholder="Option 1&#10;Option 2"></textarea>
-      </div>
-      <div class="field">
-        <label>Placeholder (optional)</label>
-        <input type="text" id="cfmPlaceholder" placeholder="e.g. Enter your quote here..."/>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
-        <input type="checkbox" id="cfmRequired"/>
-        <label for="cfmRequired" style="margin:0;font-weight:400;">Required field</label>
-      </div>
-      <div class="review-actions">
-        <button class="btn btn-outline" onclick="closeCustomFieldModal()">Cancel</button>
-        <button class="btn btn-primary" id="cfmSaveBtn" onclick="saveCustomField()">Save Field</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="createFormModal" class="modal-overlay">
-    <div class="review-card">
-      <h2>Create Custom Category</h2>
-      <p>Add a completely new section to your magazine.</p>
-      <div class="field">
-        <label>Category ID (lowercase, no spaces)</label>
-        <input type="text" id="crfId" placeholder="e.g. sports_highlights"/>
-      </div>
-      <div class="field">
-        <label>Display Name</label>
-        <input type="text" id="crfName" placeholder="e.g. Sports Highlights"/>
-      </div>
-      <div class="field">
-        <label>Icon (Emoji)</label>
-        <input type="text" id="crfIcon" placeholder="🏆"/>
-      </div>
-      <div class="field">
-        <label>Card Tag</label>
-        <input type="text" id="crfTag" placeholder="ATHLETICS"/>
-      </div>
-      <div class="field">
-        <label>Form Subtitle</label>
-        <input type="text" id="crfSubtitle" placeholder="Share your athletic achievements"/>
-      </div>
-      <div class="review-actions">
-        <button class="btn btn-outline" onclick="closeCreateFormModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveNewForm()">Create Category</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- AI Layout Styles Placeholder -->
-  <style id="ai-custom-css"></style>
-
+  
   <script src="script.js"></script>
 </body>
 </html>
