@@ -110,8 +110,23 @@ function removeBootOverlay(){
       <div class="admin-topbar">
         <div class="admin-topbar-left"><div><span class="admin-logo">MagicEditor</span><h1>Production Dashboard</h1></div></div>
       </div>
-      <div class="admin-tabs" id="dynamicAdminTabs">
-        <!-- Tabs populated by script.js -->
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="setCategory('all')" id="tab-all">All <span class="tab-count" id="count-all">0</span></button>
+        <button class="admin-tab" onclick="setCategory('teachers')" id="tab-teachers">Teachers <span class="tab-count" id="count-teachers">0</span></button>
+        <button class="admin-tab" onclick="setCategory('primary5')" id="tab-primary5">Primary 5 <span class="tab-count" id="count-primary5">0</span></button>
+        <button class="admin-tab" onclick="setCategory('jss3')" id="tab-jss3">JSS3 <span class="tab-count" id="count-jss3">0</span></button>
+        <button class="admin-tab" onclick="setCategory('ss3')" id="tab-ss3">SS3 <span class="tab-count" id="count-ss3">0</span></button>
+        <button class="admin-tab" onclick="setCategory('speeches')" id="tab-speeches">Speeches <span class="tab-count" id="count-speeches">0</span></button>
+        <button class="admin-tab" onclick="setCategory('creative')" id="tab-creative">Creative <span class="tab-count" id="count-creative">0</span></button>
+        <button class="admin-tab" onclick="setCategory('events')" id="tab-events">Events <span class="tab-count" id="count-events">0</span></button>
+        <button class="admin-tab" onclick="setCategory('academic')" id="tab-academic">Academic <span class="tab-count" id="count-academic">0</span></button>
+        <button class="admin-tab" onclick="setCategory('interviews')" id="tab-interviews">Interviews <span class="tab-count" id="count-interviews">0</span></button>
+        <button class="admin-tab" onclick="setCategory('motivational')" id="tab-motivational">Motivation <span class="tab-count" id="count-motivational">0</span></button>
+        <button class="admin-tab" onclick="setCategory('gallery')" id="tab-gallery">Gallery <span class="tab-count" id="count-gallery">0</span></button>
+        <button class="admin-tab" onclick="setCategory('editorial')" id="tab-editorial" style="color:var(--gold);font-style:italic;">✎ Editorial <span class="tab-count" id="count-editorial">0</span></button>
+        <button class="admin-tab" onclick="openWorkspace()" id="tab-layout" style="color:var(--ws-accent);font-weight:700;">🛠 Open Workspace</button>
+        <button class="admin-tab" onclick="openShareLinks()" id="tab-sharelinks">🔗 Share Links</button>
+        <button class="admin-tab" onclick="openSettings()" id="tab-settings">⚙ Settings</button>
       </div>
       <div class="admin-topbar-right">
         <button class="admin-exit" onclick="adminRefresh()">↻ Refresh</button>
@@ -783,12 +798,48 @@ function removeBootOverlay(){
   </div>
 </div>
 
-<!-- SYNC INDICATOR -->
-<div id="syncBar" class="sync-bar">
-  <div id="syncDot" class="sync-dot ok"></div>
-  <span id="syncText">Connected to Cloud</span>
+<div class="sync-bar" id="syncBar">
+  <div class="sync-dot ok" id="syncDot"></div>
+  <span id="syncMsg">Cloud Sync Active</span>
 </div>
 
-<script src="script.js"></script>
+  <!-- Create Form Modal -->
+  <div class="modal-overlay" id="createFormModal">
+    <div class="modal-box">
+      <h3 id="cfmFormTitle" style="margin-bottom:15px;">Create New Form</h3>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Form Internal ID (e.g. debate_club)</label>
+        <input type="text" id="crfId" placeholder="letters and underscores only" style="width:100%;" oninput="this.value=this.value.replace(/[^a-z0-9_]/g,'')"/>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Form Name (e.g. Debate Club)</label>
+        <input type="text" id="crfName" placeholder="Public facing name" style="width:100%;"/>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Icon (Emoji)</label>
+        <input type="text" id="crfIcon" placeholder="e.g. 🗣️" style="width:100px;"/>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Form Tag (e.g. Debate)</label>
+        <input type="text" id="crfTag" placeholder="Short tag" style="width:100%;"/>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+        <label>Subtitle / Description</label>
+        <textarea id="crfSubtitle" style="width:100%;font-family:'Lato',sans-serif;padding:8px;" rows="2" placeholder="Description of what this form is for"></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+        <button class="btn" onclick="closeCreateFormModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveNewForm()">Create Form</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYNC INDICATOR -->
+  <div id="syncBar" class="sync-bar">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncMsg"></span>
+  </div>
+  
+  <script src="script.js"></script>
 </body>
 </html>
