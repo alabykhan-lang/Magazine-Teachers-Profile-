@@ -688,3 +688,72 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
   border: 1px solid var(--cloud);
   border-radius: 4px;
 }
+
+/* ── Workspace AI Apply/Decline Card ── */
+.ws-ai-apply-card {
+  background: linear-gradient(135deg, #1e3a5f, #162d4a);
+  border: 1.5px solid #4a9eff66;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 10px 0;
+  box-shadow: 0 4px 16px rgba(74,158,255,.2);
+}
+.ws-ai-apply-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #4a9eff;
+  margin-bottom: 8px;
+}
+.ws-ai-apply-summary {
+  font-size: 12px;
+  color: #c8deff;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ws-ai-apply-summary span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ws-ai-apply-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ws-ai-apply-btn {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Lato', sans-serif;
+  transition: transform .1s, opacity .2s;
+}
+.ws-ai-apply-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+.ws-ai-apply-btn.apply {
+  background: linear-gradient(135deg, #2ee89a, #1bc97d);
+  color: #0a2a1a;
+}
+.ws-ai-apply-btn.decline {
+  background: rgba(255,80,80,.15);
+  color: #ff8080;
+  border: 1px solid #ff808040;
+}
+
+/* Workspace preview iframe fills container */
+#wsPageContainer {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#wsPageContainer iframe#ws-preview-iframe {
+  flex: 1;
+  border: none;
+  background: #888;
+}
