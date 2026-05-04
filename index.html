@@ -595,6 +595,18 @@ function removeBootOverlay(){
               <label style="color:#2d1b4e;">Main Content</label>
               <textarea id="edNoteBody" placeholder="Write your message to the students and parents..." style="border-color:#c6a5f0;min-height:300px;"></textarea>
             </div>
+            <!-- Photo Upload for Editorial Note -->
+            <div class="field" style="background:#f0ebfa;border:1.5px dashed #c6a5f0;border-radius:10px;padding:14px 16px;">
+              <label style="color:#2d1b4e;font-weight:700;display:block;margin-bottom:8px;">📸 Editor Photo (optional)</label>
+              <p style="font-size:12px;color:#6b4da0;margin-bottom:10px;">Add a photo to accompany the editorial note — shown on the editorial page in the magazine.</p>
+              <input type="file" id="edNotePhotoInput" accept="image/*" capture="environment" style="display:none;" onchange="edNotePickPhoto(event)"/>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-primary" style="background:#2d1b4e;border-color:#2d1b4e;padding:8px 16px;font-size:13px;" onclick="document.getElementById('edNotePhotoInput').click()">📷 Choose / Take Photo</button>
+                <button class="btn" onclick="edNoteRemovePhoto()" style="color:#8b1a1a;border-color:#d4a0a0;font-size:13px;padding:8px 14px;">✕ Remove</button>
+                <span id="edNoteImgLabel" style="font-size:12px;color:#6b4da0;">No photo selected</span>
+              </div>
+              <img id="edNoteImgPreview" src="" alt="Editorial photo preview" style="display:none;margin-top:12px;max-width:200px;max-height:200px;object-fit:cover;border-radius:8px;border:2px solid #c6a5f0;"/>
+            </div>
             <div class="compose-actions">
               <button class="btn btn-primary" style="background:#2d1b4e;border-color:#2d1b4e;padding:12px 24px;" onclick="saveEditorialNote()">💾 Save &amp; Sync to Cloud</button>
               <button class="btn btn-ai" onclick="proofreadText('edNoteBody')" style="padding:12px 24px;">✦ AI Proofread Content</button>

@@ -1307,6 +1307,27 @@ function closeReviewModal(){document.getElementById('reviewModal').classList.rem
 function confirmReview(){const note=document.getElementById('reviewNote').value.trim();const ts=Date.now();const localSubs=loadAll();const s=localSubs.find(x=>String(x.id)===String(reviewingId));if(s){s.status=reviewingDecision;s.reviewerNote=note;s.reviewedAt=ts;saveAll(localSubs);subs=localSubs;}dbUpdateStatus(reviewingId,reviewingDecision,note,ts);closeReviewModal();/* Re-pull cloud so list refreshes with latest state */dbLoadAll().then(cl=>{subs=cl;renderEditor();}).catch(()=>renderEditor());}
 
 /* SAVE EDITORIAL NOTE — called from Editor-in-Chief view */
+let _edNotePhotoData = null;
+function edNotePickPhoto(event){
+  const file = event.target.files?.[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    _edNotePhotoData = e.target.result;
+    const prev = document.getElementById('edNoteImgPreview');
+    if(prev){ prev.src = _edNotePhotoData; prev.style.display = 'block'; }
+    const lbl = document.getElementById('edNoteImgLabel');
+    if(lbl) lbl.textContent = '✓ Photo selected: ' + file.name;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+function edNoteRemovePhoto(){
+  _edNotePhotoData = null;
+  const prev = document.getElementById('edNoteImgPreview');
+  if(prev){ prev.src = ''; prev.style.display = 'none'; }
+  const lbl = document.getElementById('edNoteImgLabel');
+  if(lbl) lbl.textContent = 'No photo selected';
+}
 async function saveEditorialNote(){
   const title=(document.getElementById('edNoteTitle')?.value||'').trim();
   const body=(document.getElementById('edNoteBody')?.value||'').trim();
@@ -1316,16 +1337,17 @@ async function saveEditorialNote(){
   subs=loadAll();
   let ex=subs.find(s=>s.category==='editorial-note');
   const now=new Date().toLocaleString();
+  const photoData = _edNotePhotoData || (ex?.photoData || null);
   if(ex){
     ex.data={title:{label:'Title',value:title},body:{label:'Body',value:body}};
-    ex.ts=now;
+    ex.ts=now; ex.photoData=photoData;
     saveAll(subs);
     await dbSaveSubmission(ex);
   } else {
     const sub={id:genId(),category:'editorial-note',ts:now,createdAt:Date.now(),
       status:'approved',reviewerNote:'',reviewedAt:Date.now(),
       data:{title:{label:'Title',value:title},body:{label:'Body',value:body}},
-      photoData:null,photoName:null,photos:null};
+      photoData:photoData,photoName:null,photos:null};
     subs.push(sub);saveAll(subs);
     await dbSaveSubmission(sub);
   }
@@ -2356,8 +2378,9 @@ function wsGeneratePreview(){
   subs=loadAll();
   wsPages=[];wsPageIdx=0;
   const s=lsSettings;
-  const finalized=subs.filter(sub=>sub.status==='approved'||sub.status==='finalized');
-  document.getElementById('wsStatusFinalized').textContent=finalized.length+' approved';
+  /* Include approved, finalized AND pending so workspace always shows content */
+  const finalized=subs.filter(sub=>sub.status==='approved'||sub.status==='finalized'||sub.status==='pending');
+  document.getElementById('wsStatusFinalized').textContent=finalized.filter(x=>x.status==='approved'||x.status==='finalized').length+' approved | '+finalized.filter(x=>x.status==='pending').length+' pending';
 
   sectionOrder.filter(sec=>sec.visible).forEach(sec=>{
     if(sec.key==='cover'){wsPages.push({type:'cover',sec,label:'Cover Page'});return;}
@@ -2617,7 +2640,10 @@ async function wsAISend(){
   const model=document.getElementById('wsAIModel')?.value||'google/gemini-2.0-flash-001';
   const task=document.getElementById('wsAITask')?.value||'design';
 
-  if(!apiKey){wsAIAddMsg('assistant','','<strong style="color:var(--ws-red);">No API key.</strong> Configure it in Production Admin → Settings → Layout Studio → AI Configuration.');return;}
+  if(!apiKey){
+    wsAIAddMsg('assistant','',`<strong style="color:var(--ws-red);">No API key set.</strong> To enable AI:<br>1. Go to <strong>Production Admin → Settings → 🤖 AI API Key</strong><br>2. Enter your OpenRouter key (get one free at <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--ws-accent);">openrouter.ai/keys</a>)<br>3. Click <strong>Save API Key</strong> — then come back here and try again.`);
+    return;
+  }
 
   wsAIAddMsg('user',query);
 
