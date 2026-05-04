@@ -2452,96 +2452,78 @@ function wsRenderCurrentPage(){
   magPages = wsPages;
   const {w, h} = getPageDimensions();
   const s = lsSettings;
-  const ps = s.pageSize === 'a4' ? 'A4' : s.pageSize === 'a5' ? 'A5' : 'letter';
-  const orient = s.orientation || 'portrait';
 
-  /* Render all pages to HTML via hidden canvas */
+  /* CRITICAL FIX: Temporarily hide the real magCanvas so our temp one
+     is the one found by getElementById inside renderCurrentPage() */
+  const realCanvas = document.getElementById('magCanvas');
+  let realCanvasOrigId = null;
+  if(realCanvas){
+    realCanvasOrigId = realCanvas.id;
+    realCanvas.id = '_magCanvas_hidden_';
+  }
+
   const tempCanvas = document.createElement('div');
-  tempCanvas.id = 'magCanvas'; tempCanvas.style.display = 'none';
+  tempCanvas.id = 'magCanvas';
+  tempCanvas.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:'+w+'px;height:'+h+'px;overflow:hidden;';
   document.body.appendChild(tempCanvas);
 
   let allPagesHtml = '';
   const guidesHtml = wsShowGuides ? `
-    <div class="ws-bleed"></div>
-    <div class="ws-safe"></div>
-    <div class="ws-crop-tl"></div><div class="ws-crop-tr"></div>
-    <div class="ws-crop-bl"></div><div class="ws-crop-br"></div>
-    <div class="ws-guide-label bleed-label">BLEED 3mm</div>
-    <div class="ws-guide-label safe-label">SAFE AREA</div>
+    <div style="position:absolute;inset:-3mm;border:1px dashed rgba(255,0,0,.4);pointer-events:none;z-index:99;"></div>
+    <div style="position:absolute;inset:5mm;border:1px dashed rgba(0,120,255,.25);pointer-events:none;z-index:99;"></div>
   ` : '';
 
   for(let i = 0; i < wsPages.length; i++){
     currentPageIdx = i;
     renderCurrentPage();
     const pageHtml = tempCanvas.innerHTML;
-    allPagesHtml += `<div class="ws-mag-page ${wsShowGuides ? 'ws-guides' : ''}" id="ws-page-${i}" style="width:${w}px;height:${h}px;">
+    allPagesHtml += `<div class="mag-sheet" id="ws-page-${i}">
       ${guidesHtml}
-      <div class="ws-mag-page-inner">${pageHtml}</div>
+      <div class="mag-page-inner">${pageHtml}</div>
     </div>`;
   }
 
+  /* Restore original magCanvas */
   document.body.removeChild(tempCanvas);
+  if(realCanvas && realCanvasOrigId){
+    realCanvas.id = realCanvasOrigId;
+  }
   magPages = origPages; currentPageIdx = origIdx;
 
   /* AI-injected CSS */
   const aiCSS = document.getElementById('ai-custom-css')?.textContent || '';
 
-  /* Google fonts link for iframe */
-  const gFonts = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap';
-
-  /* Build print-ready iframe document */
+  /* Build print-ready iframe */
   const scale = wsZoom / 100;
-  const iframeDoc = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8"/>
+  const gFonts = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap';
+  const iframeDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <link href="${gFonts}" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
-    body{background:#888;font-family:'Lato',sans-serif;padding:20px;}
+    body{background:#555;font-family:'Lato',sans-serif;padding:20px;}
     .mag-sheet{
-      width:${w}px;height:${h}px;
-      margin:0 auto 24px;
-      box-shadow:0 4px 24px rgba(0,0,0,.4);
-      overflow:hidden;background:#fff;position:relative;
+      width:${w}px;height:${h}px;margin:0 auto 24px;
+      box-shadow:0 6px 30px rgba(0,0,0,.5);overflow:hidden;background:#fff;position:relative;
       transform:scale(${scale});transform-origin:top center;
       margin-bottom:${Math.round(h * scale - h + 24)}px;
     }
     .mag-page{width:${w}px!important;height:${h}px!important;}
     .mag-page-inner{width:100%;height:100%;overflow:hidden;}
     img{max-width:100%;}
-    .ws-bleed{position:absolute;inset:-3mm;border:1px dashed rgba(255,0,0,.4);pointer-events:none;z-index:99;}
-    .ws-safe{position:absolute;inset:5mm;border:1px dashed rgba(0,120,255,.25);pointer-events:none;z-index:99;}
-    .ws-crop-tl,.ws-crop-tr,.ws-crop-bl,.ws-crop-br{position:absolute;width:8px;height:8px;border-color:#333;border-style:solid;z-index:100;}
-    .ws-crop-tl{top:-4px;left:-4px;border-width:1px 0 0 1px;}
-    .ws-crop-tr{top:-4px;right:-4px;border-width:1px 1px 0 0;}
-    .ws-crop-bl{bottom:-4px;left:-4px;border-width:0 0 1px 1px;}
-    .ws-crop-br{bottom:-4px;right:-4px;border-width:0 1px 1px 0;}
-    .ws-guide-label{position:absolute;font-size:8px;color:#999;z-index:101;}
-    .bleed-label{top:-14px;left:0;}
-    .safe-label{top:5mm;left:5mm;}
     ${aiCSS}
-  </style>
-</head>
-<body>
-  ${allPagesHtml.replace(/class="ws-mag-page/g, 'class="mag-sheet').replace(/class="ws-mag-page-inner"/g, 'class="mag-page-inner"')}
-</body>
-</html>`;
+  </style></head><body>${allPagesHtml}</body></html>`;
 
-  /* Re-use or create the iframe */
+  /* Create or reuse iframe */
   let iframe = container.querySelector('iframe#ws-preview-iframe');
   if(!iframe){
     container.innerHTML = '';
     iframe = document.createElement('iframe');
     iframe.id = 'ws-preview-iframe';
-    iframe.style.cssText = 'border:none;width:100%;height:100%;background:#888;';
+    iframe.style.cssText = 'border:none;width:100%;height:100%;min-height:600px;background:#555;';
     container.appendChild(iframe);
   }
-
   const iDoc = iframe.contentDocument || iframe.contentWindow.document;
-  iDoc.open();
-  iDoc.write(iframeDoc);
-  iDoc.close();
+  iDoc.open(); iDoc.write(iframeDoc); iDoc.close();
 }
 
 
@@ -2777,87 +2759,6 @@ Context:\n${ctx}`}];
     messages.push({role:'user',content:query});
   }
 
-  /* Pending suggestion storage */
-  let _wsPendingSuggestion = null;
-
-  function wsShowApplyCard(suggestionObj, summaryHtml){
-    _wsPendingSuggestion = suggestionObj;
-    const cardHtml = `<div class="ws-ai-apply-card" id="wsApplyCard">
-      <div class="ws-ai-apply-title">✦ AI Suggestion Ready</div>
-      <div class="ws-ai-apply-summary">${summaryHtml}</div>
-      <div class="ws-ai-apply-btns">
-        <button class="ws-ai-apply-btn apply" onclick="wsApplySuggestion()">⚡ Apply to Magazine</button>
-        <button class="ws-ai-apply-btn decline" onclick="wsDeclineSuggestion()">✕ Decline</button>
-      </div>
-    </div>`;
-    const box = document.getElementById('wsAIChat');
-    if(box){
-      const cardEl = document.createElement('div');
-      cardEl.innerHTML = cardHtml;
-      box.appendChild(cardEl.firstElementChild);
-      box.scrollTop = box.scrollHeight;
-    }
-  }
-
-  window.wsApplySuggestion = function(){
-    if(!_wsPendingSuggestion) return;
-    const {customCSS, settingsObj, actions, fmtChanges} = _wsPendingSuggestion;
-    const applied = [];
-
-    if(customCSS){
-      const aiStyle = document.getElementById('ai-custom-css');
-      if(aiStyle) aiStyle.textContent = customCSS;
-      applied.push('CSS injected');
-    }
-
-    if(settingsObj){
-      try{
-        wsUndoPush();
-        applyLayoutFromObject(settingsObj, null);
-        wsRenderColorPanel(); wsRenderFontPanel();
-        applied.push(Object.keys(settingsObj).length + ' settings applied');
-      }catch(e){}
-    }
-
-    actions.forEach(action => {
-      if(action === 'approveAll'){
-        const allSubs = loadAll(); let changed = 0;
-        allSubs.forEach(s => { if(s.status==='pending'){ s.status='approved'; changed++; }});
-        if(changed){ saveAll(allSubs); applied.push(`Approved ${changed} submissions`); }
-      } else if(action.startsWith('finalizeCategory:')){
-        const cat = action.split(':')[1].trim();
-        const allSubs = loadAll(); let changed = 0;
-        allSubs.forEach(s => { if((s.category===cat||cat==='all')&&s.status==='approved'){ s.status='finalized'; changed++; }});
-        if(changed){ saveAll(allSubs); applied.push(`Finalized ${changed} in ${cat}`); }
-      } else if(action.startsWith('setSectionOrder:')){
-        const keys = action.split(':')[1].split(',').map(k=>k.trim());
-        const oldOrder = [...sectionOrder];
-        sectionOrder = keys.map(k=>oldOrder.find(o=>o.key===k)).filter(Boolean);
-        oldOrder.forEach(o=>{ if(!sectionOrder.find(s=>s.key===o.key)) sectionOrder.push(o); });
-        saveLsSettingsToStorage(lsSettings);
-        dbSaveSettings('section_order', sectionOrder);
-        applied.push('Sections reordered');
-      }
-    });
-
-    wsGeneratePreview();
-    wsRenderCurrentPage();
-    wsMarkDirty();
-    _wsPendingSuggestion = null;
-
-    /* Replace card with success message */
-    const card = document.getElementById('wsApplyCard');
-    if(card) card.outerHTML = `<div class="ws-ai-msg assistant"><em style="color:var(--ws-green);">✓ Applied: ${applied.join(', ')}. Preview updated.</em></div>`;
-    const box = document.getElementById('wsAIChat');
-    if(box) box.scrollTop = box.scrollHeight;
-  };
-
-  window.wsDeclineSuggestion = function(){
-    _wsPendingSuggestion = null;
-    const card = document.getElementById('wsApplyCard');
-    if(card) card.outerHTML = '<div class="ws-ai-msg system"><em style="color:#aaa;">Suggestion declined.</em></div>';
-  };
-
   try{
     const modelsToTry = [model, 'google/gemini-2.0-flash-lite-001', 'anthropic/claude-3-haiku'];
     let result = '';
@@ -2889,9 +2790,6 @@ Context:\n${ctx}`}];
 
     /* Parse formatting commands */
     const fmtCommands={};
-    const fmtRegex=/\[FORMAT:(\w+):[\s\S]*?\]/g;
-    let fmtMatch;
-    /* Need to re-run regex to capture values properly */
     const fmtRegex2=/\[FORMAT:(\w+):([\s\S]*?)\]/g;
     let fm2;
     while((fm2=fmtRegex2.exec(result))!==null) fmtCommands[fm2[1]]=fm2[2];
@@ -2902,36 +2800,69 @@ Context:\n${ctx}`}];
     const settingsObj = settingsMatch ? (() => { try{ return JSON.parse(settingsMatch[1].trim()); }catch(e){ return null; } })() : null;
     const adviceText=displayText.replace(/```settings[\s\S]*?```/gi,'').replace(/```css[\s\S]*?```/gi,'').trim();
 
-    /* Collect actions */
-    const actions = [];
-    if(fmtCommands.action) actions.push(fmtCommands.action.trim());
+    /* ═══ AGENT MODE: Auto-apply all changes directly ═══ */
+    wsUndoPush(); /* Save state for undo */
+    const applied = [];
 
-    /* Build suggestion summary for the Apply card */
-    const changeSummary = [];
-    if(fmtCommands.customCSS) changeSummary.push('🎨 Style/CSS changes');
-    if(settingsObj) changeSummary.push(`⚙️ ${Object.keys(settingsObj).length} layout settings`);
-    actions.forEach(a => {
-      if(a==='approveAll') changeSummary.push('✅ Approve all pending');
-      else if(a.startsWith('finalizeCategory:')) changeSummary.push(`📌 Finalize ${a.split(':')[1]}`);
-      else if(a.startsWith('setSectionOrder:')) changeSummary.push('📋 Reorder sections');
-    });
-
-    /* Show AI advice in chat */
-    const htmlResp = esc(adviceText).replace(/\n/g,'<br>');
-    wsAIAddMsg('assistant', adviceText, htmlResp);
-    wsAIRenderChat();
-
-    /* Show Apply/Decline card if there are actionable changes */
-    if(changeSummary.length > 0){
-      wsShowApplyCard(
-        { customCSS: fmtCommands.customCSS||null, settingsObj, actions, fmtChanges: changeSummary },
-        changeSummary.map(c=>`<span>${c}</span>`).join('')
-      );
-    } else {
-      /* AI gave advice only — no changes to apply */
-      wsAIChatHistory[wsAIChatHistory.length-1].html += '<br><em style="color:#aaa;font-size:11px;">No direct changes detected in this response. Try asking the AI to change colours, fonts, or layout.</em>';
-      wsAIRenderChat();
+    /* 1. Inject CSS directly */
+    if(fmtCommands.customCSS){
+      const aiStyle = document.getElementById('ai-custom-css');
+      if(aiStyle) aiStyle.textContent = fmtCommands.customCSS;
+      applied.push('🎨 CSS applied');
     }
+
+    /* 2. Apply settings directly */
+    if(settingsObj){
+      try{
+        applyLayoutFromObject(settingsObj, null);
+        wsRenderColorPanel(); wsRenderFontPanel();
+        applied.push('⚙️ ' + Object.keys(settingsObj).length + ' settings changed');
+      }catch(e){ console.warn('[AI] Settings apply error:', e); }
+    }
+
+    /* 3. Execute action commands directly */
+    if(fmtCommands.action){
+      const action = fmtCommands.action.trim();
+      if(action === 'approveAll'){
+        const allSubs = loadAll(); let changed = 0;
+        allSubs.forEach(s => { if(s.status==='pending'){ s.status='approved'; changed++; }});
+        if(changed){ saveAll(allSubs); applied.push(`✅ Approved ${changed} submissions`); }
+      } else if(action.startsWith('finalizeCategory:')){
+        const cat = action.split(':')[1].trim();
+        const allSubs = loadAll(); let changed = 0;
+        allSubs.forEach(s => { if((s.category===cat||cat==='all')&&s.status==='approved'){ s.status='finalized'; changed++; }});
+        if(changed){ saveAll(allSubs); applied.push(`📌 Finalized ${changed} in ${cat}`); }
+      } else if(action.startsWith('setSectionOrder:')){
+        const keys = action.split(':')[1].split(',').map(k=>k.trim());
+        const oldOrder = [...sectionOrder];
+        sectionOrder = keys.map(k=>oldOrder.find(o=>o.key===k)).filter(Boolean);
+        oldOrder.forEach(o=>{ if(!sectionOrder.find(s=>s.key===o.key)) sectionOrder.push(o); });
+        saveLsSettingsToStorage(lsSettings);
+        dbSaveSettings('section_order', sectionOrder);
+        applied.push('📋 Sections reordered');
+      }
+    }
+
+    /* 4. Regenerate preview with changes */
+    if(applied.length > 0){
+      wsGeneratePreview();
+      wsRenderCurrentPage();
+      wsMarkDirty();
+    }
+
+    /* 5. Show response + what was applied + Undo button */
+    const appliedHtml = applied.length > 0
+      ? `<br><div class="ws-ai-apply-card" style="margin-top:8px;">
+          <div class="ws-ai-apply-title">✦ AGENT EXECUTED</div>
+          <div class="ws-ai-apply-summary">${applied.map(a=>'<span>'+a+'</span>').join('')}</div>
+          <div class="ws-ai-apply-btns">
+            <button class="ws-ai-apply-btn decline" onclick="wsUndo();wsGeneratePreview();wsRenderCurrentPage();this.closest('.ws-ai-apply-card').outerHTML='<em style=color:#aaa>Undone.</em>'">↶ Undo Changes</button>
+          </div>
+        </div>`
+      : '<br><em style="color:#aaa;font-size:11px;">No direct changes in this response. Try: "Make the cover page more premium" or "Change primary colour to navy blue".</em>';
+    
+    const htmlResp = esc(adviceText).replace(/\n/g,'<br>') + appliedHtml;
+    wsAIAddMsg('assistant', adviceText, htmlResp);
 
   }catch(e){
     wsAIChatHistory.splice(thinkIdx,1);
