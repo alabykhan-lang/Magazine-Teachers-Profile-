@@ -1,0 +1,20 @@
+﻿<!-- PIN OVERLAY -->
+<div id="pinOverlay" class="pin-overlay">
+  <div class="pin-box">
+    <div id="pinModeBadge" style="display:inline-block;padding:4px 12px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;"></div>
+    <h2 id="pinTitle">Enter PIN</h2>
+    <p class="pin-sub" id="pinSub">Enter your 4-digit PIN</p>
+    <div class="pin-dots">
+      <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey(1)">1</button><button class="pin-key" onclick="pinKey(2)">2</button><button class="pin-key" onclick="pinKey(3)">3</button>
+      <button class="pin-key" onclick="pinKey(4)">4</button><button class="pin-key" onclick="pinKey(5)">5</button><button class="pin-key" onclick="pinKey(6)">6</button>
+      <button class="pin-key" onclick="pinKey(7)">7</button><button class="pin-key" onclick="pinKey(8)">8</button><button class="pin-key" onclick="pinKey(9)">9</button>
+      <button class="pin-key del" onclick="pinDel()">⌫</button><button class="pin-key zero" onclick="pinKey(0)">0</button>
+    </div>
+    <div class="pin-err-msg" id="pinErr"></div>
+    <button class="pin-cancel" onclick="closePIN()">Cancel</button>
+  </div>
+</div>

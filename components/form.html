@@ -1,0 +1,30 @@
+<!-- FORM VIEW -->
+<div id="viewForm" class="view">
+  <div class="form-hero">
+    <button class="form-hero-back" onclick="goLanding()">← Back</button>
+    <div class="form-hero-inner">
+      <span class="form-hero-tag" id="formTag">—</span>
+      <h1 id="formTitle">—</h1>
+      <p id="formSubtitle">—</p>
+    </div>
+  </div>
+  <div id="formContainer" class="form-body"></div>
+  <div id="successWrap" class="success-wrap" style="display:none;">
+    <div id="successUploading" style="display:none;text-align:center;">
+      <div style="font-size:56px;margin-bottom:1rem;">⏳</div>
+      <h2 style="color:var(--school-navy);">Saving your submission…</h2>
+      <p style="margin-bottom:1rem;">Please wait while we upload your content to the cloud.</p>
+      <div style="width:100%;max-width:280px;height:6px;background:#e0e0d8;border-radius:3px;margin:0 auto;overflow:hidden;">
+        <div id="uploadProgressBar" style="height:100%;background:var(--school-mint3);width:0%;border-radius:3px;transition:width .4s;"></div>
+      </div>
+      <p id="uploadProgressText" style="font-size:12px;color:var(--ink3);margin-top:8px;">Connecting to cloud…</p>
+    </div>
+    <div id="successDone" style="display:none;">
+      <div class="success-icon">🎉</div>
+      <h2>Submission Received!</h2>
+      <p>Thank you. Your submission has been sent to the Editor-in-Chief for review.</p>
+      <p style="font-size:12px;color:var(--school-mint3);font-weight:700;margin-bottom:1.5rem;">✓ Saved to cloud — visible to editors on all devices</p>
+      <button onclick="goLanding()">Back to Home</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,417 @@
+<!-- PRODUCTION DASHBOARD -->
+<div id="viewAdmin" class="view">
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-topbar">
+        <div class="admin-topbar-left"><div><span class="admin-logo">MagicEditor</span><h1>Production Dashboard</h1></div></div>
+      </div>
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="setCategory('all')" id="tab-all">All <span class="tab-count" id="count-all">0</span></button>
+        <button class="admin-tab" onclick="setCategory('teachers')" id="tab-teachers">Staff <span class="tab-count" id="count-teachers">0</span></button>
+        <button class="admin-tab" onclick="setCategory('primary5')" id="tab-primary5">Primary 5 <span class="tab-count" id="count-primary5">0</span></button>
+        <button class="admin-tab" onclick="setCategory('jss3')" id="tab-jss3">JSS3 <span class="tab-count" id="count-jss3">0</span></button>
+        <button class="admin-tab" onclick="setCategory('ss3')" id="tab-ss3">SS3 <span class="tab-count" id="count-ss3">0</span></button>
+        <button class="admin-tab" onclick="setCategory('speeches')" id="tab-speeches">Speeches <span class="tab-count" id="count-speeches">0</span></button>
+        <button class="admin-tab" onclick="setCategory('creative')" id="tab-creative">Creative <span class="tab-count" id="count-creative">0</span></button>
+        <button class="admin-tab" onclick="setCategory('events')" id="tab-events">Events <span class="tab-count" id="count-events">0</span></button>
+        <button class="admin-tab" onclick="setCategory('academic')" id="tab-academic">Academic <span class="tab-count" id="count-academic">0</span></button>
+        <button class="admin-tab" onclick="setCategory('interviews')" id="tab-interviews">Interviews <span class="tab-count" id="count-interviews">0</span></button>
+        <button class="admin-tab" onclick="setCategory('motivational')" id="tab-motivational">Motivation <span class="tab-count" id="count-motivational">0</span></button>
+        <button class="admin-tab" onclick="setCategory('gallery')" id="tab-gallery">Gallery <span class="tab-count" id="count-gallery">0</span></button>
+        <button class="admin-tab" onclick="setCategory('editorial')" id="tab-editorial" style="color:var(--gold);font-style:italic;">✎ Editorial <span class="tab-count" id="count-editorial">0</span></button>
+        <button class="admin-tab" onclick="openWorkspace()" id="tab-layout" style="color:var(--ws-accent);font-weight:700;">🛠 Open Workspace</button>
+        <button class="admin-tab" onclick="openShareLinks()" id="tab-sharelinks">🔗 Share Links</button>
+        <button class="admin-tab" onclick="openSettings()" id="tab-settings">⚙ Settings</button>
+      </div>
+      <div class="admin-topbar-right">
+        <button class="admin-exit" onclick="adminRefresh()">↻ Refresh</button>
+        <button class="admin-exit" onclick="goLanding()">← Back to Home</button>
+      </div>
+    </aside>
+    <main class="admin-main">
+      <div style="background:var(--school-navy);color:#fff;padding:14px 20px;text-align:center;font-family:'Lato',sans-serif;border-bottom:4px solid var(--school-mint3);">
+        <div style="font-size:11px;letter-spacing:3px;color:var(--school-mint);font-weight:700;margin-bottom:4px;">CURRENTLY VIEWING</div>
+        <div style="font-size:22px;font-weight:700;letter-spacing:1px;">⚙ PRODUCTION ADMIN</div>
+        <div style="font-size:12px;color:#bbb;margin-top:3px;">Content intake · Structuring · Routing · Layout Studio</div>
+      </div>
+      <div class="admin-body">
+    <!-- Submissions -->
+    <div id="adminModeSubs">
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">Total Submissions</div><div class="stat-sub">Across all categories</div></div>
+        <div class="stat-card"><div class="stat-num pending" id="statPending">0</div><div class="stat-lbl">Pending Review</div><div class="stat-sub">Awaiting Editor-in-Chief</div></div>
+        <div class="stat-card"><div class="stat-num approved" id="statApproved">0</div><div class="stat-lbl">Approved</div><div class="stat-sub">Ready for layout</div></div>
+        <div class="stat-card"><div class="stat-num" id="statFinalized">0</div><div class="stat-lbl">Finalized</div><div class="stat-sub">Locked &amp; exported</div></div>
+      </div>
+      <div class="action-row">
+        <span class="action-row-label">Filter:</span>
+        <select class="filter-select" id="filterStatus" onchange="renderAdmin()">
+          <option value="all">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="pending">Pending Review</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="finalized">Finalized</option>
+        </select>
+        <span class="action-row-label" style="margin-left:auto;">Export:</span>
+        <button class="btn btn-primary" onclick="exportCurrentCategory()">⬇ Category ZIP</button>
+        <button class="btn btn-gold" onclick="exportMasterMagazine()">⬇ Master Magazine ZIP</button>
+      </div>
+      <div id="adminSubList" class="sub-list"></div>
+    </div>
+
+    <!-- Editorial -->
+    <div id="adminModeEditorial" style="display:none;">
+      <div class="editorial-compose">
+        <h3>📜 Appreciation Section</h3>
+        <p class="intro">Written by Production Admin. Acknowledgements, contributors, sponsors, and thanks.</p>
+        <input type="text" id="apprTitle" placeholder="Section title (e.g., 'With Gratitude')"/>
+        <textarea id="apprBody" placeholder="List of contributors, sponsors, special thanks..."></textarea>
+        <div class="compose-actions">
+          <button class="btn btn-primary" onclick="saveAppreciation()">Save Appreciation</button>
+          <span id="apprStatus" style="font-size:12px;color:var(--ink3);align-self:center;"></span>
+        </div>
+      </div>
+      <div class="editorial-compose" style="background:linear-gradient(135deg,#f4f0fd,#eae4fa);border-color:#c6a5f0;">
+        <h3 style="color:#2d1b4e;">✎ Editorial Note (read-only here)</h3>
+        <p class="intro" style="color:#4a2d7a;">Written by the Editor-in-Chief. Displayed here for reference.</p>
+        <div id="edNotePreview" style="background:#fff;padding:14px;border-radius:7px;font-size:14px;color:var(--ink2);min-height:80px;white-space:pre-wrap;"></div>
+      </div>
+      <h2 style="margin-top:2rem;margin-bottom:1rem;font-size:18px;font-family:'Lato',sans-serif;">Editorial Entries</h2>
+      <div id="editorialList" class="sub-list"></div>
+    </div>
+
+    <!-- Layout Studio -->
+    <div id="adminModeLayout" style="display:none;">
+      <div style="background:linear-gradient(135deg,var(--school-navy),var(--school-navy2));color:#fff;padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;border-bottom:3px solid var(--school-mint3);">
+        <div>
+          <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--school-mint);margin-bottom:3px;">Production Admin</div>
+          <h2 style="font-size:18px;color:#fff;font-family:'Lato',sans-serif;">🗞 Layout Studio</h2>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-mint" onclick="generateMagPreview()">▶ Generate Preview</button>
+          <button class="btn btn-ai" onclick="lsTab('aiassist')">✦ AI Assistant</button>
+          <button class="btn btn-gold" onclick="openPrintView()">🖨 Open Print View</button>
+        </div>
+      </div>
+      <div class="ls-tabs">
+        <button class="ls-tab active" onclick="lsTab('preview')" id="lstab-preview">📖 Preview</button>
+        <button class="ls-tab" onclick="lsTab('sections')" id="lstab-sections">📋 Sections</button>
+        <button class="ls-tab" onclick="lsTab('design')" id="lstab-design">🎨 Design</button>
+        <button class="ls-tab" onclick="lsTab('toc')" id="lstab-toc">📑 Contents</button>
+        <button class="ls-tab" onclick="lsTab('aiassist')" id="lstab-aiassist">✦ AI Chat</button>
+      </div>
+      <div class="ls-body">
+        <!-- Preview -->
+        <div id="lspanel-preview">
+          <div class="mag-preview-toolbar">
+            <h3 id="previewPageTitle">Page 1 of —</h3>
+            <div class="page-nav">
+              <button onclick="prevPage()" id="btnPrevPage" disabled>‹</button>
+              <span class="page-nav-info" id="pageNavInfo">1 / —</span>
+              <button onclick="nextPage()" id="btnNextPage">›</button>
+            </div>
+            <span style="font-size:11px;color:var(--ink3);margin-left:8px;">Live preview — updates as content is approved</span>
+          </div>
+          <div class="mag-canvas" id="magCanvas">
+            <div style="text-align:center;color:var(--ink3);padding:4rem 1rem;">
+              <div style="font-size:48px;margin-bottom:1rem;">🗞</div>
+              <h3 style="font-family:'Lato',sans-serif;color:var(--ink2);margin-bottom:8px;">No preview yet</h3>
+              <p style="font-size:14px;">Click <strong>Generate Preview</strong> above to build your magazine pages.</p>
+            </div>
+          </div>
+        </div>
+        <!-- Section Manager -->
+        <div id="lspanel-sections" style="display:none;">
+          <div style="background:var(--school-mint2);border:1px solid var(--school-mint3);border-radius:var(--radius);padding:14px 18px;margin-bottom:1.25rem;">
+            <p style="font-size:13.5px;color:var(--school-navy);"><strong>Drag</strong> sections to reorder · <strong>Toggle</strong> to show/hide · <strong>Layout</strong> sets items per page · <strong>Rename</strong> to change print heading</p>
+          </div>
+          <div class="section-list" id="sectionList"></div>
+          <button class="btn btn-primary" style="margin-top:1.25rem;" onclick="saveSectionOrder()">💾 Save Section Order</button>
+        </div>
+        <!-- Design Settings -->
+        <div id="lspanel-design" style="display:none;">
+          <div class="ls-settings-grid">
+            <div class="ls-setting-card">
+              <h4>📰 Magazine Identity</h4>
+              <div class="ls-field"><label>Magazine Title</label><input type="text" id="ls-magTitle" placeholder="e.g., The Torch"/></div>
+              <div class="ls-field"><label>School Name</label><input type="text" id="ls-schoolName" placeholder="Way To Success Standard Schools"/></div>
+              <div class="ls-field"><label>Location</label><input type="text" id="ls-location" placeholder="Ejigbo, Osun State"/></div>
+              <div class="ls-field"><label>Edition</label><input type="text" id="ls-edition" placeholder="1st Edition"/></div>
+              <div class="ls-field"><label>Year</label><input type="text" id="ls-year" placeholder="2025/2026"/></div>
+              <div class="ls-field"><label>Theme / Motto</label><input type="text" id="ls-theme" placeholder="e.g., Lighting the Path"/></div>
+              <button class="ls-save-btn" onclick="saveLsSettings()">Save Identity</button>
+            </div>
+            <div class="ls-setting-card">
+              <h4>🎨 Color Scheme</h4>
+              <div class="ls-field"><label>Primary Color</label><input type="color" id="ls-color1" value="#1a2744"/></div>
+              <div class="ls-field"><label>Accent Color</label><input type="color" id="ls-color2" value="#7dd4a8"/></div>
+              <div class="ls-field"><label>Highlight Color</label><input type="color" id="ls-color3" value="#8b1a1a"/></div>
+              <div class="ls-field"><label>Page Background</label><input type="color" id="ls-pageBg" value="#ffffff"/></div>
+              <div class="ls-field"><label>Text Color</label><input type="color" id="ls-textColor" value="#1c1c1e"/></div>
+              <button class="ls-save-btn" onclick="saveLsSettings()">Apply Colors</button>
+            </div>
+            <div class="ls-setting-card">
+              <h4>🔤 Typography</h4>
+              <div class="ls-field"><label>Heading Font</label>
+                <select id="ls-headingFont">
+                  <option value="'Playfair Display',serif">Playfair Display (Classic)</option>
+                  <option value="Georgia,serif">Georgia (Traditional)</option>
+                  <option value="'Times New Roman',serif">Times New Roman</option>
+                  <option value="'Lato',sans-serif">Lato (Modern)</option>
+                </select>
+              </div>
+              <div class="ls-field"><label>Body Font</label>
+                <select id="ls-bodyFont">
+                  <option value="'Crimson Text',serif">Crimson Text (Editorial)</option>
+                  <option value="'Lato',sans-serif">Lato (Clean)</option>
+                  <option value="Georgia,serif">Georgia</option>
+                </select>
+              </div>
+              <div class="ls-field"><label>Body Font Size</label>
+                <select id="ls-fontSize">
+                  <option value="10px">10px (Compact)</option>
+                  <option value="11px" selected>11px (Standard)</option>
+                  <option value="12px">12px (Comfortable)</option>
+                  <option value="13px">13px (Large)</option>
+                </select>
+              </div>
+              <button class="ls-save-btn" onclick="saveLsSettings()">Apply Typography</button>
+            </div>
+            <div class="ls-setting-card">
+              <h4>📐 Page Layout</h4>
+              <div class="ls-field"><label>Page Size</label>
+                <select id="ls-pageSize" onchange="updatePageSizeUI()">
+                  <option value="a4">A4 (210 × 297mm)</option>
+                  <option value="a5">A5 (148 × 210mm)</option>
+                  <option value="letter">Letter (216 × 279mm)</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div class="ls-field" id="ls-customSizeRow" style="display:none;">
+                <label>Custom (width × height px)</label>
+                <div style="display:flex;gap:6px;">
+                  <input type="number" id="ls-customW" placeholder="794" style="flex:1;"/>
+                  <input type="number" id="ls-customH" placeholder="1123" style="flex:1;"/>
+                </div>
+              </div>
+              <div class="ls-field"><label>Orientation</label>
+                <select id="ls-orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+              </div>
+              <div class="ls-field"><label>Show Page Numbers</label>
+                <select id="ls-pageNums"><option value="yes">Yes</option><option value="no">No</option></select>
+              </div>
+              <button class="ls-save-btn" onclick="saveLsSettings()">Apply Layout</button>
+            </div>
+            <div class="ls-setting-card">
+              <h4>🤖 AI Configuration</h4>
+              <div class="ls-field"><label>OpenRouter API Key</label><input type="password" id="ls-apiKey" placeholder="sk-or-v1-…"/></div>
+              <div class="ls-field"><label>Layout AI Model</label>
+                <select id="ls-layoutModel">
+                  <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash ✓ (Fast/Cheap)</option>
+                  <option value="google/gemini-2.0-flash-lite-001">Gemini 2.0 Flash Lite (Cheapest)</option>
+                  <option value="google/gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro (Best Quality)</option>
+                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Premium)</option>
+                  <option value="anthropic/claude-3-haiku">Claude 3 Haiku (Reliable)</option>
+                  <option value="deepseek/deepseek-chat">DeepSeek V3 (Cheap/Smart)</option>
+                  <option value="openai/gpt-4o-mini">GPT-4o Mini (Fast)</option>
+                  <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B (Free)</option>
+                </select>
+              </div>
+              <div class="ls-field"><label>Proofread AI Model</label>
+                <select id="ls-proofModel">
+                  <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash ✓ (Fast/Cheap)</option>
+                  <option value="google/gemini-2.0-flash-lite-001">Gemini 2.0 Flash Lite (Cheapest)</option>
+                  <option value="google/gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro (Best Quality)</option>
+                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Premium)</option>
+                  <option value="anthropic/claude-3-haiku">Claude 3 Haiku (Reliable)</option>
+                  <option value="deepseek/deepseek-chat">DeepSeek V3 (Cheap/Smart)</option>
+                  <option value="openai/gpt-4o-mini">GPT-4o Mini (Fast)</option>
+                  <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B (Free)</option>
+                </select>
+              </div>
+              <div class="ls-field"><label>Max Tokens (per AI call)</label>
+                <select id="ls-maxTokens">
+                  <option value="500">500 (Fastest/cheapest)</option>
+                  <option value="1000" selected>1000 (Standard)</option>
+                  <option value="2000">2000 (Detailed)</option>
+                </select>
+              </div>
+              <button class="ls-save-btn" onclick="saveLsSettings()">Save AI Config</button>
+            </div>
+            <div class="ls-setting-card">
+              <h4>🏷 Section &amp; Form Labels</h4>
+              <p style="font-size:12px;color:var(--ink3);margin-bottom:10px;">Rename any section heading or form title. Changes reflect everywhere — TOC, preview, and landing page.</p>
+              <div id="labelRenameList"></div>
+              <button class="ls-save-btn" onclick="saveAllLabels()">Save All Labels</button>
+            </div>
+            <div class="ls-setting-card">
+              <h4>⚙️ Automation Rules</h4>
+              <div class="ls-field"><label>Staff per page</label>
+                <select id="ls-teachersPerPage">
+                  <option value="6">6 (large cards)</option>
+                  <option value="9" selected>9 (medium 3×3 grid)</option>
+                  <option value="12">12 (compact)</option>
+                  <option value="15">15 (very compact)</option>
+                </select>
+              </div>
+              <div class="ls-field"><label>Students per page</label>
+                <select id="ls-studentsPerPage">
+                  <option value="1">1 (full page)</option>
+                  <option value="2" selected>2 (half page each)</option>
+                  <option value="3">3 (thirds)</option>
+                  <option value="4">4 (compact grid)</option>
+                </select>
+              </div>
+              <div class="ls-field"><label>Speeches per page</label>
+                <select id="ls-speechesPerPage">
+                  <option value="1" selected>1 (full — recommended)</option>
+                  <option value="2">2 (half each)</option>
+                </select>
+              </div>
+              <div class="ls-field"><label>Gallery photos per page</label>
+                <select id="ls-galleryPerPage">
+                  <option value="2">2 (large)</option>
+                  <option value="4" selected>4 (standard grid)</option>
+                  <option value="6">6 (compact)</option>
+                  <option value="9">9 (mosaic)</option>
+                </select>
+              </div>
+              <div class="ls-field"><label>Creative items per page</label>
+                <select id="ls-creativePerPage">
+                  <option value="1">1 (full)</option>
+                  <option value="2" selected>2 (two items)</option>
+                  <option value="3">3 (three items)</option>
+                </select>
+              </div>
+              <div class="ls-field"><label>Auto-trim long text</label>
+                <select id="ls-autoTrim">
+                  <option value="yes" selected>Yes (AI adds "…continued")</option>
+                  <option value="no">No (may overflow)</option>
+                </select>
+              </div>
+              <button class="ls-save-btn" onclick="saveLsSettings()">Save Automation Rules</button>
+            </div>
+          </div>
+        </div>
+        <!-- TOC -->
+        <div id="lspanel-toc" style="display:none;">
+          <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;box-shadow:var(--shadow);">
+            <h3 style="margin-bottom:4px;font-family:'Lato',sans-serif;">Auto-Generated Table of Contents</h3>
+            <p style="font-size:13px;color:var(--ink3);margin-bottom:1.5rem;">Updates when you click Generate Preview. Page numbers are calculated from your section order and layout settings.</p>
+            <div id="tocPreview"></div>
+          </div>
+        </div>
+        <!-- AI Assistant -->
+        <div id="lspanel-aiassist" style="display:none;">
+          <div class="ls-ai-panel">
+            <h4>✦ AI Layout Designer — Conversational</h4>
+            <p style="font-size:12.5px;color:var(--school-navy);margin-bottom:12px;">Chat with the AI about your magazine design. Ask about layout, colours, typography, headers, styles — the AI can suggest changes and you can review before applying. Use <strong>Gemini 2.0 Flash</strong> for best speed/cost balance.</p>
+
+            <!-- Chat history -->
+            <div id="aiChatHistory" style="max-height:420px;overflow-y:auto;margin-bottom:14px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;"></div>
+
+            <!-- Input area -->
+            <textarea id="aiAssistQuery" style="width:100%;padding:12px;border:2px solid var(--school-mint3);border-radius:10px;font-size:14px;font-family:'Lato',sans-serif;min-height:80px;resize:vertical;margin-bottom:10px;background:#fff;display:block;" placeholder="Ask the AI about layout, colours, bold headers, styles, etc..."></textarea>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <button class="btn btn-ai" onclick="runLayoutAI()">✦ Send Message</button>
+              <button class="btn btn-primary" id="btnApplyLayout" onclick="applyLayoutSuggestions()" style="display:none;background:var(--school-mint3);color:#fff;border:none;">⚡ Apply Suggestions</button>
+              <button class="btn" onclick="clearAIChat()" style="font-size:12px;">Clear Chat</button>
+            </div>
+
+            <!-- Pending suggestion review box -->
+            <div id="aiReviewBox" style="display:none;margin-top:14px;background:linear-gradient(135deg,#fdf8ee,#faf4e4);border:2px solid #e8d090;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:12px;font-weight:700;color:#4a3408;margin-bottom:8px;">📋 AI Suggestion Ready for Review</div>
+              <div id="aiReviewText" style="font-size:13px;color:#4a3408;margin-bottom:12px;max-height:200px;overflow-y:auto;"></div>
+              <div style="display:flex;gap:10px;">
+                <button class="btn btn-primary" onclick="approveAISuggestion()" style="background:var(--green);color:#fff;border:none;">✓ Apply This</button>
+                <button class="btn" onclick="rejectAISuggestion()" style="color:var(--red);border-color:var(--red2);">✗ Reject</button>
+              </div>
+            </div>
+
+            <div class="ls-ai-result" id="aiAssistResult"></div>
+            <div id="aiApplyLog" style="display:none;margin-top:12px;background:#f0fdf6;border:1px solid var(--school-mint2);border-radius:9px;padding:12px 14px;font-size:13px;color:var(--green);"></div>
+          </div>
+          <div class="ls-ai-panel" style="margin-top:1.25rem;">
+            <h4>📊 Content Summary</h4>
+            <div id="aiContentSummary" style="font-size:13px;color:var(--ink2);background:#fff;padding:12px;border-radius:8px;border:1px solid var(--school-mint2);white-space:pre-line;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Share Links -->
+    <div id="adminModeShareLinks" style="display:none;">
+      <div class="editor-intro"><h2>🔗 Share Links</h2><p>Copy and send to each group via WhatsApp or email. Each link opens that category's form directly.</p></div>
+      <div id="shareLinksContainer"></div>
+    </div>
+
+    <!-- Settings -->
+    <div id="adminModeSettings" style="display:none;">
+      <div class="settings-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;">🛠️ Customize Forms</h3>
+          <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openCreateFormModal()">+ Create New Form</button>
+        </div>
+        <p class="desc">Hide/show fields, toggle required status, reorder, or add custom fields per form.</p>
+        <div class="cust-cat-picker">
+          <label>Edit form:</label>
+          <select id="custCatPicker" onchange="renderFieldCustomizer()">
+            <option value="">— Select a category —</option>
+            <option value="teachers">👨‍🏫 Staff Profiles</option>
+            <option value="primary5">🧒 Primary 5 Graduates</option>
+            <option value="jss3">🎒 JSS3 Graduates</option>
+            <option value="ss3">🎓 SS3 Graduates</option>
+            <option value="speeches">🎤 Speeches &amp; Addresses</option>
+            <option value="creative">✍️ Creative Corner</option>
+            <option value="events">📸 School Life &amp; Events</option>
+            <option value="academic">📚 Academic &amp; Educational</option>
+            <option value="interviews">🎙️ Interviews</option>
+            <option value="motivational">💡 Motivational Articles</option>
+            <option value="gallery">🖼️ Photo Gallery</option>
+          </select>
+        </div>
+        <div id="custFieldsList"></div>
+        <div id="custActions" class="cust-actions-row" style="display:none;">
+          <button class="btn btn-primary" onclick="openCustomFieldModal()">+ Add Custom Field</button>
+          <button class="btn" onclick="resetCategoryToDefaults()" style="color:var(--amber);border-color:var(--amber2);">↺ Reset to defaults</button>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Change PINs</h3>
+        <p class="desc">Set new 4-digit PINs. Current defaults: Admin 1234 / Editor 5678.</p>
+        <div class="settings-row"><label>Production Admin PIN:</label><input type="text" id="setAdminPin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="4 digits"/></div>
+        <div class="settings-row"><label>Editor-in-Chief PIN:</label><input type="text" id="setEditorPin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="4 digits"/></div>
+        <button class="btn btn-primary" onclick="savePins()">Save PINs</button>
+        <span id="pinSaveStatus" style="font-size:12px;color:var(--ink3);margin-left:10px;"></span>
+      </div>
+      <div class="settings-section">
+        <h3>🤖 AI API Key</h3>
+        <p class="desc">Required for the AI Design Assistant and AI Proofreader in the workspace. Get a free key from <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--school-mint3);font-weight:700;">openrouter.ai/keys</a></p>
+        <div class="settings-row"><label>OpenRouter API Key:</label><input type="password" id="settingsApiKey" placeholder="sk-or-v1-…" style="flex:1;max-width:400px;"/></div>
+        <button class="btn btn-primary" onclick="saveApiKeyFromSettings()">Save API Key</button>
+        <span id="apiKeySaveStatus" style="font-size:12px;color:var(--ink3);margin-left:10px;"></span>
+      </div>
+      <div class="settings-section">
+        <h3>System Diagnostics</h3>
+        <p class="desc">Current state of the system.</p>
+        <div class="settings-diag" id="diagOutput">Loading...</div>
+        <button class="btn" onclick="refreshDiag()" style="margin-top:10px;">Refresh diagnostics</button>
+      </div>
+      <div class="settings-section">
+        <h3 style="color:var(--red);">⚠️ Reset Zone</h3>
+        <p class="desc">Reset PINs to defaults (1234/5678) or clear ALL submissions.</p>
+        <button class="btn" onclick="resetPinsToDefault()">Reset PINs to defaults</button>
+        <button class="btn btn-danger" onclick="wipeAllData()" style="margin-left:10px;">Wipe all submissions</button>
+      </div>
+      <div class="settings-section">
+        <h3>🗑️ Purge Local Cache</h3>
+        <p class="desc">Clear stale localStorage data from old database connections. Cloud data remains safe.</p>
+        <button class="btn btn-danger" onclick="purgeLocalCache()" style="background:#d4380d;">Purge Local Cache</button>
+        <span id="purgeStatus" style="font-size:12px;color:var(--ink3);margin-left:10px;"></span>
+      </div>
+      </div>
+    </div> <!-- Added missing closing div for admin-body -->
+    </main>
+  </div>
+</div>

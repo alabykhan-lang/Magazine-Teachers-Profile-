@@ -1,7 +1,7 @@
 /* MagicEditor v2.0 — Way To Success Standard Schools — 1st Edition 2025/2026 */
 
 let CATEGORIES={
-  teachers:{label:'Teacher Profiles',tag:'Teachers',title:'Teacher Profile Submission',subtitle:'Share your journey and message to the graduating class.',icon:'👩‍🏫',photoRequired:true,fields:[
+  teachers:{label:'Staff Profiles',tag:'Staff',title:'Staff Profile Submission',subtitle:'Share your journey and message to the graduating class.',icon:'👨‍🏫',photoRequired:true,fields:[
     {id:'name',label:'Full name',type:'text',required:true,placeholder:'As it should appear in print'},
     {id:'title',label:'Title / position',type:'text',required:true,placeholder:'e.g. Head of Mathematics Department'},
     {id:'subject',label:'Subject(s) taught',type:'text',required:true,placeholder:'e.g. Mathematics, Further Mathematics'},
@@ -842,7 +842,7 @@ const DEFAULT_SECTION_ORDER=[
   {key:'primary5',label:'Primary 5 Graduates',icon:'🧒',editable:true,visible:true,layout:'grid'},
   {key:'jss3',label:'JSS3 Graduates',icon:'🎒',editable:true,visible:true,layout:'grid'},
   {key:'ss3',label:'SS3 Graduates',icon:'🎓',editable:true,visible:true,layout:'grid'},
-  {key:'teachers',label:'Teacher Profiles',icon:'👩‍🏫',editable:true,visible:true,layout:'teacher-grid'},
+  {key:'teachers',label:'Staff Profiles',icon:'👨‍🏫',editable:true,visible:true,layout:'teacher-grid'},
   {key:'academic',label:'Academic & Educational',icon:'📚',editable:true,visible:true,layout:'single'},
   {key:'creative',label:'Creative Corner',icon:'✍️',editable:true,visible:true,layout:'double'},
   {key:'events',label:'School Life & Events',icon:'📸',editable:true,visible:true,layout:'events'},
@@ -890,7 +890,7 @@ function renderLandingCards(){
   const grid=document.getElementById('formGrid');
   if(!grid) return;
   const h=document.getElementById('landingHeading');if(h)h.textContent=getLabel('landing_heading','Choose a content category');
-  const DESCS={teachers:'For teaching staff. Share your journey, subjects, and message to the graduating class.',primary5:'For Primary 5 pupils moving on. Tell the world who you are.',jss3:'For Junior Secondary 3 students finishing this phase.',ss3:'For the main graduating class. Your legacy, your ambitions, your message.',speeches:'Proprietor, Senior Boy, guest speakers — formal addresses for the magazine.',creative:'Poems, short stories, jokes, riddles — creative writing from across the school.',events:'Sports days, excursions, competitions, achievements — the year\'s highlights.',academic:'Articles, subject features, research write-ups, and educational content.',interviews:'Q&A with old students, guest speakers, and notable voices.',motivational:'Inspirational messages and wisdom for the graduating class.',gallery:'Submit standalone photos with captions for the gallery section.'};
+  const DESCS={teachers:'For teaching staff and management. Share your journey, subjects, and message to the graduating class.',primary5:'For Primary 5 pupils moving on. Tell the world who you are.',jss3:'For Junior Secondary 3 students finishing this phase.',ss3:'For the main graduating class. Your legacy, your ambitions, your message.',speeches:'Proprietor, Senior Boy, guest speakers — formal addresses for the magazine.',creative:'Poems, short stories, jokes, riddles — creative writing from across the school.',events:'Sports days, excursions, competitions, achievements — the year\'s highlights.',academic:'Articles, subject features, research write-ups, and educational content.',interviews:'Q&A with old students, guest speakers, and notable voices.',motivational:'Inspirational messages and wisdom for the graduating class.',gallery:'Submit standalone photos with captions for the gallery section.'};
   const STRIPES={teachers:'stripe-gold',primary5:'stripe-green',jss3:'stripe-green',ss3:'stripe-green',speeches:'stripe-blue',creative:'stripe-purple',events:'stripe-amber',academic:'stripe-blue',interviews:'stripe-mint',motivational:'stripe-purple',gallery:'stripe-gold'};
   
   if(!CATEGORY_KEYS || !CATEGORY_KEYS.length) {
@@ -2709,18 +2709,29 @@ TYPOGRAPHY: Heading:${s.headingFont||'Playfair Display'} Body:${s.bodyFont||'Cri
 CURRENT PAGE: ${wsPageIdx+1} of ${wsPages.length} — ${wsPages[wsPageIdx]?.label||'none'}`;
 
   const taskPrompts={
-    design:`You are an AGENT controlling a magazine design system. You MUST directly implement changes by outputting [FORMAT:customCSS:...] and settings JSON blocks in EVERY response. Do NOT just suggest — EXECUTE.
+    design:`You are a DIRECT-ACTION AGENT controlling a magazine design system. You do NOT suggest changes — you EXECUTE them.
 
-RULES:
-1. ALWAYS include a [FORMAT:customCSS:...] block with CSS that directly implements your design changes.
-2. ALWAYS include a settings JSON block to change colours, fonts, spacing.
-3. Explain what you changed BRIEFLY, then show the implementation.
-4. You are the sole design controller — the user has no manual design tools.
-5. Make designs PREMIUM: rich colours, elegant typography, professional spacing.
-6. For print magazines use CMYK-friendly colours, high contrast, proper margins.`,
-    reasoning:'You are a production strategist. Analyze the magazine structure, content balance, page count, and help optimize the overall layout for cost-effective printing. Output settings JSON to implement any changes.',
-    proofread:'You are a professional proofreader for a Nigerian school graduation magazine. Check grammar, spelling, punctuation across all finalized content.',
-    image:`You are a design analyst AND agent. Analyze the uploaded design sample image, describe its style, then REPLICATE it by outputting [FORMAT:customCSS:...] and settings JSON blocks. Do not just describe — implement the style directly.`
+CRITICAL RULES — follow these EXACTLY:
+1. For ANY design change, you MUST output a [FORMAT:customCSS:] block containing valid CSS.
+   Example: [FORMAT:customCSS: .mag-item-name { font-size:14px; color:#2d1b4e; } ]
+2. For colour/font/layout changes, you MUST output a settings block:
+   \`\`\`settings
+   {"color1":"#1a2744","color2":"#7dd4a8"}
+   \`\`\`
+3. NEVER respond with only text advice. EVERY response MUST have at least one [FORMAT:customCSS:...] block OR a settings block.
+4. Make designs PREMIUM: rich colours, elegant typography, professional spacing, print-quality.
+5. Respond briefly explaining what you did, then include the executable blocks.`,
+    reasoning:`You are a production strategist AND agent. Analyze the magazine, then EXECUTE changes directly.
+You MUST output a settings block or [FORMAT:customCSS:...] block with every response.
+\`\`\`settings
+{"teachersPerPage":9}
+\`\`\``,
+    proofread:`You are a professional proofreader for a Nigerian school graduation magazine.
+Check grammar, spelling, punctuation. Output corrections as [FORMAT:customCSS:...] to highlight errors.
+Also output any text fixes you find.`,
+    image:`You are a design replication agent. Analyze the uploaded image, then EXECUTE the same style by outputting:
+[FORMAT:customCSS: /* css that replicates the style */ ]
+and a settings block. Do NOT just describe — implement directly.`
   };
 
   const messages=[{role:'system',content:`${taskPrompts[task]||taskPrompts.design}
@@ -2788,17 +2799,23 @@ Context:\n${ctx}`}];
     /* Remove thinking indicator */
     wsAIChatHistory.splice(thinkIdx,1);
 
-    /* Parse formatting commands */
+    /* Parse formatting commands — [FORMAT:key:value] */
     const fmtCommands={};
     const fmtRegex2=/\[FORMAT:(\w+):([\s\S]*?)\]/g;
     let fm2;
     while((fm2=fmtRegex2.exec(result))!==null) fmtCommands[fm2[1]]=fm2[2];
     let displayText=result.replace(/\[FORMAT:.*?\]/gs,'').trim();
 
-    /* Extract settings JSON */
-    const settingsMatch=displayText.match(/```settings\s*([\s\S]*?)```/i);
+    /* ALSO extract CSS from ```css code blocks (AI often uses this format) */
+    const cssBlockMatch = displayText.match(/```css\s*([\s\S]*?)```/i);
+    if(cssBlockMatch && cssBlockMatch[1].trim() && !fmtCommands.customCSS){
+      fmtCommands.customCSS = cssBlockMatch[1].trim();
+    }
+
+    /* Extract settings from ```settings OR ```json blocks */
+    const settingsMatch = displayText.match(/```(?:settings|json)\s*([\s\S]*?)```/i);
     const settingsObj = settingsMatch ? (() => { try{ return JSON.parse(settingsMatch[1].trim()); }catch(e){ return null; } })() : null;
-    const adviceText=displayText.replace(/```settings[\s\S]*?```/gi,'').replace(/```css[\s\S]*?```/gi,'').trim();
+    const adviceText = displayText.replace(/```(?:settings|json|css)[\s\S]*?```/gi,'').trim();
 
     /* ═══ AGENT MODE: Auto-apply all changes directly ═══ */
     wsUndoPush(); /* Save state for undo */
@@ -2928,6 +2945,137 @@ function wsExportEditable(){
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   }).catch(err=>alert('Export failed: '+err.message));
+}
+
+/* ── Export: Word Document for Printing Press ── */
+function wsExportWord(){
+  const s = lsSettings;
+  const allSubs = loadAll();
+  const approved = allSubs.filter(x => x.status==='approved' || x.status==='finalized');
+  const magTitle = s.magTitle || 'The Torch';
+  const schoolName = s.schoolName || 'Way To Success Standard Schools';
+  const edition = s.edition || '1st Edition';
+  const year = s.year || '2025/2026';
+  const c1 = s.color1 || '#1a2744';
+  const c2 = s.color2 || '#7dd4a8';
+
+  /* Helper: escape HTML */
+  function e(str){ return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  /* Helper: render all fields from a submission */
+  function renderFields(sub){
+    return Object.entries(sub.data||{}).map(([k,fc]) => {
+      if(!fc || !fc.value) return '';
+      return `<tr><td style="font-weight:bold;color:#555;padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap;font-size:10pt;">${e(fc.label)}</td><td style="padding:4px 0;font-size:11pt;line-height:1.6;">${e(fc.value).replace(/\n/g,'<br>')}</td></tr>`;
+    }).join('');
+  }
+
+  /* Build sections */
+  let bodyHtml = '';
+
+  /* Title Page */
+  bodyHtml += `<div style="text-align:center;page-break-after:always;padding:120px 40px;">
+    <h1 style="font-size:36pt;color:${c1};margin-bottom:8px;">${e(magTitle)}</h1>
+    <p style="font-size:16pt;color:${c2};margin-bottom:4px;">${e(schoolName)}</p>
+    <p style="font-size:14pt;color:#666;">${e(edition)} &mdash; ${e(year)}</p>
+    <hr style="border:none;border-top:3px solid ${c2};width:200px;margin:30px auto;">
+    <p style="font-size:11pt;color:#999;margin-top:40px;">Full Content Document for Printing Press<br>Exported: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</p>
+    <p style="font-size:10pt;color:#aaa;margin-top:8px;">Total approved submissions: ${approved.length}</p>
+  </div>`;
+
+  /* Editorial Note */
+  const edNote = approved.find(x => x.category==='editorial-note');
+  if(edNote){
+    bodyHtml += `<div style="page-break-before:always;">
+      <h2 style="color:${c1};border-bottom:3px solid ${c2};padding-bottom:8px;font-size:18pt;">EDITORIAL NOTE</h2>
+      ${edNote.data.title?.value ? '<h3 style="color:#333;margin:12px 0 8px;">'+e(edNote.data.title.value)+'</h3>' : ''}
+      <div style="font-size:11pt;line-height:1.8;white-space:pre-line;">${e(edNote.data.body?.value||'')}</div>
+      ${edNote.photoData ? '<p style="margin-top:16px;"><img src="'+edNote.photoData+'" style="max-width:200px;border:1px solid #ccc;"></p>' : ''}
+    </div>`;
+  }
+
+  /* Appreciation */
+  const appr = approved.find(x => x.category==='appreciation');
+  if(appr){
+    bodyHtml += `<div style="page-break-before:always;">
+      <h2 style="color:${c1};border-bottom:3px solid ${c2};padding-bottom:8px;font-size:18pt;">APPRECIATION</h2>
+      ${appr.data.title?.value ? '<h3 style="color:#333;margin:12px 0 8px;">'+e(appr.data.title.value)+'</h3>' : ''}
+      <div style="font-size:11pt;line-height:1.8;white-space:pre-line;">${e(appr.data.body?.value||'')}</div>
+    </div>`;
+  }
+
+  /* Each category section */
+  sectionOrder.filter(sec => sec.visible && CATEGORIES[sec.key]).forEach(sec => {
+    const catDef = CATEGORIES[sec.key];
+    const catSubs = approved.filter(x => x.category === sec.key);
+    if(!catSubs.length) return;
+
+    bodyHtml += `<div style="page-break-before:always;">
+      <h2 style="color:${c1};border-bottom:3px solid ${c2};padding-bottom:8px;font-size:18pt;">${e(catDef.label.toUpperCase())}</h2>
+      <p style="font-size:10pt;color:#888;margin:4px 0 16px;">${e(catDef.subtitle||'')} &mdash; ${catSubs.length} submission${catSubs.length>1?'s':''}</p>`;
+
+    catSubs.forEach((sub, idx) => {
+      const name = sub.data.name?.value || sub.data.speakerName?.value || sub.data.contribName?.value ||
+                   sub.data.authorName?.value || sub.data.intervieweeName?.value || sub.data.submitterName?.value ||
+                   sub.data.eventName?.value || 'Submission '+(idx+1);
+
+      bodyHtml += `<div style="margin-bottom:24px;padding:16px;border:1px solid #e0e0e0;border-radius:4px;background:#fafafa;">
+        <h3 style="color:${c1};font-size:14pt;margin:0 0 8px;border-left:4px solid ${c2};padding-left:10px;">${e(name)}</h3>`;
+
+      /* Photo */
+      if(sub.photoData){
+        bodyHtml += `<p><img src="${sub.photoData}" style="max-width:180px;max-height:220px;object-fit:cover;border:1px solid #ccc;margin:8px 0;"></p>`;
+      }
+      /* Multi photos */
+      if(Array.isArray(sub.photos) && sub.photos.length){
+        bodyHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">';
+        sub.photos.forEach(p => {
+          if(p.data) bodyHtml += `<img src="${p.data}" style="max-width:120px;max-height:140px;object-fit:cover;border:1px solid #ccc;">`;
+        });
+        bodyHtml += '</div>';
+      }
+
+      /* All fields in table */
+      bodyHtml += `<table style="width:100%;border-collapse:collapse;margin-top:8px;">${renderFields(sub)}</table>`;
+      bodyHtml += `<p style="font-size:9pt;color:#aaa;margin-top:8px;">Status: ${sub.status} | Submitted: ${sub.ts || 'N/A'}</p>`;
+      bodyHtml += '</div>';
+    });
+    bodyHtml += '</div>';
+  });
+
+  /* Assemble full HTML document that Word can open */
+  const docHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8">
+  <meta name="ProgId" content="Word.Document">
+  <meta name="Generator" content="MagicEditor v2.0">
+  <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+  <style>
+    @page { size: A4 portrait; margin: 2cm 2.5cm; }
+    body { font-family: 'Calibri', 'Segoe UI', sans-serif; font-size: 11pt; color: #1c1c1e; line-height: 1.5; }
+    h1, h2, h3 { font-family: 'Cambria', 'Georgia', serif; }
+    table { border-collapse: collapse; }
+    img { max-width: 100%; }
+  </style>
+</head>
+<body>
+  ${bodyHtml}
+  <div style="page-break-before:always;text-align:center;padding:60px 40px;">
+    <hr style="border:none;border-top:2px solid ${c2};width:200px;margin:0 auto 20px;">
+    <p style="font-size:12pt;color:#999;">End of Document</p>
+    <p style="font-size:10pt;color:#aaa;">${e(magTitle)} &mdash; ${e(edition)} ${e(year)}<br>${e(schoolName)}</p>
+    <p style="font-size:9pt;color:#bbb;margin-top:12px;">Generated by MagicEditor v2.0 on ${new Date().toLocaleString()}</p>
+  </div>
+</body>
+</html>`;
+
+  /* Download as .doc file */
+  const blob = new Blob([docHtml], {type:'application/msword'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${slugify(magTitle||'magazine')}_content_${new Date().toISOString().slice(0,10)}.doc`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 /* UTILITY */
