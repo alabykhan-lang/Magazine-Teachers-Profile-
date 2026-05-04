@@ -6,7 +6,7 @@
 <title>MagicEditor v2.0 | Way To Success Standard Schools</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
 <style>
   /* Failsafe: auto-show force-open button after 5s via CSS animation */
@@ -17,6 +17,31 @@
   #bootLoadingOverlay { animation: fadeOverlay 0.6s ease 12s forwards; }
 </style>
 <style id="ai-custom-css"></style>
+<style id="mobile-touch-fix">
+  /* Mobile touch fix: ensure all interactive elements register taps */
+  button, .form-card, .admin-tab, .editor-tab, .pin-key, .ls-tab,
+  [onclick], a, select, input, textarea, label {
+    cursor: pointer;
+    -webkit-tap-highlight-color: rgba(0,0,0,0.08);
+    touch-action: manipulation;
+  }
+  /* Force boot overlay fully gone after 10s on all devices */
+  @keyframes forceHide {
+    0%   { opacity: 1; visibility: visible; pointer-events: auto; }
+    99%  { opacity: 0; visibility: visible; pointer-events: none; }
+    100% { opacity: 0; visibility: hidden;  pointer-events: none; display: none; }
+  }
+  #bootLoadingOverlay {
+    animation: forceHide 0.5s ease 10s forwards !important;
+  }
+  /* Prevent invisible overlay blocking touch after fade */
+  #bootLoadingOverlay[style*="display: none"],
+  #bootLoadingOverlay[style*="display:none"],
+  #bootLoadingOverlay[style*="visibility: hidden"] {
+    pointer-events: none !important;
+    display: none !important;
+  }
+</style>
 </head>
 <body>
 <!-- GLOBAL BOOT LOADING OVERLAY -->
