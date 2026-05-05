@@ -545,10 +545,19 @@ function applyCustomCategories(s){
 }
 
 /* LABELS */
-function loadLabels(){try{const s=JSON.parse(localStorage.getItem('me_labels')||'null');if(s&&typeof s==='object')return s;}catch(e){}return{};}
-function saveLabels(l){labelOverrides=l;try{localStorage.setItem('me_labels',JSON.stringify(l));}catch(e){}dbSaveSettings('labels',l);}
+function loadLabels(){
+  try{
+    const s=JSON.parse(localStorage.getItem('me_labels')||'null');
+    if(s && typeof s==='object' && !Array.isArray(s)) return s;
+  }catch(e){}
+  return {};
+}
+function saveLabels(l){labelOverrides=l||{};try{localStorage.setItem('me_labels',JSON.stringify(labelOverrides));}catch(e){}dbSaveSettings('labels',labelOverrides);}
 let labelOverrides=loadLabels();
-function getLabel(key,fallback){return labelOverrides[key]||fallback;}
+function getLabel(key,fallback){
+  if (!labelOverrides || typeof labelOverrides !== 'object') return fallback;
+  return labelOverrides[key]||fallback;
+}
 
 /* ── Async init: pull cloud data on page load ── */
 async function initCloudSync(){
@@ -889,27 +898,32 @@ function goLanding(){show('viewLanding');currentFormCategory=null;resetFormState
 function renderLandingCards(){
   const grid=document.getElementById('formGrid');
   if(!grid) return;
-  const h=document.getElementById('landingHeading');if(h)h.textContent=getLabel('landing_heading','Choose a content category');
-  const DESCS={teachers:'For teaching staff and management. Share your journey, subjects, and message to the graduating class.',primary5:'For Primary 5 pupils moving on. Tell the world who you are.',jss3:'For Junior Secondary 3 students finishing this phase.',ss3:'For the main graduating class. Your legacy, your ambitions, your message.',speeches:'Proprietor, Senior Boy, guest speakers — formal addresses for the magazine.',creative:'Poems, short stories, jokes, riddles — creative writing from across the school.',events:'Sports days, excursions, competitions, achievements — the year\'s highlights.',academic:'Articles, subject features, research write-ups, and educational content.',interviews:'Q&A with old students, guest speakers, and notable voices.',motivational:'Inspirational messages and wisdom for the graduating class.',gallery:'Submit standalone photos with captions for the gallery section.'};
-  const STRIPES={teachers:'stripe-gold',primary5:'stripe-green',jss3:'stripe-green',ss3:'stripe-green',speeches:'stripe-blue',creative:'stripe-purple',events:'stripe-amber',academic:'stripe-blue',interviews:'stripe-mint',motivational:'stripe-purple',gallery:'stripe-gold'};
-  
-  if(!CATEGORY_KEYS || !CATEGORY_KEYS.length) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--ink2);">No categories found. Please check configuration.</div>';
-    return;
-  }
+  try {
+    const h=document.getElementById('landingHeading');if(h)h.textContent=getLabel('landing_heading','Choose a content category');
+    const DESCS={teachers:'For teaching staff and management. Share your journey, subjects, and message to the graduating class.',primary5:'For Primary 5 pupils moving on. Tell the world who you are.',jss3:'For Junior Secondary 3 students finishing this phase.',ss3:'For the main graduating class. Your legacy, your ambitions, your message.',speeches:'Proprietor, Senior Boy, guest speakers — formal addresses for the magazine.',creative:'Poems, short stories, jokes, riddles — creative writing from across the school.',events:'Sports days, excursions, competitions, achievements — the year\'s highlights.',academic:'Articles, subject features, research write-ups, and educational content.',interviews:'Q&A with old students, guest speakers, and notable voices.',motivational:'Inspirational messages and wisdom for the graduating class.',gallery:'Submit standalone photos with captions for the gallery section.'};
+    const STRIPES={teachers:'stripe-gold',primary5:'stripe-green',jss3:'stripe-green',ss3:'stripe-green',speeches:'stripe-blue',creative:'stripe-purple',events:'stripe-amber',academic:'stripe-blue',interviews:'stripe-mint',motivational:'stripe-purple',gallery:'stripe-gold'};
+    
+    if(!CATEGORY_KEYS || !CATEGORY_KEYS.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--ink2);">No categories found. Please check configuration.</div>';
+      return;
+    }
 
-  grid.innerHTML=CATEGORY_KEYS.map(k=>{
-    const cat=CATEGORIES[k];
-    if(!cat) return '';
-    const lbl=getLabel('cat_label_'+k, cat.label || k);
-    const dsc=getLabel('cat_desc_'+k, DESCS[k]||'');
-    return`<div class="form-card" onclick="openForm('${k}')">
-      <span class="form-card-stripe ${STRIPES[k]||'stripe-blue'}"></span>
-      <span class="form-card-icon">${cat.icon||'📝'}</span>
-      <h3>${esc(lbl)}</h3>
-      <p>${esc(dsc)}</p>
-    </div>`;
-  }).join('');
+    grid.innerHTML=CATEGORY_KEYS.map(k=>{
+      const cat=CATEGORIES[k];
+      if(!cat) return '';
+      const lbl=getLabel('cat_label_'+k, cat.label || k);
+      const dsc=getLabel('cat_desc_'+k, DESCS[k]||'');
+      return`<div class="form-card" onclick="openForm('${k}')">
+        <span class="form-card-stripe ${STRIPES[k]||'stripe-blue'}"></span>
+        <span class="form-card-icon">${cat.icon||'📝'}</span>
+        <h3>${esc(lbl)}</h3>
+        <p>${esc(dsc)}</p>
+      </div>`;
+    }).join('');
+  } catch(err) {
+    console.error('Render error in renderLandingCards:', err);
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--red);">Failed to render categories. Please refresh the page.</div>';
+  }
 }
 
 /* FORM BUILDING */
@@ -1460,13 +1474,17 @@ function loadLsSettingsToUI(){const s=lsSettings;const set=(id,val)=>{const el=d
 function updatePageSizeUI(){const ps=document.getElementById('ls-pageSize');const row=document.getElementById('ls-customSizeRow');if(ps&&row)row.style.display=ps.value==='custom'?'block':'none';}
 function saveLsSettings(){const get=id=>{const el=document.getElementById(id);return el?el.value:undefined;};const s={magTitle:get('ls-magTitle'),schoolName:get('ls-schoolName'),location:get('ls-location'),edition:get('ls-edition'),year:get('ls-year'),theme:get('ls-theme'),color1:get('ls-color1'),color2:get('ls-color2'),color3:get('ls-color3'),pageBg:get('ls-pageBg'),textColor:get('ls-textColor'),headingFont:get('ls-headingFont'),bodyFont:get('ls-bodyFont'),fontSize:get('ls-fontSize'),pageSize:get('ls-pageSize'),orientation:get('ls-orientation'),pageNums:get('ls-pageNums'),apiKey:get('ls-apiKey'),layoutModel:get('ls-layoutModel'),proofModel:get('ls-proofModel'),maxTokens:get('ls-maxTokens'),teachersPerPage:parseInt(get('ls-teachersPerPage'))||9,studentsPerPage:parseInt(get('ls-studentsPerPage'))||2,speechesPerPage:parseInt(get('ls-speechesPerPage'))||1,galleryPerPage:parseInt(get('ls-galleryPerPage'))||4,creativePerPage:parseInt(get('ls-creativePerPage'))||2,autoTrim:get('ls-autoTrim')};lsSettings=s;saveLsSettingsToStorage(s);applyLsColors(s);alert('Settings saved!');}
 function applyLsColors(s){
-  if(!s)s=lsSettings;
-  const r=document.documentElement;
-  if(s.color1){r.style.setProperty('--school-navy',s.color1);r.style.setProperty('--school-navy2',s.color1+'cc');r.style.setProperty('--admin',s.color1);}
-  if(s.color2){r.style.setProperty('--school-mint',s.color2);r.style.setProperty('--school-mint3',s.color2);}
-  if(s.color3)r.style.setProperty('--school-red',s.color3);
-  if(s.pageBg)r.style.setProperty('--surface',s.pageBg);
-  if(s.textColor)r.style.setProperty('--ink',s.textColor);
+  if(!s)s=lsSettings||{};
+  try {
+    const r=document.documentElement;
+    if(s.color1){r.style.setProperty('--school-navy',s.color1);r.style.setProperty('--school-navy2',s.color1+'cc');r.style.setProperty('--admin',s.color1);}
+    if(s.color2){r.style.setProperty('--school-mint',s.color2);r.style.setProperty('--school-mint3',s.color2);}
+    if(s.color3)r.style.setProperty('--school-red',s.color3);
+    if(s.pageBg)r.style.setProperty('--surface',s.pageBg);
+    if(s.textColor)r.style.setProperty('--ink',s.textColor);
+  } catch(err) {
+    console.error('applyLsColors error:', err);
+  }
 }
 
 /* SECTION MANAGER */
