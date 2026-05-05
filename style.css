@@ -17,16 +17,16 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
-body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:15px;line-height:1.6;}
+body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--ink);min-height:100dvh;font-size:15px;line-height:1.6;}
 h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .view{display:none;}
 .view.active{display:block;animation:fadeIn .35s ease;}
 /* Admin/Editor/Workspace views need full height for sidebar layouts */
 #viewAdmin.active,
-#viewEditor.active{display:flex!important;flex-direction:column;height:100vh;overflow:hidden;}
+#viewEditor.active{display:flex!important;flex-direction:column;height:100dvh;overflow:hidden;}
 #viewAdmin.active>.admin-layout,
 #viewEditor.active>.admin-layout{flex:1;display:flex;min-height:0;overflow:hidden;}
-#viewWorkspace.active{display:block!important;height:100vh;overflow:hidden;}
+#viewWorkspace.active{display:block!important;height:100dvh;overflow:hidden;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 
 /* ── Mobile hamburger overlay ── */
@@ -419,7 +419,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 }
 
 /* Layout */
-.ws-layout{display:grid;grid-template-columns:var(--ws-sidebar-w) 1fr var(--ws-ai-w);grid-template-rows:var(--ws-topbar-h) 1fr var(--ws-statusbar-h);height:100vh;overflow:hidden;background:var(--ws-bg);color:var(--ws-text);font-family:'Lato',sans-serif;}
+.ws-layout{display:grid;grid-template-columns:var(--ws-sidebar-w) 1fr var(--ws-ai-w);grid-template-rows:var(--ws-topbar-h) 1fr var(--ws-statusbar-h);height:100dvh;overflow:hidden;background:var(--ws-bg);color:var(--ws-text);font-family:'Lato',sans-serif;}
 
 /* Topbar */
 .ws-topbar{grid-column:1/-1;background:var(--ws-surface);border-bottom:1px solid var(--ws-border);display:flex;align-items:center;padding:0 16px;gap:12px;z-index:50;}

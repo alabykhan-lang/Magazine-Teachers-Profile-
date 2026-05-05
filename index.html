@@ -854,6 +854,14 @@
   <span id="syncMsg"></span>
 </div>
 
-<script src="script.js?v=4"></script>
+<script>
+  function removeBootOverlay() {
+    const overlay = document.getElementById('bootLoadingOverlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+  }
+</script>
+<script src="script.js?v=5"></script>
 </body>
 </html>
