@@ -1020,6 +1020,14 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
     pointer-events: none !important;
     display: none !important;
   }
+  /* Ensure overlay never blocks clicks after animation completes */
+  #bootLoadingOverlay {
+    pointer-events: auto;
+    transition: pointer-events 0.5s ease 4s;
+  }
+  #bootLoadingOverlay[style*="pointer-events: none"] {
+    pointer-events: none !important;
+  }
 </style>
 </head>
 <body>
@@ -1838,6 +1846,8 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
     const overlay = document.getElementById('bootLoadingOverlay');
     if (overlay) {
       overlay.style.display = 'none';
+      overlay.style.pointerEvents = 'none';
+      overlay.style.visibility = 'hidden';
     }
   }
 </script>
