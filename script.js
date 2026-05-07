@@ -928,17 +928,22 @@ function renderLandingCards(){
 
 /* FORM BUILDING */
 function openForm(k){
-  currentFormCategory=k;
-  resetFormState();
-  const cat=CATEGORIES[k];
-  if(!cat) return;
-  document.getElementById('formTag').textContent=getLabel('cat_tag_'+k,cat.tag);
-  document.getElementById('formTitle').textContent=getLabel('cat_form_title_'+k,cat.title);
-  document.getElementById('formSubtitle').textContent=getLabel('cat_form_subtitle_'+k,cat.subtitle);
-  document.getElementById('successWrap').style.display='none';
-  document.getElementById('formContainer').style.display='block';
-  buildForm(k);
-  show('viewForm');
+  try {
+    currentFormCategory=k;
+    resetFormState();
+    const cat=CATEGORIES[k];
+    if(!cat) return;
+    const tagEl=document.getElementById('formTag'); if(tagEl) tagEl.textContent=getLabel('cat_tag_'+k,cat.tag);
+    const titleEl=document.getElementById('formTitle'); if(titleEl) titleEl.textContent=getLabel('cat_form_title_'+k,cat.title);
+    const subEl=document.getElementById('formSubtitle'); if(subEl) subEl.textContent=getLabel('cat_form_subtitle_'+k,cat.subtitle);
+    const wrap=document.getElementById('successWrap'); if(wrap) wrap.style.display='none';
+    const cont=document.getElementById('formContainer'); if(cont) cont.style.display='block';
+    try { buildForm(k); } catch(e) { console.error('Error in buildForm:', e); }
+  } catch(err) {
+    console.error('Error in openForm:', err);
+  } finally {
+    show('viewForm');
+  }
 }
 function resetFormState(){photoFile=null;photoDataURL=null;photoFilesMulti=[];photoDataURLsMulti=[];}
 function buildForm(k){

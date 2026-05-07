@@ -13,21 +13,11 @@
   --border:#ddddd5;--radius:12px;--shadow:0 2px 16px rgba(0,0,0,.07);
   --admin:#1a2744;--admin2:#243460;--admin3:#7dd4a8;
   --editor:#2d1b4e;--editor2:#4a2d7a;
-  --cloud: #e2e8f0;
+  --cloud: #e2e8f0; /* Added missing cloud variable for rendering */
 }
-/* ── FIX 1: Force light mode — prevents WebView/Gemini dark-mode inversion ── */
 *{box-sizing:border-box;margin:0;padding:0;}
-html{
-  scroll-behavior:smooth;
-  color-scheme:light; /* Tells WebViews: this is a light-mode page — do NOT invert */
-}
-body{
-  font-family:'Lato',sans-serif;
-  background:#f5f5f0;background:var(--bg); /* explicit fallback first */
-  color:#1c1c1e;color:var(--ink);          /* explicit fallback first */
-  min-height:100dvh;font-size:15px;line-height:1.6;
-  -webkit-text-size-adjust:100%;           /* Prevent iOS auto font scaling */
-}
+html{scroll-behavior:smooth;}
+body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--ink);min-height:100dvh;font-size:15px;line-height:1.6;}
 h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .view{display:none;}
 .view.active{display:block;animation:fadeIn .35s ease;}
@@ -72,36 +62,23 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 
 
 /* LANDING */
-.land-hero{background:#1a2744;background:var(--school-navy);color:#fff;padding:4rem 1.5rem 3rem;text-align:center;position:relative;overflow:hidden;}
+.land-hero{background:var(--school-navy);color:#fff;padding:4rem 1.5rem 3rem;text-align:center;position:relative;overflow:hidden;}
 .land-hero::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(125,212,168,.04) 40px,rgba(125,212,168,.04) 80px);}
 .land-hero-inner{position:relative;z-index:1;max-width:700px;margin:0 auto;}
-.land-logo{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#7dd4a8;color:var(--school-mint);font-weight:700;margin-bottom:16px;display:block;}
+.land-logo{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--school-mint);font-weight:700;margin-bottom:16px;display:block;}
 .land-hero h1{font-size:clamp(32px,6vw,54px);color:#fff;margin-bottom:8px;}
-.land-hero h1 .me-magic{color:#7dd4a8;color:var(--school-mint);}
+.land-hero h1 .me-magic{color:var(--school-mint);}
 .land-hero-school{font-size:13px;color:rgba(125,212,168,.8);margin-bottom:6px;font-weight:700;letter-spacing:1px;}
 .land-hero p{font-size:16px;color:#bbb;max-width:520px;margin:0 auto 2rem;}
-
-/* ── FIX 2: land-body — explicit background so dark-mode WebViews can't override ── */
-.land-body{
-  max-width:1000px;margin:0 auto;padding:3rem 1rem 5rem;
-  background:#f5f5f0;background:var(--bg); /* explicit + variable */
-}
-.land-section-title{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:#8e8e93;color:var(--ink3);font-weight:700;margin-bottom:1rem;text-align:center;}
-.land-section-h{font-size:28px;text-align:center;margin-bottom:3rem;color:#1c1c1e;color:var(--ink);font-family:'Playfair Display',serif;}
+.land-body{max-width:1000px;margin:0 auto;padding:3rem 1rem 5rem;}
+.land-section-title{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-bottom:1rem;text-align:center;}
+.land-section-h{font-size:28px;text-align:center;margin-bottom:3rem;color:var(--ink);font-family:'Playfair Display',serif;}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;}
-
-/* ── FIX 3: form-card — explicit colors so WebView dark-mode can't make cards invisible ── */
-.form-card{
-  background:#ffffff;background:var(--surface);  /* explicit white first */
-  border:1px solid #ddddd5;border:1px solid var(--border);
-  border-radius:var(--radius);padding:1.75rem;cursor:pointer;
-  transition:all .25s;box-shadow:var(--shadow);position:relative;overflow:hidden;
-  color:#1c1c1e; /* Explicit text color — critical for dark-mode WebViews */
-}
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;cursor:pointer;transition:all .25s;box-shadow:var(--shadow);position:relative;overflow:hidden;}
 .form-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.1);border-color:var(--school-mint);}
 .form-card-icon{font-size:30px;margin-bottom:1rem;display:block;}
-.form-card h3{font-size:20px;margin-bottom:8px;color:#1c1c1e;color:var(--ink);} /* explicit */
-.form-card p{font-size:13.5px;color:#48484a;color:var(--ink2);line-height:1.6;}  /* explicit */
+.form-card h3{font-size:20px;margin-bottom:8px;color:var(--ink);}
+.form-card p{font-size:13.5px;color:var(--ink2);line-height:1.6;}
 .form-card-stripe{position:absolute;top:0;left:0;width:4px;height:100%;}
 .stripe-gold{background:var(--gold);}
 .stripe-green{background:var(--school-mint3);}
@@ -109,7 +86,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .stripe-purple{background:var(--purple);}
 .stripe-amber{background:var(--amber);}
 .stripe-mint{background:var(--school-mint);}
-.land-footer{text-align:center;margin-top:4rem;padding-top:2rem;border-top:1px solid var(--border);color:var(--ink3);font-size:12px;cursor:pointer;}
+.land-footer{text-align:center;margin-top:4rem;padding-top:2rem;border-top:1px solid var(--border);color:var(--ink3);font-size:12px;}
 
 /* FORMS */
 .form-hero{background:var(--school-navy);color:#fff;padding:2.75rem 1.5rem 2.25rem;text-align:center;position:relative;overflow:hidden;}
@@ -121,7 +98,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .form-hero h1{font-size:clamp(22px,5vw,32px);color:#fff;margin-bottom:8px;}
 .form-hero p{font-size:14px;color:#bbb;max-width:420px;margin:0 auto;}
 .form-body{max-width:620px;margin:0 auto;padding:2rem 1rem 5rem;}
-.f-card{background:#ffffff;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;margin-bottom:1.25rem;box-shadow:var(--shadow);}
+.f-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;margin-bottom:1.25rem;box-shadow:var(--shadow);}
 .f-card-title{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3);margin-bottom:1.5rem;padding-bottom:10px;border-bottom:1px solid var(--border);}
 .field{margin-bottom:1.2rem;}
 .field:last-child{margin-bottom:0;}
@@ -190,6 +167,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .sync-dot.ok{background:var(--school-mint3);}
 .sync-dot.live{background:var(--school-mint);box-shadow:0 0 10px var(--school-mint);animation:pulse 1.5s infinite;}
+
 .sync-dot.syncing{background:var(--gold);animation:pulse .8s infinite;}
 .sync-dot.err{background:var(--red);}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
@@ -212,7 +190,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .pin-overlay{display:none;position:fixed;inset:0;background:rgba(15,26,46,.92);z-index:1000;backdrop-filter:blur(4px);align-items:center;justify-content:center;}
 .pin-overlay.active{display:flex;animation:fadeIn .2s ease;}
 .pin-overlay.editor{background:rgba(45,27,78,.92);}
-.pin-box{background:#ffffff;background:var(--surface);border-radius:16px;padding:2rem 1.75rem;max-width:340px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.pin-box{background:var(--surface);border-radius:16px;padding:2rem 1.75rem;max-width:340px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.25);}
 .pin-box h2{font-size:20px;text-align:center;margin-bottom:4px;}
 .pin-box .pin-sub{font-size:12.5px;text-align:center;color:var(--ink3);margin-bottom:1.25rem;}
 .pin-dots{display:flex;justify-content:center;gap:12px;margin-bottom:1.5rem;}
@@ -633,8 +611,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
   .land-hero{padding:3rem 1rem 2.5rem;}
   .land-body{padding:2rem .85rem 4rem;}
   .land-section-h{font-size:22px;margin-bottom:2rem;}
-  /* FIX 4: 2-column cards on medium phones — min width smaller so they actually fit */
-  .form-grid{grid-template-columns:repeat(2,1fr);gap:1rem;}
+  .form-grid{grid-template-columns:1fr 1fr;gap:1rem;}
   .form-card{padding:1.25rem;}
   .form-card h3{font-size:17px;}
 
@@ -729,10 +706,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
   /* Landing */
   .land-hero{padding:2.5rem .85rem 2rem;}
   .land-hero h1{font-size:clamp(26px,8vw,38px);}
-
-  /* FIX 5: Single-column cards on small phones — this is the key fix */
   .form-grid{grid-template-columns:1fr;gap:.85rem;}
-
   .land-section-h{font-size:20px;}
   .land-footer{font-size:11px;}
 
