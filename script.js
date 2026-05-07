@@ -913,7 +913,7 @@ function renderLandingCards(){
       if(!cat) return '';
       const lbl=getLabel('cat_label_'+k, cat.label || k);
       const dsc=getLabel('cat_desc_'+k, DESCS[k]||'');
-      return`<div class="form-card" onclick="openForm('${k}')">
+      return`<div class="form-card" data-cat="${esc(k)}" onclick="openForm(this.getAttribute('data-cat'))">
         <span class="form-card-stripe ${STRIPES[k]||'stripe-blue'}"></span>
         <span class="form-card-icon">${cat.icon||'📝'}</span>
         <h3>${esc(lbl)}</h3>
