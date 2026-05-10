@@ -3185,3 +3185,4 @@ function handleFooterClick(){
   clearTimeout(footerClickTimer);
   footerClickTimer = setTimeout(() => { footerClicks = 0; }, 1000);
 }
+
