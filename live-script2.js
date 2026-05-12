@@ -108,24 +108,6 @@ let CATEGORIES={
   ]}
 };
 let CATEGORY_KEYS=Object.keys(CATEGORIES);
-const BUILTIN_CATEGORIES=JSON.parse(JSON.stringify(CATEGORIES));
-const BUILTIN_CATEGORY_KEYS=Object.keys(BUILTIN_CATEGORIES);
-function ensureCategoriesReady(){
-  if(!CATEGORIES||typeof CATEGORIES!=='object'||Array.isArray(CATEGORIES)){
-    CATEGORIES=JSON.parse(JSON.stringify(BUILTIN_CATEGORIES));
-  }
-  BUILTIN_CATEGORY_KEYS.forEach(k=>{
-    if(!CATEGORIES[k]||typeof CATEGORIES[k]!=='object'){
-      CATEGORIES[k]=JSON.parse(JSON.stringify(BUILTIN_CATEGORIES[k]));
-    }
-  });
-  CATEGORY_KEYS=Object.keys(CATEGORIES).filter(k=>CATEGORIES[k]&&typeof CATEGORIES[k]==='object');
-  if(!CATEGORY_KEYS.length){
-    CATEGORIES=JSON.parse(JSON.stringify(BUILTIN_CATEGORIES));
-    CATEGORY_KEYS=[...BUILTIN_CATEGORY_KEYS];
-  }
-  return CATEGORY_KEYS;
-}
 const EDITORIAL_META={'editorial-note':{label:'Editorial Note',tag:'Editorial Note'},'appreciation':{label:'Appreciation Section',tag:'Appreciation'}};
 
 /* ═══════════════════════════════════════════════════════════
@@ -548,12 +530,11 @@ function saveLsSettingsToStorage(s){
 }
 
 function applyCustomCategories(s){
-  ensureCategoriesReady();
   if(!s||!Array.isArray(s.customCategories))return;
   s.customCategories.forEach(c=>{
     CATEGORIES[c.id]=c;
   });
-  ensureCategoriesReady();
+  CATEGORY_KEYS=Object.keys(CATEGORIES);
   
   // Ensure they are in sectionOrder
   s.customCategories.forEach(c=>{
@@ -771,8 +752,6 @@ function switchGalleryTab(tab){
     document.getElementById('gtab-'+t)?.classList.toggle('active',t===tab);
     document.getElementById('gpane-'+t)?.classList.toggle('active',t===tab);
   });
-  const mainSubmit=document.getElementById('mainSubmitBtn');
-  if(mainSubmit) mainSubmit.style.display=tab==='bulk'?'none':'block';
 }
 
 function handleBulkPhotos(event){
@@ -920,7 +899,6 @@ function renderLandingCards(){
   const grid=document.getElementById('formGrid');
   if(!grid) return;
   try {
-    ensureCategoriesReady();
     const h=document.getElementById('landingHeading');if(h)h.textContent=getLabel('landing_heading','Choose a content category');
     const DESCS={teachers:'For teaching staff and management. Share your journey, subjects, and message to the graduating class.',primary5:'For Primary 5 pupils moving on. Tell the world who you are.',jss3:'For Junior Secondary 3 students finishing this phase.',ss3:'For the main graduating class. Your legacy, your ambitions, your message.',speeches:'Proprietor, Senior Boy, guest speakers — formal addresses for the magazine.',creative:'Poems, short stories, jokes, riddles — creative writing from across the school.',events:'Sports days, excursions, competitions, achievements — the year\'s highlights.',academic:'Articles, subject features, research write-ups, and educational content.',interviews:'Q&A with old students, guest speakers, and notable voices.',motivational:'Inspirational messages and wisdom for the graduating class.',gallery:'Submit standalone photos with captions for the gallery section.'};
     const STRIPES={teachers:'stripe-gold',primary5:'stripe-green',jss3:'stripe-green',ss3:'stripe-green',speeches:'stripe-blue',creative:'stripe-purple',events:'stripe-amber',academic:'stripe-blue',interviews:'stripe-mint',motivational:'stripe-purple',gallery:'stripe-gold'};
@@ -951,7 +929,6 @@ function renderLandingCards(){
 /* FORM BUILDING */
 function openForm(k){
   try {
-    ensureCategoriesReady();
     currentFormCategory=k;
     resetFormState();
     const cat=CATEGORIES[k];
@@ -970,7 +947,6 @@ function openForm(k){
 }
 function resetFormState(){photoFile=null;photoDataURL=null;photoFilesMulti=[];photoDataURLsMulti=[];}
 function buildForm(k){
-  ensureCategoriesReady();
   const cat=CATEGORIES[k];const c=document.getElementById('formContainer');
   bulkPhotos=[];/* reset bulk state */
   let h=`<div class="f-card"><div class="f-card-title">Your Details</div>`;
@@ -995,11 +971,11 @@ function buildFieldHtml(f){
   const hint=f.hint?`<div class="field-hint">${esc(f.hint)}</div>`:'';
   const err=`<div class="field-err">This field is required.</div>`;
   const id=`ff-${f.id}`;
-  if(f.type==='textarea'){return`<div class="field" id="fw-${f.id}"><label for="${id}">${esc(f.label)}${req}</label><textarea id="${id}" class="${f.long?'long':''}" placeholder="${esc(f.placeholder||'')}"></textarea>${hint}${err}</div>`;}
-  if(f.type==='select'){let optsArr=Array.isArray(f.options)?f.options:typeof f.options==='string'?f.options.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean):[];const opts=optsArr.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');return`<div class="field" id="fw-${f.id}"><label for="${id}">${esc(f.label)}${req}</label><select id="${id}"><option value="">— Select —</option>${opts}</select>${hint}${err}</div>`;}
+  if(f.type==='textarea'){return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><textarea id="${id}" class="${f.long?'long':''}" placeholder="${esc(f.placeholder||'')}"></textarea>${hint}${err}</div>`;}
+  if(f.type==='select'){let optsArr=Array.isArray(f.options)?f.options:typeof f.options==='string'?f.options.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean):[];const opts=optsArr.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><select id="${id}"><option value="">— Select —</option>${opts}</select>${hint}${err}</div>`;}
   if(f.type==='checkbox'){return`<div class="field" id="fw-${f.id}"><div style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="${id}"/><label for="${id}" style="font-weight:400;display:inline;cursor:pointer;">${esc(f.label)}</label></div>${hint}</div>`;}
-  if(f.type==='number'){return`<div class="field" id="fw-${f.id}"><label for="${id}">${esc(f.label)}${req}</label><input type="number" id="${id}" placeholder="${esc(f.placeholder||'')}" inputmode="numeric"/>${hint}${err}</div>`;}
-  return`<div class="field" id="fw-${f.id}"><label for="${id}">${esc(f.label)}${req}</label><input type="${f.type}" id="${id}" placeholder="${esc(f.placeholder||'')}"/>${hint}${err}</div>`;
+  if(f.type==='number'){return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><input type="number" id="${id}" placeholder="${esc(f.placeholder||'')}" inputmode="numeric"/>${hint}${err}</div>`;}
+  return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><input type="${f.type}" id="${id}" placeholder="${esc(f.placeholder||'')}"/>${hint}${err}</div>`;
 }
 
 /* PHOTO */
@@ -3209,4 +3185,3 @@ function handleFooterClick(){
   clearTimeout(footerClickTimer);
   footerClickTimer = setTimeout(() => { footerClicks = 0; }, 1000);
 }
-
