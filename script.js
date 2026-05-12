@@ -752,6 +752,8 @@ function switchGalleryTab(tab){
     document.getElementById('gtab-'+t)?.classList.toggle('active',t===tab);
     document.getElementById('gpane-'+t)?.classList.toggle('active',t===tab);
   });
+  const mainSubmit=document.getElementById('mainSubmitBtn');
+  if(mainSubmit) mainSubmit.style.display=tab==='bulk'?'none':'block';
 }
 
 function handleBulkPhotos(event){
@@ -971,11 +973,11 @@ function buildFieldHtml(f){
   const hint=f.hint?`<div class="field-hint">${esc(f.hint)}</div>`:'';
   const err=`<div class="field-err">This field is required.</div>`;
   const id=`ff-${f.id}`;
-  if(f.type==='textarea'){return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><textarea id="${id}" class="${f.long?'long':''}" placeholder="${esc(f.placeholder||'')}"></textarea>${hint}${err}</div>`;}
-  if(f.type==='select'){let optsArr=Array.isArray(f.options)?f.options:typeof f.options==='string'?f.options.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean):[];const opts=optsArr.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><select id="${id}"><option value="">— Select —</option>${opts}</select>${hint}${err}</div>`;}
+  if(f.type==='textarea'){return`<div class="field" id="fw-${f.id}"><label for="${id}">${esc(f.label)}${req}</label><textarea id="${id}" class="${f.long?'long':''}" placeholder="${esc(f.placeholder||'')}"></textarea>${hint}${err}</div>`;}
+  if(f.type==='select'){let optsArr=Array.isArray(f.options)?f.options:typeof f.options==='string'?f.options.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean):[];const opts=optsArr.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');return`<div class="field" id="fw-${f.id}"><label for="${id}">${esc(f.label)}${req}</label><select id="${id}"><option value="">— Select —</option>${opts}</select>${hint}${err}</div>`;}
   if(f.type==='checkbox'){return`<div class="field" id="fw-${f.id}"><div style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="${id}"/><label for="${id}" style="font-weight:400;display:inline;cursor:pointer;">${esc(f.label)}</label></div>${hint}</div>`;}
-  if(f.type==='number'){return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><input type="number" id="${id}" placeholder="${esc(f.placeholder||'')}" inputmode="numeric"/>${hint}${err}</div>`;}
-  return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><input type="${f.type}" id="${id}" placeholder="${esc(f.placeholder||'')}"/>${hint}${err}</div>`;
+  if(f.type==='number'){return`<div class="field" id="fw-${f.id}"><label for="${id}">${esc(f.label)}${req}</label><input type="number" id="${id}" placeholder="${esc(f.placeholder||'')}" inputmode="numeric"/>${hint}${err}</div>`;}
+  return`<div class="field" id="fw-${f.id}"><label for="${id}">${esc(f.label)}${req}</label><input type="${f.type}" id="${id}" placeholder="${esc(f.placeholder||'')}"/>${hint}${err}</div>`;
 }
 
 /* PHOTO */
