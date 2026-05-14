@@ -117,9 +117,28 @@ function ensureCategoriesReady(){
   BUILTIN_CATEGORY_KEYS.forEach(k=>{
     if(!CATEGORIES[k]||typeof CATEGORIES[k]!=='object'){
       CATEGORIES[k]=JSON.parse(JSON.stringify(BUILTIN_CATEGORIES[k]));
+    } else {
+      const fallback=BUILTIN_CATEGORIES[k];
+      CATEGORIES[k]={
+        ...fallback,
+        ...CATEGORIES[k],
+        fields:Array.isArray(CATEGORIES[k].fields)&&CATEGORIES[k].fields.length
+          ? CATEGORIES[k].fields
+          : fallback.fields
+      };
+      if(!CATEGORIES[k].icon) CATEGORIES[k].icon=fallback.icon;
+      if(!CATEGORIES[k].label) CATEGORIES[k].label=fallback.label;
+      if(!CATEGORIES[k].tag) CATEGORIES[k].tag=fallback.tag;
+      if(!CATEGORIES[k].title) CATEGORIES[k].title=fallback.title;
+      if(!CATEGORIES[k].subtitle) CATEGORIES[k].subtitle=fallback.subtitle;
     }
   });
-  CATEGORY_KEYS=Object.keys(CATEGORIES).filter(k=>CATEGORIES[k]&&typeof CATEGORIES[k]==='object');
+  Object.keys(CATEGORIES).forEach(k=>{
+    if(!CATEGORIES[k]||typeof CATEGORIES[k]!=='object'||!Array.isArray(CATEGORIES[k].fields)){
+      delete CATEGORIES[k];
+    }
+  });
+  CATEGORY_KEYS=Object.keys(CATEGORIES).filter(k=>CATEGORIES[k]&&typeof CATEGORIES[k]==='object'&&Array.isArray(CATEGORIES[k].fields));
   if(!CATEGORY_KEYS.length){
     CATEGORIES=JSON.parse(JSON.stringify(BUILTIN_CATEGORIES));
     CATEGORY_KEYS=[...BUILTIN_CATEGORY_KEYS];
@@ -139,7 +158,7 @@ let _supa=null;
 let subs=[];
 let lsSettings=loadLsSettingsFromStorage();
 let bulkPhotos=[];
-let sectionOrder=loadSectionOrder();
+let sectionOrder=[];
 let formConfig=loadFormConfig();
 
 function loadLsSettingsFromStorage(){
@@ -551,7 +570,14 @@ function applyCustomCategories(s){
   ensureCategoriesReady();
   if(!s||!Array.isArray(s.customCategories))return;
   s.customCategories.forEach(c=>{
-    CATEGORIES[c.id]=c;
+    if(!c||!c.id)return;
+    const base=CATEGORIES[c.id]||BUILTIN_CATEGORIES[c.id]||{};
+    const merged={...base,...c};
+    if(!Array.isArray(merged.fields)||!merged.fields.length){
+      merged.fields=Array.isArray(base.fields)?base.fields:[];
+    }
+    if(!merged.fields.length)return;
+    CATEGORIES[c.id]=merged;
   });
   ensureCategoriesReady();
   
@@ -604,7 +630,7 @@ async function initCloudSync(){
         }
         if(key === 'labels'){ labelOverrides = {...labelOverrides, ...val}; try{localStorage.setItem('me_labels',JSON.stringify(labelOverrides));}catch(e){} }
         if(key === 'section_order'){ sectionOrder = val; try{localStorage.setItem('me_section_order',JSON.stringify(val));}catch(e){} }
-        if(key === 'form_config'){ formConfig = val; try{localStorage.setItem('me_form_config',JSON.stringify(val));}catch(e){} }
+        if(key === 'form_config'){ formConfig = normalizeFormConfig(val); try{localStorage.setItem('me_form_config',JSON.stringify(formConfig));}catch(e){} }
       }
     });
 
@@ -890,7 +916,16 @@ function saveSectionOrder(){
 sectionOrder=loadSectionOrder();
 
 /* FORM CONFIG — Fix 4: synced to cloud so all devices/links get same custom fields */
-function loadFormConfig(){try{const raw=JSON.parse(localStorage.getItem('me_form_config')||'{}')||{};Object.keys(raw).forEach(k=>{if(!raw[k])raw[k]={};if(!raw[k].overrides||typeof raw[k].overrides!=='object')raw[k].overrides={};if(!Array.isArray(raw[k].customFields))raw[k].customFields=[];});return raw;}catch(e){return{};}}
+function normalizeFormConfig(raw){
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))return{};
+  Object.keys(raw).forEach(k=>{
+    if(!raw[k]||typeof raw[k]!=='object'||Array.isArray(raw[k]))raw[k]={};
+    if(!raw[k].overrides||typeof raw[k].overrides!=='object'||Array.isArray(raw[k].overrides))raw[k].overrides={};
+    if(!Array.isArray(raw[k].customFields))raw[k].customFields=[];
+  });
+  return raw;
+}
+function loadFormConfig(){try{return normalizeFormConfig(JSON.parse(localStorage.getItem('me_form_config')||'{}')||{});}catch(e){return{};}}
 function saveFormConfig(c){
   formConfig=c;
   localStorage.setItem('me_form_config',JSON.stringify(c));
@@ -898,7 +933,7 @@ function saveFormConfig(c){
   dbSaveSettings('form_config',c).then(()=>showSync('ok','✓ Form config saved to cloud'));
 }
 formConfig=loadFormConfig();
-function getEffectiveFields(catKey){const cat=CATEGORIES[catKey];if(!cat)return[];const ov=(formConfig[catKey]&&formConfig[catKey].overrides)||{};const cf=(formConfig[catKey]&&formConfig[catKey].customFields)||[];const bi=cat.fields.map((f,i)=>{const o=ov[f.id]||{};return{...f,_isBuiltIn:true,required:o.required!==undefined?!!o.required:!!f.required,hidden:!!o.hidden,order:o.order!==undefined?Number(o.order):i};});const cu=cf.map((c,i)=>({...c,_isBuiltIn:false,order:c.order!==undefined?Number(c.order):(1000+i)}));return[...bi,...cu].filter(f=>!f.hidden).sort((a,b)=>(a.order||0)-(b.order||0));}
+function getEffectiveFields(catKey){ensureCategoriesReady();const cat=CATEGORIES[catKey];if(!cat||!Array.isArray(cat.fields))return[];const ov=(formConfig[catKey]&&formConfig[catKey].overrides)||{};const cf=(formConfig[catKey]&&formConfig[catKey].customFields)||[];const bi=cat.fields.map((f,i)=>{const o=ov[f.id]||{};return{...f,_isBuiltIn:true,required:o.required!==undefined?!!o.required:!!f.required,hidden:!!o.hidden,order:o.order!==undefined?Number(o.order):i};});const cu=cf.map((c,i)=>({...c,_isBuiltIn:false,order:c.order!==undefined?Number(c.order):(1000+i)}));const visible=[...bi,...cu].filter(f=>!f.hidden).sort((a,b)=>(a.order||0)-(b.order||0));return visible.length?visible:bi.map(f=>({...f,hidden:false})).sort((a,b)=>(a.order||0)-(b.order||0));}
 function getAllFieldsForEditing(catKey){const cat=CATEGORIES[catKey];if(!cat)return[];const ov=(formConfig[catKey]&&formConfig[catKey].overrides)||{};const cf=(formConfig[catKey]&&formConfig[catKey].customFields)||[];const bi=cat.fields.map((f,i)=>{const o=ov[f.id]||{};return{...f,_isBuiltIn:true,required:o.required!==undefined?!!o.required:!!f.required,hidden:!!o.hidden,order:o.order!==undefined?Number(o.order):i};});const cu=cf.map((c,i)=>({...c,_isBuiltIn:false,hidden:!!c.hidden,order:c.order!==undefined?Number(c.order):(1000+i)}));return[...bi,...cu].sort((a,b)=>(a.order||0)-(b.order||0));}
 
 /* STATE */

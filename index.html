@@ -861,22 +861,35 @@
       overlay.remove(); // Completely remove from DOM to prevent click blocking
     }
   }
+  let __footerFallbackClicks = 0;
+  let __footerFallbackTimer = null;
+  function handleFooterClick() {
+    if (typeof openPIN === 'function') {
+      __footerFallbackClicks++;
+      if (__footerFallbackClicks >= 4) {
+        __footerFallbackClicks = 0;
+        openPIN('unified');
+      }
+      clearTimeout(__footerFallbackTimer);
+      __footerFallbackTimer = setTimeout(() => { __footerFallbackClicks = 0; }, 1000);
+    }
+  }
 </script>
 <script src="script.js?v=8"></script>
 <script>
   (function landingFallback(){
     const cards = [
-      ['teachers','Staff Profiles','For teaching staff and management. Share your journey, subjects, and message to the graduating class.','stripe-gold','SP'],
-      ['primary5','Primary 5 Graduates','For Primary 5 pupils moving on. Tell the world who you are.','stripe-green','P5'],
-      ['jss3','JSS3 Graduates','For Junior Secondary 3 students finishing this phase.','stripe-green','J3'],
-      ['ss3','SS3 Graduates','For the main graduating class. Your legacy, your ambitions, your message.','stripe-green','S3'],
-      ['speeches','Speeches & Addresses','Formal addresses for the magazine.','stripe-blue','SA'],
-      ['creative','Creative Corner','Poems, short stories, jokes, riddles, and creative writing from across the school.','stripe-purple','CC'],
-      ['events','School Life & Events','Sports days, excursions, competitions, achievements, and school highlights.','stripe-amber','EV'],
-      ['academic','Academic & Educational','Articles, subject features, research write-ups, and educational content.','stripe-blue','AC'],
-      ['interviews','Interviews','Q&A with old students, guest speakers, and notable voices.','stripe-mint','IN'],
-      ['motivational','Motivational Articles','Inspirational messages and wisdom for the graduating class.','stripe-purple','MO'],
-      ['gallery','Photo Gallery','Submit standalone photos with captions for the gallery section.','stripe-gold','PG']
+      ['teachers','Staff Profiles','For teaching staff and management. Share your journey, subjects, and message to the graduating class.','stripe-gold','👨‍🏫'],
+      ['primary5','Primary 5 Graduates','For Primary 5 pupils moving on. Tell the world who you are.','stripe-green','🧒'],
+      ['jss3','JSS3 Graduates','For Junior Secondary 3 students finishing this phase.','stripe-green','🎒'],
+      ['ss3','SS3 Graduates','For the main graduating class. Your legacy, your ambitions, your message.','stripe-green','🎓'],
+      ['speeches','Speeches & Addresses','Formal addresses for the magazine.','stripe-blue','🎤'],
+      ['creative','Creative Corner','Poems, short stories, jokes, riddles, and creative writing from across the school.','stripe-purple','✍️'],
+      ['events','School Life & Events','Sports days, excursions, competitions, achievements, and school highlights.','stripe-amber','📸'],
+      ['academic','Academic & Educational','Articles, subject features, research write-ups, and educational content.','stripe-blue','📚'],
+      ['interviews','Interviews','Q&A with old students, guest speakers, and notable voices.','stripe-mint','🎙️'],
+      ['motivational','Motivational Articles','Inspirational messages and wisdom for the graduating class.','stripe-purple','💡'],
+      ['gallery','Photo Gallery','Submit standalone photos with captions for the gallery section.','stripe-gold','🖼️']
     ];
     function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
     function fill(){
