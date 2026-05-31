@@ -1686,11 +1686,19 @@ function renderCurrentPage(){
     /* ── STUDENT GRID (primary5 / jss3 / ss3) ─────────────────────────────── */
     else if(layout==='grid'){
       const cols = items.length === 1 ? 1 : 2;
+      const namePlacement = page.sec?.namePlacement || page.namePlacement || 'side';
       contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;">
         ${items.map(sub => {
           const name = resolveName(sub);
           const ph = resolvePhotoBlock(sub,'62px','74px','6px',`2px solid ${c2}55`);
           const allFields = renderAllFields(sub, {skipFirst:true, maxChars:120, textColor, bFont});
+          if(namePlacement==='under'||namePlacement==='photo-under'){
+            return `<div class="mag-item mag-item-student" style="padding:10px;background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};text-align:center;">
+              <div class="mag-item-photo" style="width:72px;margin:0 auto 6px;">${ph}</div>
+              <div class="mag-item-name" style="font-size:12px;font-weight:700;color:${c1};font-family:${hFont};line-height:1.25;margin-bottom:${namePlacement==='photo-under'?'0':'6px'};">${esc(name)}</div>
+              ${namePlacement==='photo-under'?'':`<div class="mag-item-fields" style="text-align:left;">${allFields}</div>`}
+            </div>`;
+          }
           return `<div class="mag-item mag-item-student" style="display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px;background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};">
             <div class="mag-item-photo">${ph}</div>
             <div class="mag-item-details">
@@ -2425,9 +2433,9 @@ let wsAIChatHistory=[],wsAISampleBase64=null,wsAISampleMime=null;
 let wsUndoStack=[],wsRedoStack=[],wsAutoSaveTimer=null;
 function wsEnsureProduction(){if(!lsSettings.production||typeof lsSettings.production!=='object')lsSettings.production={pages:{}};if(!lsSettings.production.pages)lsSettings.production.pages={};return lsSettings.production;}
 function wsPageKey(page,idx){if(!page)return 'page-'+idx;const ids=(page.items||[]).map(x=>x.id).join('-')||(page.sub?.id||'');return [page.type,page.sec?.key||'global',page.pageInSection||1,ids||idx].join('|');}
-function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false},prod.pages[key]||{});}
+function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,namePlacement:'side'},prod.pages[key]||{});}
 function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);prod.pages[key]=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{});saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
-function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked});if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title});return copy;}
+function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,namePlacement:meta.namePlacement});if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement});return copy;}
 function wsCurrentMeta(){return wsGetPageMeta(wsPages[wsPageIdx],wsPageIdx);}
 
 /* ── Open / Close ── */
@@ -2617,10 +2625,12 @@ function wsUpdateProductionControls(){
   const st=document.getElementById('wsPageStatus');if(st)st.value=meta.status||'draft';
   const tmpl=document.getElementById('wsPageTemplate');if(tmpl)tmpl.value=meta.template||page.sec?.layout||'single';
   const title=document.getElementById('wsPageTitleInput');if(title&&document.activeElement!==title)title.value=meta.title||page.label||'';
+  const namePlace=document.getElementById('wsNamePlacement');if(namePlace)namePlace.value=meta.namePlacement||'side';
   const lock=document.getElementById('wsLockPageBtn');if(lock)lock.textContent=meta.locked?'Unlock Page':'Lock Page';
 }
 function wsSetPageStatus(status){wsSavePageMeta(wsPageIdx,{status});wsRenderPageList();wsUpdateProductionControls();wsRunPreflight(false);}
 function wsSetPageTemplate(template){const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before changing the template.');wsUpdateProductionControls();return;}wsSavePageMeta(wsPageIdx,{template});wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);}
+function wsSetNamePlacement(namePlacement){const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before changing name placement.');wsUpdateProductionControls();return;}wsSavePageMeta(wsPageIdx,{namePlacement});wsRenderPageList();wsRenderCurrentPage();}
 function wsSetPageTitle(title){const meta=wsCurrentMeta();if(meta.locked)return;clearTimeout(window.__wsTitleTimer);window.__wsTitleTimer=setTimeout(()=>{wsSavePageMeta(wsPageIdx,{title:title.trim()||wsPages[wsPageIdx]?.label||'Untitled'});wsRenderPageList();wsRenderCurrentPage();},350);}
 function wsTogglePageLock(){const meta=wsCurrentMeta();const nextLocked=!meta.locked;wsSavePageMeta(wsPageIdx,{locked:nextLocked,status:nextLocked?'locked':(meta.status==='locked'?'approved':meta.status)});wsRenderPageList();wsUpdateProductionControls();wsRunPreflight(false);}
 function wsPhotoSrc(p){return p?.data||p?.url||'';}

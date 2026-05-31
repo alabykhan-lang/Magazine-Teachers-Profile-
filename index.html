@@ -738,6 +738,12 @@
           </select>
           <label class="ws-font-label">Section title</label>
           <input class="ws-font-select" id="wsPageTitleInput" type="text" oninput="wsSetPageTitle(this.value)" placeholder="Section title"/>
+          <label class="ws-font-label">Name placement</label>
+          <select class="ws-font-select" id="wsNamePlacement" onchange="wsSetNamePlacement(this.value)">
+            <option value="side">Beside photo</option>
+            <option value="under">Under photo</option>
+            <option value="photo-under">Only under photo</option>
+          </select>
           <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="wsSetPageStatus('approved')">Approve Page</button>
             <button class="ws-prod-btn" onclick="wsTogglePageLock()" id="wsLockPageBtn">Lock Page</button>
@@ -1025,7 +1031,7 @@
     }
   }
 </script>
-<script src="script.js?v=13"></script>
+<script src="script.js?v=14"></script>
 <script>
   (function landingFallback(){
     const cards = [
