@@ -828,6 +828,21 @@
           <button class="ws-export-btn" onclick="wsDuplicateCurrentPage()">
             <span class="ws-export-icon">?</span><span>Duplicate Page<span class="ws-export-desc">Create an extra editable copy</span></span>
           </button>
+          <button class="ws-export-btn" onclick="wsDeleteCurrentPageCopy()">
+            <span class="ws-export-icon">?</span><span>Delete Copy<span class="ws-export-desc">Remove duplicated workspace page</span></span>
+          </button>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsMoveSelectedItemToPage(-1)">Move to Previous</button>
+            <button class="ws-prod-btn" onclick="wsMoveSelectedItemToPage(1)">Move to Next</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsAddManualTextBox()">Add Text Box</button>
+            <button class="ws-prod-btn" onclick="wsAddManualImageBox()">Add Image Box</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsAddManualCaption()">Add Caption</button>
+            <button class="ws-prod-btn" onclick="wsSplitLongTextToCopy()">Split Long Text</button>
+          </div>
           <div id="wsPageEditList" class="ws-page-edit-list"></div>
         </div>
       </div>

@@ -1511,7 +1511,7 @@ function lsTab(tab){currentLsTab=tab;document.querySelectorAll('.ls-tab').forEac
 
 function loadLsSettingsToUI(){const s=lsSettings;const set=(id,val)=>{const el=document.getElementById(id);if(el&&val!==undefined)el.value=val;};set('ls-magTitle',s.magTitle||'The Torch');set('ls-schoolName',s.schoolName||'Way To Success Standard Schools');set('ls-location',s.location||'Ejigbo, Osun State');set('ls-edition',s.edition||'1st Edition');set('ls-year',s.year||'2025/2026');set('ls-theme',s.theme||'');set('ls-color1',s.color1||'#1a2744');set('ls-color2',s.color2||'#7dd4a8');set('ls-color3',s.color3||'#8b1a1a');set('ls-pageBg',s.pageBg||'#ffffff');set('ls-textColor',s.textColor||'#1c1c1e');set('ls-headingFont',s.headingFont||"'Playfair Display',serif");set('ls-bodyFont',s.bodyFont||"'Crimson Text',serif");set('ls-fontSize',s.fontSize||'11px');set('ls-pageSize',s.pageSize||'a4');set('ls-orientation',s.orientation||'portrait');set('ls-pageNums',s.pageNums||'yes');set('ls-apiKey',s.apiKey||'');set('ls-layoutModel',s.layoutModel||'google/gemini-2.0-flash-001');set('ls-proofModel',s.proofModel||'google/gemini-flash-1.5');set('ls-maxTokens',s.maxTokens||'1000');set('ls-teachersPerPage',String(s.teachersPerPage||9));set('ls-studentsPerPage',String(s.studentsPerPage||2));set('ls-speechesPerPage',String(s.speechesPerPage||1));set('ls-galleryPerPage',String(s.galleryPerPage||4));set('ls-creativePerPage',String(s.creativePerPage||2));set('ls-autoTrim',s.autoTrim||'yes');updatePageSizeUI();}
 function updatePageSizeUI(){const ps=document.getElementById('ls-pageSize');const row=document.getElementById('ls-customSizeRow');if(ps&&row)row.style.display=ps.value==='custom'?'block':'none';}
-function saveLsSettings(){const get=id=>{const el=document.getElementById(id);return el?el.value:undefined;};const s={magTitle:get('ls-magTitle'),schoolName:get('ls-schoolName'),location:get('ls-location'),edition:get('ls-edition'),year:get('ls-year'),theme:get('ls-theme'),color1:get('ls-color1'),color2:get('ls-color2'),color3:get('ls-color3'),pageBg:get('ls-pageBg'),textColor:get('ls-textColor'),headingFont:get('ls-headingFont'),bodyFont:get('ls-bodyFont'),fontSize:get('ls-fontSize'),pageSize:get('ls-pageSize'),orientation:get('ls-orientation'),pageNums:get('ls-pageNums'),apiKey:get('ls-apiKey'),layoutModel:get('ls-layoutModel'),proofModel:get('ls-proofModel'),maxTokens:get('ls-maxTokens'),teachersPerPage:parseInt(get('ls-teachersPerPage'))||9,studentsPerPage:parseInt(get('ls-studentsPerPage'))||2,speechesPerPage:parseInt(get('ls-speechesPerPage'))||1,galleryPerPage:parseInt(get('ls-galleryPerPage'))||4,creativePerPage:parseInt(get('ls-creativePerPage'))||2,autoTrim:get('ls-autoTrim')};lsSettings=s;saveLsSettingsToStorage(s);applyLsColors(s);alert('Settings saved!');}
+function saveLsSettings(){const get=id=>{const el=document.getElementById(id);return el?el.value:undefined;};const s={magTitle:get('ls-magTitle'),schoolName:get('ls-schoolName'),location:get('ls-location'),edition:get('ls-edition'),year:get('ls-year'),theme:get('ls-theme'),color1:get('ls-color1'),color2:get('ls-color2'),color3:get('ls-color3'),pageBg:get('ls-pageBg'),textColor:get('ls-textColor'),headingFont:get('ls-headingFont'),bodyFont:get('ls-bodyFont'),fontSize:get('ls-fontSize'),pageSize:get('ls-pageSize'),orientation:get('ls-orientation'),pageNums:get('ls-pageNums'),apiKey:get('ls-apiKey'),layoutModel:get('ls-layoutModel'),proofModel:get('ls-proofModel'),maxTokens:get('ls-maxTokens'),teachersPerPage:parseInt(get('ls-teachersPerPage'))||9,studentsPerPage:parseInt(get('ls-studentsPerPage'))||2,speechesPerPage:parseInt(get('ls-speechesPerPage'))||1,galleryPerPage:parseInt(get('ls-galleryPerPage'))||4,creativePerPage:parseInt(get('ls-creativePerPage'))||2,autoTrim:get('ls-autoTrim'),production:lsSettings.production,customCategories:lsSettings.customCategories};lsSettings=s;saveLsSettingsToStorage(s);applyLsColors(s);alert('Settings saved!');}
 function applyLsColors(s){
   if(!s)s=lsSettings||{};
   try {
@@ -1623,7 +1623,8 @@ function renderCurrentPage(){
         if(!fc || !fc.value) return '';
         const val = String(fc.value);
         const isLong = val.length > 60;
-        const display = val.length > maxChars ? val.substring(0, maxChars) + '…' : val;
+        const effectiveMax = page.textLimit ? Math.min(maxChars, page.textLimit) : maxChars;
+        const display = val.length > effectiveMax ? val.substring(0, effectiveMax) + '…' : val;
         if(isLong){
           return `<div class="mag-item-field" style="margin-bottom:5px;">
             <div class="mag-item-field-label" style="font-size:8px;text-transform:uppercase;letter-spacing:.4px;color:#999;font-weight:700;margin-bottom:1px;">${esc(fc.label)}</div>
@@ -1659,11 +1660,27 @@ function renderCurrentPage(){
              sub.data.eventReport?.value || sub.data.message?.value ||
              sub.data.introParagraph?.value || '';
     }
+    function renderManualBlocks(blocks){
+      if(!Array.isArray(blocks)||!blocks.length)return '';
+      return `<div class="mag-manual-blocks" style="display:grid;gap:8px;margin-top:10px;">
+        ${blocks.map(b=>{
+          if(!b)return '';
+          if(b.type==='image')return `<figure class="mag-manual-block mag-manual-image" style="margin:0;padding:8px;border:1px dashed ${c2}66;border-radius:7px;background:#fff;">
+            ${b.src?`<img src="${esc(b.src)}" style="width:100%;max-height:150px;object-fit:cover;border-radius:5px;display:block;"/>`:`<div style="height:110px;border-radius:5px;background:#f0f0ea;display:flex;align-items:center;justify-content:center;color:#888;font-size:11px;">Image box</div>`}
+            ${b.caption?`<figcaption style="font-size:8px;color:#777;line-height:1.4;margin-top:5px;">${esc(b.caption)}</figcaption>`:''}
+          </figure>`;
+          if(b.type==='caption')return `<div class="mag-manual-block mag-manual-caption" style="font-size:8px;color:#777;line-height:1.5;border-left:3px solid ${c2};padding:5px 8px;background:${c2}14;border-radius:0 6px 6px 0;">${esc(b.text||'Caption').replace(/\n/g,'<br>')}</div>`;
+          return `<div class="mag-manual-block mag-manual-text" style="font-family:${bFont};font-size:${bSize};line-height:1.65;color:${textColor};padding:8px 10px;border:1px solid #e8e8e0;border-radius:7px;background:#fff;white-space:pre-line;">${esc(b.text||'Text box')}</div>`;
+        }).join('')}
+      </div>`;
+    }
     function resolvePhotoBlock(sub, w, h, radius, border, bg){
       const ini = resolveName(sub).trim().split(/\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();
       if(sub.photoData){
         if(bg){
-          return `<div style="width:${w};height:${h};border-radius:${radius};background:${bg};border:${border};flex-shrink:0;display:block;overflow:hidden;"><img src="${sub.photoData}" style="width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:${radius};display:block;mix-blend-mode:multiply;filter:contrast(1.04) saturate(1.03);"/></div>`;
+          return `<div style="width:${w};height:${h};border-radius:${radius};background:${bg};border:${border};flex-shrink:0;display:block;overflow:hidden;position:relative;">
+            <img src="${sub.photoData}" style="width:100%;height:100%;object-fit:cover;object-position:top center;border:0;display:block;position:relative;z-index:1;filter:none;mix-blend-mode:normal;"/>
+          </div>`;
         }
         return `<img src="${sub.photoData}" style="width:${w};height:${h};object-fit:cover;object-position:top center;border-radius:${radius};flex-shrink:0;border:${border};display:block;"/>`;
       }
@@ -1807,12 +1824,13 @@ function renderCurrentPage(){
           ${pullQuote ? `<div class="mag-item-quote" style="border-left:4px solid ${c2};padding:8px 12px;margin:8px 0;background:${c2}22;border-radius:0 8px 8px 0;">
             <p style="font-family:${hFont};font-size:12px;color:${c1};font-style:italic;">${esc(pullQuote)}</p>
           </div>` : ''}
-          ${mainText ? `<p class="mag-item-body" style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;margin-bottom:10px;">${esc(mainText)}</p>` : ''}
+          ${mainText ? `<p class="mag-item-body" style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;margin-bottom:10px;">${esc(page.textLimit&&mainText.length>page.textLimit?mainText.substring(0,page.textLimit)+'…':mainText)}</p>` : ''}
           <div class="mag-item-fields">${allFields}</div>
         </div>`;
       }).join('');
     }
 
+    contentHtml+=renderManualBlocks(page.manualBlocks);
     inner=`<div style="background:${pageBg};height:100%;display:flex;flex-direction:column;">${page.isFirst?`<div style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.25rem 2rem;min-height:90px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:5px;">Section</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(secLabel)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div>`:`<div style="background:${c1};padding:6px 2rem;"><span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:${c2};font-weight:700;">${esc(secLabel)} (continued)</span></div>`}<div style="padding:1rem 1.5rem;flex:1;overflow:hidden;">${contentHtml}</div>${s.pageNums!=='no'?foot:''}</div>`;
   }
   canvas.innerHTML=`<div class="mag-page" data-category="${esc(page.sec?.key || page.type)}" style="width:${w}px;height:${h}px;transform:scale(${scale});transform-origin:top center;"><div class="mag-page-inner">${inner}</div></div>`;
@@ -2460,10 +2478,10 @@ function wsDefaultProfileFieldIds(secKey){const fields=(CATEGORIES[secKey]?.fiel
 function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'staff-detailed'}:{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'student-balanced'};}
 function wsIsProfilePage(page){const key=page?.sec?.key;return page?.type==='section-content'&&(key==='teachers'||['primary5','jss3','ss3'].includes(key)||page?.sec?.layout==='teacher-grid'||page?.sec?.layout==='grid');}
 function wsGetProfileControls(page,meta){const prod=wsEnsureProduction();const key=page?.sec?.key;return Object.assign({},wsDefaultProfileControls(key),prod.profileDefaults?.[key]||{},meta?.profileControls||{});}
-function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,hidden:false,itemOrder:null,namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});}
+function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,hidden:false,itemOrder:null,removedItemIds:[],addedItemIds:[],manualBlocks:[],textLimit:null,namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});}
 function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);prod.pages[key]=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{});saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
 function wsApplyItemOrder(items,order){if(!Array.isArray(items)||!Array.isArray(order)||!order.length)return items;const rank=new Map(order.map((id,i)=>[String(id),i]));return items.slice().sort((a,b)=>{const ar=rank.has(String(a.id))?rank.get(String(a.id)):9999;const br=rank.has(String(b.id))?rank.get(String(b.id)):9999;return ar-br;});}
-function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,hidden:!!meta.hidden,namePlacement:meta.namePlacement,profileControls});if(copy.items)copy.items=wsApplyItemOrder(copy.items,meta.itemOrder);if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
+function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,hidden:!!meta.hidden,manualBlocks:Array.isArray(meta.manualBlocks)?meta.manualBlocks:[],textLimit:meta.textLimit,namePlacement:meta.namePlacement,profileControls});if(copy.items){const removed=new Set((meta.removedItemIds||[]).map(String));const added=(meta.addedItemIds||[]).map(id=>loadAll().find(s=>String(s.id)===String(id))).filter(Boolean);const seen=new Set();copy.items=copy.items.concat(added).filter(x=>x&&!removed.has(String(x.id))).filter(x=>{const id=String(x.id);if(seen.has(id))return false;seen.add(id);return true;});copy.items=wsApplyItemOrder(copy.items,meta.itemOrder);}if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
 function wsCurrentMeta(){return wsGetPageMeta(wsPages[wsPageIdx],wsPageIdx);}
 
 /* ── Open / Close ── */
@@ -2515,7 +2533,8 @@ function wsGeneratePreview(){
   });
   (wsEnsureProduction().duplicates||[]).forEach(d=>{
     const items=(d.itemIds||[]).map(id=>finalized.find(s=>String(s.id)===String(id))).filter(Boolean);
-    if(!items.length)return;
+    const dMeta=wsEnsureProduction().pages?.['duplicate|'+d.id]||{};
+    if(!items.length&&!(Array.isArray(dMeta.manualBlocks)&&dMeta.manualBlocks.length))return;
     const sec=sectionOrder.find(x=>x.key===d.secKey)||{key:d.secKey,label:d.label||'Duplicated Page',layout:d.layout||'single',visible:true};
     wsPages.push({type:d.type||'section-content',sec:Object.assign({},sec,{layout:d.layout||sec.layout}),items,duplicateId:d.id,label:d.label||((sec.label||'Duplicated Page')+' copy')});
   });
@@ -2671,9 +2690,11 @@ function wsRenderPageEditPanel(page,meta){
   if(btn)btn.querySelector('span:last-child').firstChild.textContent=meta.hidden?'Show Page':'Hide Page';
   if(!list)return;
   const ordered=wsPageWithMeta(page,wsPageIdx).items||[];
-  if(!ordered.length){list.innerHTML='<div class="ws-empty-mini">No reorderable cards on this page.</div>';return;}
   const cols=wsPageGridCols(wsPageWithMeta(page,wsPageIdx),ordered.length);
-  list.innerHTML='<div class="ws-profile-title">Card Order</div>'+ordered.map((sub,i)=>`<div class="ws-page-edit-row"><span>${esc(wsItemLabel(sub))}</span><button onclick="wsMovePageItem('${sub.id}',${-cols})" ${i-cols<0?'disabled':''}>Up</button><button onclick="wsMovePageItem('${sub.id}',${cols})" ${i+cols>=ordered.length?'disabled':''}>Down</button><button onclick="wsMovePageItem('${sub.id}',-1)" ${i===0?'disabled':''}>Left</button><button onclick="wsMovePageItem('${sub.id}',1)" ${i===ordered.length-1?'disabled':''}>Right</button></div>`).join('');
+  const cards=ordered.length?'<div class="ws-profile-title">Card Order</div><select class="ws-font-select" id="wsMoveItemSelect">'+ordered.map(sub=>`<option value="${esc(sub.id)}">${esc(wsItemLabel(sub))}</option>`).join('')+'</select>'+ordered.map((sub,i)=>`<div class="ws-page-edit-row"><span>${esc(wsItemLabel(sub))}</span><button onclick="wsMovePageItem('${sub.id}',${-cols})" ${i-cols<0?'disabled':''}>Up</button><button onclick="wsMovePageItem('${sub.id}',${cols})" ${i+cols>=ordered.length?'disabled':''}>Down</button><button onclick="wsMovePageItem('${sub.id}',-1)" ${i===0?'disabled':''}>Left</button><button onclick="wsMovePageItem('${sub.id}',1)" ${i===ordered.length-1?'disabled':''}>Right</button></div>`).join(''):'<div class="ws-empty-mini">No reorderable cards on this page.</div>';
+  const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks:[];
+  const blockHtml=blocks.length?'<div class="ws-profile-title" style="margin-top:10px;">Manual Blocks</div>'+blocks.map((b,i)=>`<div class="ws-manual-row"><span>${esc((b.type||'text').toUpperCase())}: ${esc((b.text||b.caption||b.src||'Manual block').slice(0,36))}</span><button onclick="wsEditManualBlock(${i})">Edit</button><button onclick="wsDeleteManualBlock(${i})">Delete</button></div>`).join(''):'';
+  list.innerHTML=cards+blockHtml;
 }
 function wsTogglePageHidden(){
   const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!page)return;
@@ -2695,6 +2716,66 @@ function wsDuplicateCurrentPage(){
   prod.duplicates.push({id,type:rendered.type,secKey:rendered.sec?.key,layout:rendered.sec?.layout,label:(meta.title||rendered.label||'Page')+' copy',itemIds:(rendered.items||[]).map(x=>String(x.id))});
   prod.pages['duplicate|'+id]=Object.assign({},meta,{title:(meta.title||rendered.label||'Page')+' copy',status:'draft',locked:false,hidden:false});
   saveLsSettingsToStorage(lsSettings);wsMarkDirty();wsGeneratePreview();wsPageIdx=wsPages.findIndex(p=>p.duplicateId===id);if(wsPageIdx<0)wsPageIdx=wsPages.length-1;wsRenderPageList();wsRenderCurrentPage();wsUpdateNavUI();
+}
+function wsDeleteCurrentPageCopy(){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!page)return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before deleting it.');wsUpdateProductionControls();return;}
+  if(!page.duplicateId){alert('Only duplicated workspace pages can be deleted. Use Hide Page for generated pages.');return;}
+  const prod=wsEnsureProduction();prod.duplicates=prod.duplicates.filter(d=>d.id!==page.duplicateId);delete prod.pages['duplicate|'+page.duplicateId];
+  saveLsSettingsToStorage(lsSettings);wsMarkDirty();wsGeneratePreview();wsPageIdx=Math.max(0,Math.min(wsPageIdx,wsPages.length-1));wsRenderPageList();wsRenderCurrentPage();wsUpdateNavUI();wsRunPreflight(false);
+}
+function wsFindSiblingPageIdx(dir){
+  const page=wsPages[wsPageIdx];if(!page?.sec?.key)return -1;
+  for(let i=wsPageIdx+dir;i>=0&&i<wsPages.length;i+=dir){
+    if(wsPages[i]?.sec?.key===page.sec.key&&Array.isArray(wsPages[i].items))return i;
+  }
+  return -1;
+}
+function wsMoveSelectedItemToPage(dir){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!page||!Array.isArray(page.items))return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before moving content.');wsUpdateProductionControls();return;}
+  const targetIdx=wsFindSiblingPageIdx(dir);if(targetIdx<0){alert('No matching '+(dir<0?'previous':'next')+' page in this section. Duplicate the page first if you need a new destination.');return;}
+  const targetMeta=wsGetPageMeta(wsPages[targetIdx],targetIdx);if(targetMeta.locked){alert('The destination page is locked for print. Unlock it before moving content there.');return;}
+  const select=document.getElementById('wsMoveItemSelect');const id=select?.value||String((wsPageWithMeta(page,wsPageIdx).items||[])[0]?.id||'');if(!id)return;
+  const removed=[...new Set([...(meta.removedItemIds||[]).map(String),String(id)])];
+  const addedTarget=[...new Set([...(targetMeta.addedItemIds||[]).map(String),String(id)])];
+  wsSavePageMeta(wsPageIdx,{removedItemIds:removed});
+  wsSavePageMeta(targetIdx,{addedItemIds:addedTarget,itemOrder:null});
+  wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);
+}
+function wsAddManualBlock(block){
+  const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before adding manual blocks.');wsUpdateProductionControls();return;}
+  const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];blocks.push(Object.assign({id:'block-'+Date.now()},block));
+  wsSavePageMeta(wsPageIdx,{manualBlocks:blocks});wsRenderCurrentPage();wsUpdateProductionControls();
+}
+function wsAddManualTextBox(){const text=prompt('Text box content:');if(text!==null&&text.trim())wsAddManualBlock({type:'text',text:text.trim()});}
+function wsAddManualImageBox(){const src=prompt('Image URL or data URL:');if(src!==null)wsAddManualBlock({type:'image',src:src.trim(),caption:''});}
+function wsAddManualCaption(){const text=prompt('Caption text:');if(text!==null&&text.trim())wsAddManualBlock({type:'caption',text:text.trim()});}
+function wsEditManualBlock(i){
+  const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before editing manual blocks.');return;}
+  const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];const b=blocks[i];if(!b)return;
+  if(b.type==='image'){const src=prompt('Image URL or data URL:',b.src||'');if(src===null)return;const caption=prompt('Image caption:',b.caption||'');if(caption===null)return;blocks[i]=Object.assign({},b,{src:src.trim(),caption:caption.trim()});}
+  else{const text=prompt((b.type==='caption'?'Caption':'Text box')+' content:',b.text||'');if(text===null)return;blocks[i]=Object.assign({},b,{text:text.trim()});}
+  wsSavePageMeta(wsPageIdx,{manualBlocks:blocks});wsRenderCurrentPage();wsUpdateProductionControls();
+}
+function wsDeleteManualBlock(i){
+  const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before deleting manual blocks.');return;}
+  const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];blocks.splice(i,1);
+  wsSavePageMeta(wsPageIdx,{manualBlocks:blocks});wsRenderCurrentPage();wsUpdateProductionControls();
+}
+function wsSplitLongTextToCopy(){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!page)return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before splitting text.');return;}
+  const rendered=wsPageWithMeta(page,wsPageIdx);const items=rendered.items||[];let longest='';
+  items.forEach(sub=>Object.values(sub.data||{}).forEach(fc=>{const val=String(fc?.value||'');if(val.length>longest.length)longest=val;}));
+  if(longest.length<700){alert('No long text found on this page.');return;}
+  const splitAt=Math.max(350,longest.lastIndexOf(' ',Math.floor(longest.length/2)));
+  const cont=longest.slice(splitAt).trim();if(!cont)return;
+  wsSavePageMeta(wsPageIdx,{textLimit:splitAt,manualBlocks:[...(Array.isArray(meta.manualBlocks)?meta.manualBlocks:[]),{id:'block-'+Date.now(),type:'caption',text:'Continued on next page'}]});
+  const prod=wsEnsureProduction();const id='split-'+Date.now();
+  prod.duplicates.push({id,type:rendered.type,secKey:rendered.sec?.key,layout:rendered.sec?.layout,label:(meta.title||rendered.label||'Page')+' continued',itemIds:[]});
+  prod.pages['duplicate|'+id]=Object.assign({},meta,{title:(meta.title||rendered.label||'Page')+' continued',status:'draft',locked:false,hidden:false,manualBlocks:[{id:'block-'+Date.now(),type:'text',text:cont}],removedItemIds:[],addedItemIds:[],itemOrder:null});
+  saveLsSettingsToStorage(lsSettings);wsMarkDirty();wsGeneratePreview();wsPageIdx=wsPages.findIndex(p=>p.duplicateId===id);if(wsPageIdx<0)wsPageIdx=wsPages.length-1;wsRenderPageList();wsRenderCurrentPage();wsUpdateNavUI();wsRunPreflight(false);
 }
 function wsUpdateProfileControls(page,meta){
   const wrap=document.getElementById('wsProfileControls');if(!wrap)return;
