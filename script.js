@@ -1709,15 +1709,16 @@ function renderCurrentPage(){
       const style = profileStyleDefaults(page);
       const cols = items.length === 1 ? 1 : items.length <= 4 ? 2 : items.length <= 9 ? 3 : 4;
       const namePlacement = page.sec?.namePlacement || page.namePlacement || 'side';
-      contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${style.gap};">
+      const compactCards = namePlacement==='under'||namePlacement==='photo-under';
+      contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${style.gap};${compactCards?'justify-items:center;':''}">
         ${items.map(sub => {
           const name = resolveName(sub);
           const ph = resolvePhotoBlock(sub,style.photoW,style.photoH,style.shape,`2px solid ${c2}55`,style.ctl.photoBg||'#ffffff');
           const allFields = profileFields(sub, style, 120);
           if(namePlacement==='under'||namePlacement==='photo-under'){
-            return `<div class="mag-item mag-item-student" style="padding:${style.pad};background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};text-align:center;">
+            return `<div class="mag-item mag-item-student" style="width:calc(${style.photoW} + 42px);min-width:96px;max-width:150px;padding:${style.pad};background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};text-align:center;">
               <div class="mag-item-photo" style="width:${style.photoW};margin:0 auto 6px;">${ph}</div>
-              <div class="mag-item-name" style="font-size:${style.nameSize};font-weight:700;color:${c1};font-family:${hFont};line-height:1.25;margin-bottom:${namePlacement==='photo-under'?'0':'6px'};">${esc(name)}</div>
+              <div class="mag-item-name" style="font-size:${style.nameSize};font-weight:700;color:${c1};font-family:${hFont};line-height:1.25;margin-bottom:${namePlacement==='photo-under'?'0':'6px'};overflow-wrap:anywhere;">${esc(name)}</div>
               ${namePlacement==='photo-under'?'':`<div class="mag-item-fields" style="text-align:left;">${allFields}</div>`}
             </div>`;
           }
@@ -2459,9 +2460,10 @@ function wsDefaultProfileFieldIds(secKey){const fields=(CATEGORIES[secKey]?.fiel
 function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'staff-detailed'}:{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'student-balanced'};}
 function wsIsProfilePage(page){const key=page?.sec?.key;return page?.type==='section-content'&&(key==='teachers'||['primary5','jss3','ss3'].includes(key)||page?.sec?.layout==='teacher-grid'||page?.sec?.layout==='grid');}
 function wsGetProfileControls(page,meta){const prod=wsEnsureProduction();const key=page?.sec?.key;return Object.assign({},wsDefaultProfileControls(key),prod.profileDefaults?.[key]||{},meta?.profileControls||{});}
-function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});}
+function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,hidden:false,itemOrder:null,namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});}
 function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);prod.pages[key]=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{});saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
-function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,namePlacement:meta.namePlacement,profileControls});if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
+function wsApplyItemOrder(items,order){if(!Array.isArray(items)||!Array.isArray(order)||!order.length)return items;const rank=new Map(order.map((id,i)=>[String(id),i]));return items.slice().sort((a,b)=>{const ar=rank.has(String(a.id))?rank.get(String(a.id)):9999;const br=rank.has(String(b.id))?rank.get(String(b.id)):9999;return ar-br;});}
+function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,hidden:!!meta.hidden,namePlacement:meta.namePlacement,profileControls});if(copy.items)copy.items=wsApplyItemOrder(copy.items,meta.itemOrder);if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
 function wsCurrentMeta(){return wsGetPageMeta(wsPages[wsPageIdx],wsPageIdx);}
 
 /* ── Open / Close ── */
@@ -2530,7 +2532,7 @@ function wsRenderPageList(){
       <div class="ws-page-thumb">${icon}</div>
       <div class="ws-page-info">
         <div class="ws-page-info-name">${esc(p.label||p.type)}</div>
-        <div class="ws-page-info-meta">Page ${i+1}</div>
+        <div class="ws-page-info-meta">Page ${i+1}${wsGetPageMeta(p,i).hidden?' · hidden':''}</div>
         <div class="ws-page-status-pill ${wsGetPageMeta(p,i).status}">${esc(wsGetPageMeta(p,i).locked?'locked':wsGetPageMeta(p,i).status)}</div>
       </div>
     </div>`;
@@ -2653,7 +2655,30 @@ function wsUpdateProductionControls(){
   const title=document.getElementById('wsPageTitleInput');if(title&&document.activeElement!==title)title.value=meta.title||page.label||'';
   const namePlace=document.getElementById('wsNamePlacement');if(namePlace)namePlace.value=meta.namePlacement||'side';
   wsUpdateProfileControls(page,meta);
+  wsRenderPageEditPanel(page,meta);
   const lock=document.getElementById('wsLockPageBtn');if(lock)lock.textContent=meta.locked?'Unlock Page':'Lock Page';
+}
+function wsItemLabel(sub){return sub?.data?.name?.value||sub?.data?.speakerName?.value||sub?.data?.contribName?.value||sub?.data?.reporterName?.value||sub?.data?.authorName?.value||sub?.data?.intervieweeName?.value||sub?.data?.submitterName?.value||sub?.data?.eventName?.value||sub?.data?.title?.value||'Untitled';}
+function wsRenderPageEditPanel(page,meta){
+  const btn=document.getElementById('wsHidePageBtn'),list=document.getElementById('wsPageEditList');
+  if(btn)btn.querySelector('span:last-child').firstChild.textContent=meta.hidden?'Show Page':'Hide Page';
+  if(!list)return;
+  const ordered=wsPageWithMeta(page,wsPageIdx).items||[];
+  if(!ordered.length){list.innerHTML='<div class="ws-empty-mini">No reorderable cards on this page.</div>';return;}
+  list.innerHTML='<div class="ws-profile-title">Card Order</div>'+ordered.map((sub,i)=>`<div class="ws-page-edit-row"><span>${esc(wsItemLabel(sub))}</span><button onclick="wsMovePageItem('${sub.id}',-1)" ${i===0?'disabled':''}>Up</button><button onclick="wsMovePageItem('${sub.id}',1)" ${i===ordered.length-1?'disabled':''}>Down</button></div>`).join('');
+}
+function wsTogglePageHidden(){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!page)return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before hiding or showing it.');wsUpdateProductionControls();return;}
+  wsSavePageMeta(wsPageIdx,{hidden:!meta.hidden});wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);
+}
+function wsMovePageItem(id,dir){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!page||!Array.isArray(page.items))return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before reordering cards.');wsUpdateProductionControls();return;}
+  const current=wsPageWithMeta(page,wsPageIdx).items||[];const ids=current.map(x=>String(x.id));const idx=ids.indexOf(String(id));const next=idx+dir;
+  if(idx<0||next<0||next>=ids.length)return;
+  [ids[idx],ids[next]]=[ids[next],ids[idx]];
+  wsSavePageMeta(wsPageIdx,{itemOrder:ids});wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);
 }
 function wsUpdateProfileControls(page,meta){
   const wrap=document.getElementById('wsProfileControls');if(!wrap)return;
@@ -2739,6 +2764,7 @@ function wsRunPreflight(showAlert){
   const issues=[];const pages=wsPages.map((p,i)=>wsPageWithMeta(p,i));
   if(!pages.length)issues.push({level:'err',text:'No pages generated yet.'});
   pages.forEach((p,i)=>{const meta=wsGetPageMeta(wsPages[i],i);
+    if(meta.hidden)issues.push({level:'warn',text:'Page '+(i+1)+': hidden from final print/PDF.'});
     if(!['approved','locked'].includes(meta.status))issues.push({level:'warn',text:'Page '+(i+1)+': status is '+meta.status+'.'});
     const items=p.items||[];
     const needsPhoto=items.some(sub=>CATEGORIES[sub.category]?.photoRequired&&!sub.photoData&&!(Array.isArray(sub.photos)&&sub.photos.length));
@@ -3125,7 +3151,8 @@ Context:\n${ctx}`}];
 function wsExportPrintPDF(){
   /* Temporarily set magPages to workspace pages with production/profile metadata. */
   const origPages=magPages;const origIdx=currentPageIdx;
-  magPages=wsPages.map((p,i)=>wsPageWithMeta(p,i));currentPageIdx=0;
+  magPages=wsPages.map((p,i)=>wsPageWithMeta(p,i)).filter(p=>!p.hidden);currentPageIdx=0;
+  if(!magPages.length){alert('No visible workspace pages to print. Show at least one page first.');magPages=origPages;currentPageIdx=origIdx;return;}
   openPrintView();
   magPages=origPages;currentPageIdx=origIdx;
 }

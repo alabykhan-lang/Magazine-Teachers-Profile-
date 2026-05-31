@@ -816,6 +816,18 @@
           </div>
         </div>
       </div>
+      <!-- Page Editing Panel -->
+      <div class="ws-panel" id="wsPanelPageEditing">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelPageEditing')">
+          <span>Page Editing</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <button class="ws-export-btn" id="wsHidePageBtn" onclick="wsTogglePageHidden()">
+            <span class="ws-export-icon">?</span><span>Hide Page<span class="ws-export-desc">Exclude from final print/PDF</span></span>
+          </button>
+          <div id="wsPageEditList" class="ws-page-edit-list"></div>
+        </div>
+      </div>
       <!-- Design Controls Panel -->
       <div class="ws-panel" id="wsPanelDesignControls">
         <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelDesignControls')">
