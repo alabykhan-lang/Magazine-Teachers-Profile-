@@ -744,6 +744,58 @@
             <option value="under">Under photo</option>
             <option value="photo-under">Only under photo</option>
           </select>
+          <div class="ws-profile-controls" id="wsProfileControls">
+            <div class="ws-profile-title">Profile Cards</div>
+            <label class="ws-font-label">Cards per page</label>
+            <select class="ws-font-select" id="wsProfileCardsPerPage" onchange="wsSetProfileCardsPerPage(this.value)">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="6">6</option>
+              <option value="9">9</option>
+              <option value="12">12</option>
+              <option value="15">15</option>
+            </select>
+            <label class="ws-font-label">Photo size</label>
+            <select class="ws-font-select" id="wsProfilePhotoSize" onchange="wsSetProfileControl('photoSize',this.value)">
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+            <label class="ws-font-label">Photo shape</label>
+            <select class="ws-font-select" id="wsProfilePhotoShape" onchange="wsSetProfileControl('photoShape',this.value)">
+              <option value="square">Square</option>
+              <option value="rounded">Rounded</option>
+              <option value="circle">Circle</option>
+            </select>
+            <label class="ws-font-label">Name size</label>
+            <select class="ws-font-select" id="wsProfileNameSize" onchange="wsSetProfileControl('nameSize',this.value)">
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+            <label class="ws-font-label">Card spacing</label>
+            <select class="ws-font-select" id="wsProfileCardSpacing" onchange="wsSetProfileControl('cardSpacing',this.value)">
+              <option value="compact">Compact</option>
+              <option value="normal">Normal</option>
+              <option value="roomy">Roomy</option>
+            </select>
+            <label class="ws-font-label">Fields under name</label>
+            <select class="ws-font-select" id="wsProfileFieldsMode" onchange="wsSetProfileControl('fieldsMode',this.value)">
+              <option value="all">All fields</option>
+              <option value="key">Key fields only</option>
+              <option value="name-only">Name only</option>
+            </select>
+            <label class="ws-font-label">Preset</label>
+            <select class="ws-font-select" id="wsProfilePreset" onchange="wsApplyProfilePreset(this.value)">
+              <option value="custom">Custom</option>
+              <option value="student-balanced">Student balanced</option>
+              <option value="student-photo">Student photo focus</option>
+              <option value="staff-compact">Staff compact</option>
+              <option value="staff-detailed">Staff detailed</option>
+            </select>
+          </div>
           <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="wsSetPageStatus('approved')">Approve Page</button>
             <button class="ws-prod-btn" onclick="wsTogglePageLock()" id="wsLockPageBtn">Lock Page</button>

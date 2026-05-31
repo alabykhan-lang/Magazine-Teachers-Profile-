@@ -1615,8 +1615,9 @@ function renderCurrentPage(){
       opts = opts || {};
       const maxChars = opts.maxChars || 99999;
       const skipFirst = opts.skipFirst || false; // skip name field (shown in header)
-      const entries = Object.entries(sub.data || {});
+      let entries = Object.entries(sub.data || {});
       if(skipFirst && entries.length > 0) entries.shift();
+      if(opts.maxFields) entries = entries.slice(0, opts.maxFields);
       return entries.map(([k, fc]) => {
         if(!fc || !fc.value) return '';
         const val = String(fc.value);
@@ -1666,17 +1667,32 @@ function renderCurrentPage(){
     }
 
     /* ── TEACHER GRID ─────────────────────────────────────────────────────── */
+    function profileStyleDefaults(page){
+      const ctl = page.sec?.profileControls || page.profileControls || {};
+      const photo = {small:['46px','54px'],medium:['62px','74px'],large:['78px','92px']}[ctl.photoSize] || ['62px','74px'];
+      const shape = ctl.photoShape==='circle'?'50%':ctl.photoShape==='square'?'0':'6px';
+      const nameSize = {small:'8.5px',medium:'12px',large:'14px'}[ctl.nameSize] || '12px';
+      const gap = {compact:'6px',normal:'10px',roomy:'14px'}[ctl.cardSpacing] || '10px';
+      const pad = {compact:'7px',normal:'10px',roomy:'13px'}[ctl.cardSpacing] || '10px';
+      const maxFields = ctl.fieldsMode==='key'?3:0;
+      return {ctl,photoW:photo[0],photoH:photo[1],shape,nameSize,gap,pad,maxFields};
+    }
+    function profileFields(sub, style, maxChars){
+      if(style.ctl.fieldsMode==='name-only') return '';
+      return renderAllFields(sub, {skipFirst:true, maxChars, maxFields:style.maxFields, textColor, bFont});
+    }
     if(layout==='teacher-grid'){
-      const cols = 3;
-      contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px 8px;">
+      const style = profileStyleDefaults(page);
+      const cols = items.length > 9 ? 4 : 3;
+      contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${style.gap};">
         ${items.map(sub => {
           const name = resolveName(sub);
           const shortName = name.split(' ').slice(0,3).join(' ');
-          const ph = resolvePhotoBlock(sub,'54px','62px','6px',`2px solid ${c2}66`);
-          const allFields = renderAllFields(sub, {skipFirst:true, maxChars:99999, textColor, bFont});
-          return `<div class="mag-item mag-item-teacher" style="background:#fafaf8;border-radius:7px;padding:8px 5px 6px;border-top:3px solid ${c2};text-align:center;">
-            <div class="mag-item-photo" style="margin:0 auto 5px;width:54px;">${ph}</div>
-            <div class="mag-item-name" style="font-size:8.5px;font-weight:700;color:${c1};line-height:1.3;margin-bottom:4px;">${esc(shortName)}</div>
+          const ph = resolvePhotoBlock(sub,style.photoW,style.photoH,style.shape,`2px solid ${c2}66`);
+          const allFields = profileFields(sub, style, 99999);
+          return `<div class="mag-item mag-item-teacher" style="background:#fafaf8;border-radius:7px;padding:${style.pad};border-top:3px solid ${c2};text-align:center;">
+            <div class="mag-item-photo" style="margin:0 auto 5px;width:${style.photoW};">${ph}</div>
+            <div class="mag-item-name" style="font-size:${style.nameSize};font-weight:700;color:${c1};line-height:1.3;margin-bottom:4px;">${esc(shortName)}</div>
             <div class="mag-item-fields" style="text-align:left;padding:0 2px;">${allFields}</div>
           </div>`;
         }).join('')}
@@ -1685,24 +1701,25 @@ function renderCurrentPage(){
 
     /* ── STUDENT GRID (primary5 / jss3 / ss3) ─────────────────────────────── */
     else if(layout==='grid'){
+      const style = profileStyleDefaults(page);
       const cols = items.length === 1 ? 1 : 2;
       const namePlacement = page.sec?.namePlacement || page.namePlacement || 'side';
-      contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;">
+      contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${style.gap};">
         ${items.map(sub => {
           const name = resolveName(sub);
-          const ph = resolvePhotoBlock(sub,'62px','74px','6px',`2px solid ${c2}55`);
-          const allFields = renderAllFields(sub, {skipFirst:true, maxChars:120, textColor, bFont});
+          const ph = resolvePhotoBlock(sub,style.photoW,style.photoH,style.shape,`2px solid ${c2}55`);
+          const allFields = profileFields(sub, style, 120);
           if(namePlacement==='under'||namePlacement==='photo-under'){
-            return `<div class="mag-item mag-item-student" style="padding:10px;background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};text-align:center;">
-              <div class="mag-item-photo" style="width:72px;margin:0 auto 6px;">${ph}</div>
-              <div class="mag-item-name" style="font-size:12px;font-weight:700;color:${c1};font-family:${hFont};line-height:1.25;margin-bottom:${namePlacement==='photo-under'?'0':'6px'};">${esc(name)}</div>
+            return `<div class="mag-item mag-item-student" style="padding:${style.pad};background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};text-align:center;">
+              <div class="mag-item-photo" style="width:${style.photoW};margin:0 auto 6px;">${ph}</div>
+              <div class="mag-item-name" style="font-size:${style.nameSize};font-weight:700;color:${c1};font-family:${hFont};line-height:1.25;margin-bottom:${namePlacement==='photo-under'?'0':'6px'};">${esc(name)}</div>
               ${namePlacement==='photo-under'?'':`<div class="mag-item-fields" style="text-align:left;">${allFields}</div>`}
             </div>`;
           }
-          return `<div class="mag-item mag-item-student" style="display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px;background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};">
+          return `<div class="mag-item mag-item-student" style="display:grid;grid-template-columns:auto 1fr;gap:${style.gap};padding:${style.pad};background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};">
             <div class="mag-item-photo">${ph}</div>
             <div class="mag-item-details">
-              <div class="mag-item-name" style="font-size:12px;font-weight:700;color:${c1};font-family:${hFont};margin-bottom:5px;">${esc(name)}</div>
+              <div class="mag-item-name" style="font-size:${style.nameSize};font-weight:700;color:${c1};font-family:${hFont};margin-bottom:5px;">${esc(name)}</div>
               <div class="mag-item-fields">${allFields}</div>
             </div>
           </div>`;
@@ -2433,9 +2450,12 @@ let wsAIChatHistory=[],wsAISampleBase64=null,wsAISampleMime=null;
 let wsUndoStack=[],wsRedoStack=[],wsAutoSaveTimer=null;
 function wsEnsureProduction(){if(!lsSettings.production||typeof lsSettings.production!=='object')lsSettings.production={pages:{}};if(!lsSettings.production.pages)lsSettings.production.pages={};return lsSettings.production;}
 function wsPageKey(page,idx){if(!page)return 'page-'+idx;const ids=(page.items||[]).map(x=>x.id).join('-')||(page.sub?.id||'');return [page.type,page.sec?.key||'global',page.pageInSection||1,ids||idx].join('|');}
-function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,namePlacement:'side'},prod.pages[key]||{});}
+function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',preset:'staff-detailed'}:{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',preset:'student-balanced'};}
+function wsIsProfilePage(page){const key=page?.sec?.key;return page?.type==='section-content'&&(key==='teachers'||['primary5','jss3','ss3'].includes(key)||page?.sec?.layout==='teacher-grid'||page?.sec?.layout==='grid');}
+function wsGetProfileControls(page,meta){return Object.assign({},wsDefaultProfileControls(page?.sec?.key),meta?.profileControls||{});}
+function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});}
 function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);prod.pages[key]=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{});saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
-function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,namePlacement:meta.namePlacement});if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement});return copy;}
+function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,namePlacement:meta.namePlacement,profileControls});if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
 function wsCurrentMeta(){return wsGetPageMeta(wsPages[wsPageIdx],wsPageIdx);}
 
 /* ── Open / Close ── */
@@ -2626,11 +2646,49 @@ function wsUpdateProductionControls(){
   const tmpl=document.getElementById('wsPageTemplate');if(tmpl)tmpl.value=meta.template||page.sec?.layout||'single';
   const title=document.getElementById('wsPageTitleInput');if(title&&document.activeElement!==title)title.value=meta.title||page.label||'';
   const namePlace=document.getElementById('wsNamePlacement');if(namePlace)namePlace.value=meta.namePlacement||'side';
+  wsUpdateProfileControls(page,meta);
   const lock=document.getElementById('wsLockPageBtn');if(lock)lock.textContent=meta.locked?'Unlock Page':'Lock Page';
+}
+function wsUpdateProfileControls(page,meta){
+  const wrap=document.getElementById('wsProfileControls');if(!wrap)return;
+  const active=wsIsProfilePage(page);wrap.classList.toggle('active',active);
+  if(!active)return;
+  const ctl=wsGetProfileControls(page,meta);
+  const set=(id,val)=>{const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=String(val);};
+  const perPage=page.sec?.key==='teachers'?(parseInt(lsSettings.teachersPerPage)||9):(parseInt(lsSettings.studentsPerPage)||2);
+  const cards=document.getElementById('wsProfileCardsPerPage'),allowed=page.sec?.key==='teachers'?[6,9,12,15]:[1,2,3,4];
+  if(cards)[...cards.options].forEach(o=>o.disabled=!allowed.includes(parseInt(o.value)));
+  set('wsProfileCardsPerPage',perPage);set('wsProfilePhotoSize',ctl.photoSize);set('wsProfilePhotoShape',ctl.photoShape);set('wsProfileNameSize',ctl.nameSize);set('wsProfileCardSpacing',ctl.cardSpacing);set('wsProfileFieldsMode',ctl.fieldsMode);set('wsProfilePreset',ctl.preset||'custom');
 }
 function wsSetPageStatus(status){wsSavePageMeta(wsPageIdx,{status});wsRenderPageList();wsUpdateProductionControls();wsRunPreflight(false);}
 function wsSetPageTemplate(template){const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before changing the template.');wsUpdateProductionControls();return;}wsSavePageMeta(wsPageIdx,{template});wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);}
 function wsSetNamePlacement(namePlacement){const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before changing name placement.');wsUpdateProductionControls();return;}wsSavePageMeta(wsPageIdx,{namePlacement});wsRenderPageList();wsRenderCurrentPage();}
+function wsSetProfileControl(key,val){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before changing profile cards.');wsUpdateProductionControls();return;}
+  const ctl=Object.assign({},wsGetProfileControls(page,meta),{[key]:val,preset:'custom'});
+  wsSavePageMeta(wsPageIdx,{profileControls:ctl});wsRenderPageList();wsRenderCurrentPage();
+}
+function wsSetProfileCardsPerPage(val){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before changing cards per page.');wsUpdateProductionControls();return;}
+  const n=parseInt(val)||0;
+  if(page.sec?.key==='teachers'){if(![6,9,12,15].includes(n))return;lsSettings.teachersPerPage=n;}
+  else{if(![1,2,3,4].includes(n))return;lsSettings.studentsPerPage=n;}
+  saveLsSettingsToStorage(lsSettings);wsGeneratePreview();
+}
+function wsApplyProfilePreset(preset){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before changing profile cards.');wsUpdateProductionControls();return;}
+  const presets={
+    'student-balanced':{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',preset:'student-balanced'},
+    'student-photo':{photoSize:'large',photoShape:'rounded',nameSize:'large',cardSpacing:'roomy',fieldsMode:'name-only',preset:'student-photo'},
+    'staff-compact':{photoSize:'small',photoShape:'rounded',nameSize:'small',cardSpacing:'compact',fieldsMode:'key',preset:'staff-compact'},
+    'staff-detailed':{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',preset:'staff-detailed'}
+  };
+  if(!presets[preset])return;
+  wsSavePageMeta(wsPageIdx,{profileControls:presets[preset]});wsRenderPageList();wsRenderCurrentPage();
+}
 function wsSetPageTitle(title){const meta=wsCurrentMeta();if(meta.locked)return;clearTimeout(window.__wsTitleTimer);window.__wsTitleTimer=setTimeout(()=>{wsSavePageMeta(wsPageIdx,{title:title.trim()||wsPages[wsPageIdx]?.label||'Untitled'});wsRenderPageList();wsRenderCurrentPage();},350);}
 function wsTogglePageLock(){const meta=wsCurrentMeta();const nextLocked=!meta.locked;wsSavePageMeta(wsPageIdx,{locked:nextLocked,status:nextLocked?'locked':(meta.status==='locked'?'approved':meta.status)});wsRenderPageList();wsUpdateProductionControls();wsRunPreflight(false);}
 function wsPhotoSrc(p){return p?.data||p?.url||'';}
