@@ -846,6 +846,32 @@
           <div id="wsPageEditList" class="ws-page-edit-list"></div>
         </div>
       </div>
+      <!-- Text Editing Panel -->
+      <div class="ws-panel" id="wsPanelTextEditing">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelTextEditing')">
+          <span>Text Editing</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <label class="ws-font-label">Text item</label>
+          <select class="ws-font-select" id="wsTextEditSelect" onchange="wsUpdateTextStats()"></select>
+          <div id="wsTextStats" class="ws-empty-mini">No editable text on this page.</div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsShortenSelectedText()">Shorten</button>
+            <button class="ws-prod-btn" onclick="wsExpandSelectedText()">Expand</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsProofreadSelectedText()">Proofread</button>
+            <button class="ws-prod-btn" onclick="wsRewriteSelectedText()">Rewrite</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsMagazineStyleText()">Magazine Style</button>
+            <button class="ws-prod-btn" onclick="wsSuggestHeadline()">Title Suggestion</button>
+          </div>
+          <button class="ws-export-btn" onclick="wsResetSelectedText()">
+            <span class="ws-export-icon">?</span><span>Reset Text<span class="ws-export-desc">Restore original submission text</span></span>
+          </button>
+        </div>
+      </div>
       <!-- Design Controls Panel -->
       <div class="ws-panel" id="wsPanelDesignControls">
         <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelDesignControls')">
@@ -1127,7 +1153,7 @@
     }
   }
 </script>
-<script src="script.js?v=14"></script>
+<script src="script.js?v=15"></script>
 <script>
   (function landingFallback(){
     const cards = [
