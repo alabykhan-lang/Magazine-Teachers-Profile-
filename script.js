@@ -1702,7 +1702,7 @@ function renderCurrentPage(){
     /* ── STUDENT GRID (primary5 / jss3 / ss3) ─────────────────────────────── */
     else if(layout==='grid'){
       const style = profileStyleDefaults(page);
-      const cols = items.length === 1 ? 1 : 2;
+      const cols = items.length === 1 ? 1 : items.length <= 4 ? 2 : items.length <= 9 ? 3 : 4;
       const namePlacement = page.sec?.namePlacement || page.namePlacement || 'side';
       contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${style.gap};">
         ${items.map(sub => {
@@ -2656,7 +2656,7 @@ function wsUpdateProfileControls(page,meta){
   const ctl=wsGetProfileControls(page,meta);
   const set=(id,val)=>{const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=String(val);};
   const perPage=page.sec?.key==='teachers'?(parseInt(lsSettings.teachersPerPage)||9):(parseInt(lsSettings.studentsPerPage)||2);
-  const cards=document.getElementById('wsProfileCardsPerPage'),allowed=page.sec?.key==='teachers'?[6,9,12,15]:[1,2,3,4];
+  const cards=document.getElementById('wsProfileCardsPerPage'),allowed=page.sec?.key==='teachers'?[6,9,12,15]:[1,2,3,4,5,6,7,8,9,10,12,15];
   if(cards)[...cards.options].forEach(o=>o.disabled=!allowed.includes(parseInt(o.value)));
   set('wsProfileCardsPerPage',perPage);set('wsProfilePhotoSize',ctl.photoSize);set('wsProfilePhotoShape',ctl.photoShape);set('wsProfileNameSize',ctl.nameSize);set('wsProfileCardSpacing',ctl.cardSpacing);set('wsProfileFieldsMode',ctl.fieldsMode);set('wsProfilePreset',ctl.preset||'custom');
 }
@@ -2674,7 +2674,7 @@ function wsSetProfileCardsPerPage(val){
   if(meta.locked){alert('This page is locked for print. Unlock it before changing cards per page.');wsUpdateProductionControls();return;}
   const n=parseInt(val)||0;
   if(page.sec?.key==='teachers'){if(![6,9,12,15].includes(n))return;lsSettings.teachersPerPage=n;}
-  else{if(![1,2,3,4].includes(n))return;lsSettings.studentsPerPage=n;}
+  else{if(![1,2,3,4,5,6,7,8,9,10,12,15].includes(n))return;lsSettings.studentsPerPage=n;}
   saveLsSettingsToStorage(lsSettings);wsGeneratePreview();
 }
 function wsApplyProfilePreset(preset){
@@ -3075,9 +3075,9 @@ Context:\n${ctx}`}];
 
 /* ── Export: Print-Ready PDF ── */
 function wsExportPrintPDF(){
-  /* Temporarily set magPages to workspace pages and use existing openPrintView */
+  /* Temporarily set magPages to workspace pages with production/profile metadata. */
   const origPages=magPages;const origIdx=currentPageIdx;
-  magPages=wsPages;currentPageIdx=0;
+  magPages=wsPages.map((p,i)=>wsPageWithMeta(p,i));currentPageIdx=0;
   openPrintView();
   magPages=origPages;currentPageIdx=origIdx;
 }
