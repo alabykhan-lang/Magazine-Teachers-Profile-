@@ -711,6 +711,87 @@
         </div>
         <div class="ws-panel-body" id="wsPageList"></div>
       </div>
+      <!-- Production Builder Panel -->
+      <div class="ws-panel" id="wsPanelProduction">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelProduction')">
+          <span>Production</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <label class="ws-font-label">Page status</label>
+          <select class="ws-font-select" id="wsPageStatus" onchange="wsSetPageStatus(this.value)">
+            <option value="draft">Draft</option>
+            <option value="needs-content">Needs content</option>
+            <option value="needs-image">Needs image</option>
+            <option value="text-overflow">Text overflow</option>
+            <option value="needs-review">Needs review</option>
+            <option value="approved">Approved</option>
+            <option value="locked">Locked for print</option>
+          </select>
+          <label class="ws-font-label">Template</label>
+          <select class="ws-font-select" id="wsPageTemplate" onchange="wsSetPageTemplate(this.value)">
+            <option value="single">Single article</option>
+            <option value="double">Two-column content</option>
+            <option value="grid">Student grid</option>
+            <option value="teacher-grid">Staff grid</option>
+            <option value="gallery">Gallery</option>
+            <option value="events">Event report</option>
+          </select>
+          <label class="ws-font-label">Section title</label>
+          <input class="ws-font-select" id="wsPageTitleInput" type="text" oninput="wsSetPageTitle(this.value)" placeholder="Section title"/>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsSetPageStatus('approved')">Approve Page</button>
+            <button class="ws-prod-btn" onclick="wsTogglePageLock()" id="wsLockPageBtn">Lock Page</button>
+          </div>
+        </div>
+      </div>
+      <!-- Design Controls Panel -->
+      <div class="ws-panel" id="wsPanelDesignControls">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelDesignControls')">
+          <span>Design Controls</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <div id="wsColorPanel"></div>
+          <label class="ws-font-label">Heading font</label>
+          <select class="ws-font-select" id="wsHeadingFont" onchange="wsUpdateFont('headingFont',this.value)">
+            <option value="'Playfair Display',serif">Playfair Display</option>
+            <option value="Georgia,serif">Georgia</option>
+            <option value="'Lato',sans-serif">Lato</option>
+          </select>
+          <label class="ws-font-label">Body font</label>
+          <select class="ws-font-select" id="wsBodyFont" onchange="wsUpdateFont('bodyFont',this.value)">
+            <option value="'Crimson Text',serif">Crimson Text</option>
+            <option value="Georgia,serif">Georgia</option>
+            <option value="'Lato',sans-serif">Lato</option>
+          </select>
+          <label class="ws-font-label">Body size</label>
+          <select class="ws-font-select" id="wsFontSize" onchange="wsUpdateFont('fontSize',this.value)">
+            <option value="10px">10px</option>
+            <option value="11px">11px</option>
+            <option value="12px">12px</option>
+            <option value="13px">13px</option>
+          </select>
+        </div>
+      </div>
+      <!-- Preflight Panel -->
+      <div class="ws-panel" id="wsPanelPreflight">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelPreflight')">
+          <span>Print Check</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <button class="ws-export-btn" onclick="wsRunPreflight()"><span class="ws-export-icon">?</span><span>Run Print Check<span class="ws-export-desc">Find missing images, long text, pending pages</span></span></button>
+          <div id="wsPreflightList" class="ws-preflight-list"></div>
+        </div>
+      </div>
+      <!-- Assets Panel -->
+      <div class="ws-panel" id="wsPanelAssets">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelAssets')">
+          <span>Photos</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <div id="wsAssetEmpty" class="ws-empty-mini">No photos loaded yet.</div>
+          <div id="wsAssetGrid" class="ws-asset-grid"></div>
+        </div>
+      </div>
       <!-- Export Panel -->
       <div class="ws-panel" id="wsPanelExport">
         <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelExport')">
@@ -944,7 +1025,7 @@
     }
   }
 </script>
-<script src="script.js?v=11"></script>
+<script src="script.js?v=13"></script>
 <script>
   (function landingFallback(){
     const cards = [
