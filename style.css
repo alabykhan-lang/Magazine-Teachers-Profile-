@@ -1381,7 +1381,7 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .ws-student-photo-bg .ws-color-swatch{width:100%;height:32px;border-radius:6px;border:1px solid var(--ws-border);background:var(--ws-surface2);}
 .ws-profile-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px;}
 .ws-page-edit-list{display:grid;gap:6px;margin-top:9px;}
-.ws-page-edit-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:5px;align-items:center;padding:7px;border:1px solid var(--ws-border);border-radius:6px;background:var(--ws-surface3);}
+.ws-page-edit-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(4,auto);gap:5px;align-items:center;padding:7px;border:1px solid var(--ws-border);border-radius:6px;background:var(--ws-surface3);}
 .ws-page-edit-row span{font-size:11px;color:var(--ws-text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ws-page-edit-row button{border:1px solid var(--ws-border);background:var(--ws-surface2);color:var(--ws-text);border-radius:5px;padding:4px 6px;font-size:10px;font-weight:700;cursor:pointer;}
 .ws-page-edit-row button:disabled{opacity:.35;cursor:not-allowed;}

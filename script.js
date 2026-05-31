@@ -1663,7 +1663,7 @@ function renderCurrentPage(){
       const ini = resolveName(sub).trim().split(/\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();
       if(sub.photoData){
         if(bg){
-          return `<div style="width:${w};height:${h};border-radius:${radius};background:${bg};border:${border};padding:3px;flex-shrink:0;display:block;overflow:hidden;"><img src="${sub.photoData}" style="width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:${radius};display:block;"/></div>`;
+          return `<div style="width:${w};height:${h};border-radius:${radius};background:${bg};border:${border};flex-shrink:0;display:block;overflow:hidden;"><img src="${sub.photoData}" style="width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:${radius};display:block;mix-blend-mode:multiply;filter:contrast(1.04) saturate(1.03);"/></div>`;
         }
         return `<img src="${sub.photoData}" style="width:${w};height:${h};object-fit:cover;object-position:top center;border-radius:${radius};flex-shrink:0;border:${border};display:block;"/>`;
       }
@@ -2454,8 +2454,8 @@ function renderShareLinks(){const c=document.getElementById('shareLinksContainer
 let wsPages=[],wsPageIdx=0,wsZoom=100,wsShowGuides=true,wsSpreadMode=false;
 let wsAIChatHistory=[],wsAISampleBase64=null,wsAISampleMime=null;
 let wsUndoStack=[],wsRedoStack=[],wsAutoSaveTimer=null;
-function wsEnsureProduction(){if(!lsSettings.production||typeof lsSettings.production!=='object')lsSettings.production={pages:{}};if(!lsSettings.production.pages)lsSettings.production.pages={};if(!lsSettings.production.profileDefaults)lsSettings.production.profileDefaults={};return lsSettings.production;}
-function wsPageKey(page,idx){if(!page)return 'page-'+idx;const ids=(page.items||[]).map(x=>x.id).join('-')||(page.sub?.id||'');return [page.type,page.sec?.key||'global',page.pageInSection||1,ids||idx].join('|');}
+function wsEnsureProduction(){if(!lsSettings.production||typeof lsSettings.production!=='object')lsSettings.production={pages:{}};if(!lsSettings.production.pages)lsSettings.production.pages={};if(!lsSettings.production.profileDefaults)lsSettings.production.profileDefaults={};if(!Array.isArray(lsSettings.production.duplicates))lsSettings.production.duplicates=[];return lsSettings.production;}
+function wsPageKey(page,idx){if(page?.duplicateId)return 'duplicate|'+page.duplicateId;if(!page)return 'page-'+idx;const ids=(page.items||[]).map(x=>x.id).join('-')||(page.sub?.id||'');return [page.type,page.sec?.key||'global',page.pageInSection||1,ids||idx].join('|');}
 function wsDefaultProfileFieldIds(secKey){const fields=(CATEGORIES[secKey]?.fields||[]).filter(f=>f.id!=='name');if(secKey==='teachers')return ['title','subject','years','qualification'].filter(id=>fields.some(f=>f.id===id));return ['nickname','favSubject','ambition','hobbies'].filter(id=>fields.some(f=>f.id===id));}
 function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'staff-detailed'}:{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'student-balanced'};}
 function wsIsProfilePage(page){const key=page?.sec?.key;return page?.type==='section-content'&&(key==='teachers'||['primary5','jss3','ss3'].includes(key)||page?.sec?.layout==='teacher-grid'||page?.sec?.layout==='grid');}
@@ -2512,6 +2512,12 @@ function wsGeneratePreview(){
     for(let i=0;i<catSubs.length;i+=perPage){
       wsPages.push({type:'section-content',sec,items:catSubs.slice(i,i+perPage),isFirst:i===0,pageInSection:Math.floor(i/perPage)+1,label:getLabel('section_'+sec.key,sec.label)+(i>0?' (p'+(Math.floor(i/perPage)+1)+')':'')});
     }
+  });
+  (wsEnsureProduction().duplicates||[]).forEach(d=>{
+    const items=(d.itemIds||[]).map(id=>finalized.find(s=>String(s.id)===String(id))).filter(Boolean);
+    if(!items.length)return;
+    const sec=sectionOrder.find(x=>x.key===d.secKey)||{key:d.secKey,label:d.label||'Duplicated Page',layout:d.layout||'single',visible:true};
+    wsPages.push({type:d.type||'section-content',sec:Object.assign({},sec,{layout:d.layout||sec.layout}),items,duplicateId:d.id,label:d.label||((sec.label||'Duplicated Page')+' copy')});
   });
 
   wsRenderPageList();
@@ -2659,13 +2665,15 @@ function wsUpdateProductionControls(){
   const lock=document.getElementById('wsLockPageBtn');if(lock)lock.textContent=meta.locked?'Unlock Page':'Lock Page';
 }
 function wsItemLabel(sub){return sub?.data?.name?.value||sub?.data?.speakerName?.value||sub?.data?.contribName?.value||sub?.data?.reporterName?.value||sub?.data?.authorName?.value||sub?.data?.intervieweeName?.value||sub?.data?.submitterName?.value||sub?.data?.eventName?.value||sub?.data?.title?.value||'Untitled';}
+function wsPageGridCols(page,itemCount){const layout=page?.sec?.layout||page?.type;if(layout==='teacher-grid')return itemCount>9?4:3;if(layout==='grid')return itemCount===1?1:itemCount<=4?2:itemCount<=9?3:4;return 1;}
 function wsRenderPageEditPanel(page,meta){
   const btn=document.getElementById('wsHidePageBtn'),list=document.getElementById('wsPageEditList');
   if(btn)btn.querySelector('span:last-child').firstChild.textContent=meta.hidden?'Show Page':'Hide Page';
   if(!list)return;
   const ordered=wsPageWithMeta(page,wsPageIdx).items||[];
   if(!ordered.length){list.innerHTML='<div class="ws-empty-mini">No reorderable cards on this page.</div>';return;}
-  list.innerHTML='<div class="ws-profile-title">Card Order</div>'+ordered.map((sub,i)=>`<div class="ws-page-edit-row"><span>${esc(wsItemLabel(sub))}</span><button onclick="wsMovePageItem('${sub.id}',-1)" ${i===0?'disabled':''}>Up</button><button onclick="wsMovePageItem('${sub.id}',1)" ${i===ordered.length-1?'disabled':''}>Down</button></div>`).join('');
+  const cols=wsPageGridCols(wsPageWithMeta(page,wsPageIdx),ordered.length);
+  list.innerHTML='<div class="ws-profile-title">Card Order</div>'+ordered.map((sub,i)=>`<div class="ws-page-edit-row"><span>${esc(wsItemLabel(sub))}</span><button onclick="wsMovePageItem('${sub.id}',${-cols})" ${i-cols<0?'disabled':''}>Up</button><button onclick="wsMovePageItem('${sub.id}',${cols})" ${i+cols>=ordered.length?'disabled':''}>Down</button><button onclick="wsMovePageItem('${sub.id}',-1)" ${i===0?'disabled':''}>Left</button><button onclick="wsMovePageItem('${sub.id}',1)" ${i===ordered.length-1?'disabled':''}>Right</button></div>`).join('');
 }
 function wsTogglePageHidden(){
   const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!page)return;
@@ -2679,6 +2687,14 @@ function wsMovePageItem(id,dir){
   if(idx<0||next<0||next>=ids.length)return;
   [ids[idx],ids[next]]=[ids[next],ids[idx]];
   wsSavePageMeta(wsPageIdx,{itemOrder:ids});wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);
+}
+function wsDuplicateCurrentPage(){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!page)return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before duplicating it.');wsUpdateProductionControls();return;}
+  const prod=wsEnsureProduction();const rendered=wsPageWithMeta(page,wsPageIdx);const id='dup-'+Date.now();
+  prod.duplicates.push({id,type:rendered.type,secKey:rendered.sec?.key,layout:rendered.sec?.layout,label:(meta.title||rendered.label||'Page')+' copy',itemIds:(rendered.items||[]).map(x=>String(x.id))});
+  prod.pages['duplicate|'+id]=Object.assign({},meta,{title:(meta.title||rendered.label||'Page')+' copy',status:'draft',locked:false,hidden:false});
+  saveLsSettingsToStorage(lsSettings);wsMarkDirty();wsGeneratePreview();wsPageIdx=wsPages.findIndex(p=>p.duplicateId===id);if(wsPageIdx<0)wsPageIdx=wsPages.length-1;wsRenderPageList();wsRenderCurrentPage();wsUpdateNavUI();
 }
 function wsUpdateProfileControls(page,meta){
   const wrap=document.getElementById('wsProfileControls');if(!wrap)return;
