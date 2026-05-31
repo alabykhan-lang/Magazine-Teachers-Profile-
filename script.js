@@ -2453,12 +2453,12 @@ function renderShareLinks(){const c=document.getElementById('shareLinksContainer
 let wsPages=[],wsPageIdx=0,wsZoom=100,wsShowGuides=true,wsSpreadMode=false;
 let wsAIChatHistory=[],wsAISampleBase64=null,wsAISampleMime=null;
 let wsUndoStack=[],wsRedoStack=[],wsAutoSaveTimer=null;
-function wsEnsureProduction(){if(!lsSettings.production||typeof lsSettings.production!=='object')lsSettings.production={pages:{}};if(!lsSettings.production.pages)lsSettings.production.pages={};return lsSettings.production;}
+function wsEnsureProduction(){if(!lsSettings.production||typeof lsSettings.production!=='object')lsSettings.production={pages:{}};if(!lsSettings.production.pages)lsSettings.production.pages={};if(!lsSettings.production.profileDefaults)lsSettings.production.profileDefaults={};return lsSettings.production;}
 function wsPageKey(page,idx){if(!page)return 'page-'+idx;const ids=(page.items||[]).map(x=>x.id).join('-')||(page.sub?.id||'');return [page.type,page.sec?.key||'global',page.pageInSection||1,ids||idx].join('|');}
 function wsDefaultProfileFieldIds(secKey){const fields=(CATEGORIES[secKey]?.fields||[]).filter(f=>f.id!=='name');if(secKey==='teachers')return ['title','subject','years','qualification'].filter(id=>fields.some(f=>f.id===id));return ['nickname','favSubject','ambition','hobbies'].filter(id=>fields.some(f=>f.id===id));}
 function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'staff-detailed'}:{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'student-balanced'};}
 function wsIsProfilePage(page){const key=page?.sec?.key;return page?.type==='section-content'&&(key==='teachers'||['primary5','jss3','ss3'].includes(key)||page?.sec?.layout==='teacher-grid'||page?.sec?.layout==='grid');}
-function wsGetProfileControls(page,meta){return Object.assign({},wsDefaultProfileControls(page?.sec?.key),meta?.profileControls||{});}
+function wsGetProfileControls(page,meta){const prod=wsEnsureProduction();const key=page?.sec?.key;return Object.assign({},wsDefaultProfileControls(key),prod.profileDefaults?.[key]||{},meta?.profileControls||{});}
 function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});}
 function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);prod.pages[key]=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{});saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
 function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,namePlacement:meta.namePlacement,profileControls});if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
@@ -2696,6 +2696,21 @@ function wsToggleProfileField(fieldId,checked){
   ctl.fieldsMode='custom';ctl.fieldIds=ids;ctl.preset='custom';
   wsSavePageMeta(wsPageIdx,{profileControls:ctl});wsRenderCurrentPage();
 }
+function wsApplyProfileToCategory(){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before applying profile cards to the category.');wsUpdateProductionControls();return;}
+  const key=page.sec?.key;if(!key)return;
+  const prod=wsEnsureProduction();const ctl=Object.assign({},wsGetProfileControls(page,meta));
+  prod.profileDefaults[key]=ctl;
+  wsPages.forEach((p,i)=>{if(p.sec?.key===key&&!wsGetPageMeta(p,i).locked){const pKey=wsPageKey(p,i);prod.pages[pKey]=Object.assign({},wsGetPageMeta(p,i),{profileControls:ctl});}});
+  saveLsSettingsToStorage(lsSettings);wsMarkDirty();wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);
+}
+function wsResetProfilePage(){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before resetting profile cards.');wsUpdateProductionControls();return;}
+  wsSavePageMeta(wsPageIdx,{profileControls:wsDefaultProfileControls(page.sec?.key)});
+  wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);
+}
 function wsSetProfileCardsPerPage(val){
   const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
   if(meta.locked){alert('This page is locked for print. Unlock it before changing cards per page.');wsUpdateProductionControls();return;}
@@ -2731,6 +2746,12 @@ function wsRunPreflight(showAlert){
     const pending=items.filter(sub=>sub.status==='pending').length;if(pending)issues.push({level:'warn',text:'Page '+(i+1)+': contains '+pending+' pending submission(s).'});
     const longText=items.some(sub=>Object.values(sub.data||{}).some(fc=>String(fc?.value||'').length>1600));
     if(longText)issues.push({level:'warn',text:'Page '+(i+1)+': long text may need splitting or shortening.'});
+    if(wsIsProfilePage(p)){
+      const ctl=wsGetProfileControls(wsPages[i],meta);
+      const fieldCount=ctl.fieldsMode==='all'?((CATEGORIES[p.sec?.key]?.fields||[]).length-1):(ctl.fieldsMode==='custom'?(ctl.fieldIds||[]).length:(ctl.fieldsMode==='key'?3:0));
+      if(items.length>=9&&fieldCount>3)issues.push({level:'warn',text:'Page '+(i+1)+': many profile cards with several fields may overflow.'});
+      if(ctl.photoSize==='large'&&items.length>=9)issues.push({level:'warn',text:'Page '+(i+1)+': large profile photos may be tight with '+items.length+' cards.'});
+    }
   });
   const unused=loadAll().filter(s=>['approved','finalized'].includes(s.status)&&!pages.some(p=>(p.items||[]).some(x=>String(x.id)===String(s.id))||String(p.sub?.id)===String(s.id)));
   if(unused.length)issues.push({level:'warn',text:unused.length+' approved/finalized item(s) are not placed on pages.'});
