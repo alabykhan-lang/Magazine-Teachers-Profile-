@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+dist/
+dist-ssr/
+*.local
+push.bat
+gather.cjs
+files.json
+mingit.zip
