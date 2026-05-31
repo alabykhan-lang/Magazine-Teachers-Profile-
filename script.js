@@ -1617,6 +1617,7 @@ function renderCurrentPage(){
       const skipFirst = opts.skipFirst || false; // skip name field (shown in header)
       let entries = Object.entries(sub.data || {});
       if(skipFirst && entries.length > 0) entries.shift();
+      if(Array.isArray(opts.fieldIds)) entries = entries.filter(([k])=>opts.fieldIds.includes(k));
       if(opts.maxFields) entries = entries.slice(0, opts.maxFields);
       return entries.map(([k, fc]) => {
         if(!fc || !fc.value) return '';
@@ -1658,12 +1659,15 @@ function renderCurrentPage(){
              sub.data.eventReport?.value || sub.data.message?.value ||
              sub.data.introParagraph?.value || '';
     }
-    function resolvePhotoBlock(sub, w, h, radius, border){
+    function resolvePhotoBlock(sub, w, h, radius, border, bg){
       const ini = resolveName(sub).trim().split(/\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();
       if(sub.photoData){
+        if(bg){
+          return `<div style="width:${w};height:${h};border-radius:${radius};background:${bg};border:${border};padding:3px;flex-shrink:0;display:block;overflow:hidden;"><img src="${sub.photoData}" style="width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:${radius};display:block;"/></div>`;
+        }
         return `<img src="${sub.photoData}" style="width:${w};height:${h};object-fit:cover;object-position:top center;border-radius:${radius};flex-shrink:0;border:${border};display:block;"/>`;
       }
-      return `<div style="width:${w};height:${h};border-radius:${radius};background:${c1};display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0;">${ini}</div>`;
+      return `<div style="width:${w};height:${h};border-radius:${radius};background:${bg||c1};border:${bg?border:'none'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0;">${ini}</div>`;
     }
 
     /* ── TEACHER GRID ─────────────────────────────────────────────────────── */
@@ -1679,7 +1683,8 @@ function renderCurrentPage(){
     }
     function profileFields(sub, style, maxChars){
       if(style.ctl.fieldsMode==='name-only') return '';
-      return renderAllFields(sub, {skipFirst:true, maxChars, maxFields:style.maxFields, textColor, bFont});
+      const fieldIds=style.ctl.fieldsMode==='custom'?style.ctl.fieldIds:null;
+      return renderAllFields(sub, {skipFirst:true, maxChars, maxFields:style.maxFields, fieldIds, textColor, bFont});
     }
     if(layout==='teacher-grid'){
       const style = profileStyleDefaults(page);
@@ -1707,7 +1712,7 @@ function renderCurrentPage(){
       contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${style.gap};">
         ${items.map(sub => {
           const name = resolveName(sub);
-          const ph = resolvePhotoBlock(sub,style.photoW,style.photoH,style.shape,`2px solid ${c2}55`);
+          const ph = resolvePhotoBlock(sub,style.photoW,style.photoH,style.shape,`2px solid ${c2}55`,style.ctl.photoBg||'#ffffff');
           const allFields = profileFields(sub, style, 120);
           if(namePlacement==='under'||namePlacement==='photo-under'){
             return `<div class="mag-item mag-item-student" style="padding:${style.pad};background:#fafaf8;border-radius:8px;border-left:3px solid ${c2};text-align:center;">
@@ -2450,7 +2455,8 @@ let wsAIChatHistory=[],wsAISampleBase64=null,wsAISampleMime=null;
 let wsUndoStack=[],wsRedoStack=[],wsAutoSaveTimer=null;
 function wsEnsureProduction(){if(!lsSettings.production||typeof lsSettings.production!=='object')lsSettings.production={pages:{}};if(!lsSettings.production.pages)lsSettings.production.pages={};return lsSettings.production;}
 function wsPageKey(page,idx){if(!page)return 'page-'+idx;const ids=(page.items||[]).map(x=>x.id).join('-')||(page.sub?.id||'');return [page.type,page.sec?.key||'global',page.pageInSection||1,ids||idx].join('|');}
-function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',preset:'staff-detailed'}:{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',preset:'student-balanced'};}
+function wsDefaultProfileFieldIds(secKey){const fields=(CATEGORIES[secKey]?.fields||[]).filter(f=>f.id!=='name');if(secKey==='teachers')return ['title','subject','years','qualification'].filter(id=>fields.some(f=>f.id===id));return ['nickname','favSubject','ambition','hobbies'].filter(id=>fields.some(f=>f.id===id));}
+function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'staff-detailed'}:{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'student-balanced'};}
 function wsIsProfilePage(page){const key=page?.sec?.key;return page?.type==='section-content'&&(key==='teachers'||['primary5','jss3','ss3'].includes(key)||page?.sec?.layout==='teacher-grid'||page?.sec?.layout==='grid');}
 function wsGetProfileControls(page,meta){return Object.assign({},wsDefaultProfileControls(page?.sec?.key),meta?.profileControls||{});}
 function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});}
@@ -2659,6 +2665,18 @@ function wsUpdateProfileControls(page,meta){
   const cards=document.getElementById('wsProfileCardsPerPage'),allowed=page.sec?.key==='teachers'?[6,9,12,15]:[1,2,3,4,5,6,7,8,9,10,12,15];
   if(cards)[...cards.options].forEach(o=>o.disabled=!allowed.includes(parseInt(o.value)));
   set('wsProfileCardsPerPage',perPage);set('wsProfilePhotoSize',ctl.photoSize);set('wsProfilePhotoShape',ctl.photoShape);set('wsProfileNameSize',ctl.nameSize);set('wsProfileCardSpacing',ctl.cardSpacing);set('wsProfileFieldsMode',ctl.fieldsMode);set('wsProfilePreset',ctl.preset||'custom');
+  const bgWrap=document.getElementById('wsStudentPhotoBgWrap'),bg=document.getElementById('wsStudentPhotoBg');
+  if(bgWrap)bgWrap.style.display=page.sec?.key==='teachers'?'none':'block';
+  if(bg)bg.value=ctl.photoBg||'#ffffff';
+  wsRenderProfileFieldPicker(page,ctl);
+}
+function wsRenderProfileFieldPicker(page,ctl){
+  const box=document.getElementById('wsProfileFieldPicker');if(!box)return;
+  if(ctl.fieldsMode!=='custom'){box.innerHTML='';box.style.display='none';return;}
+  const fields=(CATEGORIES[page.sec?.key]?.fields||[]).filter(f=>f.id!=='name');
+  const selected=Array.isArray(ctl.fieldIds)?ctl.fieldIds:wsDefaultProfileFieldIds(page.sec?.key);
+  box.style.display='grid';
+  box.innerHTML=fields.map(f=>`<label class="ws-field-check"><input type="checkbox" ${selected.includes(f.id)?'checked':''} onchange="wsToggleProfileField('${f.id}',this.checked)"/><span>${esc(f.label)}</span></label>`).join('');
 }
 function wsSetPageStatus(status){wsSavePageMeta(wsPageIdx,{status});wsRenderPageList();wsUpdateProductionControls();wsRunPreflight(false);}
 function wsSetPageTemplate(template){const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before changing the template.');wsUpdateProductionControls();return;}wsSavePageMeta(wsPageIdx,{template});wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);}
@@ -2667,7 +2685,16 @@ function wsSetProfileControl(key,val){
   const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
   if(meta.locked){alert('This page is locked for print. Unlock it before changing profile cards.');wsUpdateProductionControls();return;}
   const ctl=Object.assign({},wsGetProfileControls(page,meta),{[key]:val,preset:'custom'});
+  if(key==='fieldsMode'&&val==='custom'&&(!Array.isArray(ctl.fieldIds)||!ctl.fieldIds.length))ctl.fieldIds=wsDefaultProfileFieldIds(page.sec?.key);
   wsSavePageMeta(wsPageIdx,{profileControls:ctl});wsRenderPageList();wsRenderCurrentPage();
+}
+function wsToggleProfileField(fieldId,checked){
+  const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
+  if(meta.locked){alert('This page is locked for print. Unlock it before changing profile fields.');wsUpdateProductionControls();return;}
+  const ctl=Object.assign({},wsGetProfileControls(page,meta));let ids=Array.isArray(ctl.fieldIds)?ctl.fieldIds.slice():wsDefaultProfileFieldIds(page.sec?.key);
+  ids=checked?[...new Set([...ids,fieldId])]:ids.filter(id=>id!==fieldId);
+  ctl.fieldsMode='custom';ctl.fieldIds=ids;ctl.preset='custom';
+  wsSavePageMeta(wsPageIdx,{profileControls:ctl});wsRenderCurrentPage();
 }
 function wsSetProfileCardsPerPage(val){
   const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
@@ -2681,10 +2708,10 @@ function wsApplyProfilePreset(preset){
   const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
   if(meta.locked){alert('This page is locked for print. Unlock it before changing profile cards.');wsUpdateProductionControls();return;}
   const presets={
-    'student-balanced':{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',preset:'student-balanced'},
-    'student-photo':{photoSize:'large',photoShape:'rounded',nameSize:'large',cardSpacing:'roomy',fieldsMode:'name-only',preset:'student-photo'},
-    'staff-compact':{photoSize:'small',photoShape:'rounded',nameSize:'small',cardSpacing:'compact',fieldsMode:'key',preset:'staff-compact'},
-    'staff-detailed':{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',preset:'staff-detailed'}
+    'student-balanced':{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',fieldsMode:'key',fieldIds:wsDefaultProfileFieldIds(page.sec?.key),photoBg:'#ffffff',preset:'student-balanced'},
+    'student-photo':{photoSize:'large',photoShape:'rounded',nameSize:'large',cardSpacing:'roomy',fieldsMode:'name-only',fieldIds:wsDefaultProfileFieldIds(page.sec?.key),photoBg:'#ffffff',preset:'student-photo'},
+    'staff-compact':{photoSize:'small',photoShape:'rounded',nameSize:'small',cardSpacing:'compact',fieldsMode:'key',fieldIds:wsDefaultProfileFieldIds(page.sec?.key),photoBg:'#ffffff',preset:'staff-compact'},
+    'staff-detailed':{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',fieldsMode:'all',fieldIds:wsDefaultProfileFieldIds(page.sec?.key),photoBg:'#ffffff',preset:'staff-detailed'}
   };
   if(!presets[preset])return;
   wsSavePageMeta(wsPageIdx,{profileControls:presets[preset]});wsRenderPageList();wsRenderCurrentPage();

@@ -789,8 +789,14 @@
             <select class="ws-font-select" id="wsProfileFieldsMode" onchange="wsSetProfileControl('fieldsMode',this.value)">
               <option value="all">All fields</option>
               <option value="key">Key fields only</option>
+              <option value="custom">Choose fields</option>
               <option value="name-only">Name only</option>
             </select>
+            <div class="ws-field-picker" id="wsProfileFieldPicker"></div>
+            <div class="ws-student-photo-bg" id="wsStudentPhotoBgWrap">
+              <label class="ws-font-label">Student photo background</label>
+              <input type="color" class="ws-color-swatch" id="wsStudentPhotoBg" value="#ffffff" onchange="wsSetProfileControl('photoBg',this.value)"/>
+            </div>
             <label class="ws-font-label">Preset</label>
             <select class="ws-font-select" id="wsProfilePreset" onchange="wsApplyProfilePreset(this.value)">
               <option value="custom">Custom</option>
