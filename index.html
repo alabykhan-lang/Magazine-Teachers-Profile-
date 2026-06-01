@@ -731,6 +731,9 @@
           <select class="ws-font-select" id="wsPageTemplate" onchange="wsSetPageTemplate(this.value)">
             <option value="single">Single article</option>
             <option value="double">Two-column content</option>
+            <option value="article-columns">Article columns</option>
+            <option value="article-newspaper">Newspaper mix</option>
+            <option value="article-feature">Feature story</option>
             <option value="grid">Student grid</option>
             <option value="teacher-grid">Staff grid</option>
             <option value="gallery">Gallery</option>
@@ -784,6 +787,13 @@
               <option value="compact">Compact</option>
               <option value="normal">Normal</option>
               <option value="roomy">Roomy</option>
+            </select>
+            <label class="ws-font-label">Card design</label>
+            <select class="ws-font-select" id="wsProfileCardDesign" onchange="wsSetProfileControl('cardDesign',this.value)">
+              <option value="classic">Classic side bar</option>
+              <option value="frame">Photo frame</option>
+              <option value="badge">Badge card</option>
+              <option value="editorial">Editorial card</option>
             </select>
             <label class="ws-font-label">Fields under name</label>
             <select class="ws-font-select" id="wsProfileFieldsMode" onchange="wsSetProfileControl('fieldsMode',this.value)">
@@ -882,6 +892,13 @@
             <button class="ws-prod-btn" onclick="document.getElementById('wsImageReplaceInput').click()">Replace</button>
             <button class="ws-prod-btn" onclick="wsResetImageEdit()">Reset</button>
           </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsApplyImageEdit('page')">Apply Page</button>
+            <button class="ws-prod-btn" onclick="wsApplyImageEdit('category')">Apply Category</button>
+          </div>
+          <button class="ws-export-btn" onclick="wsApplyImageEdit('all')">
+            <span class="ws-export-icon">?</span><span>Apply Image Style Globally<span class="ws-export-desc">Use current fit, zoom, and position for all page images</span></span>
+          </button>
         </div>
       </div>
       <!-- Text Editing Panel -->
