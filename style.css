@@ -1409,3 +1409,9 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .ws-preflight-item.summary{font-weight:800;border-width:2px;background:rgba(255,255,255,.06);}
 .mag-page img,.mag-sheet img{image-rendering:auto!important;-ms-interpolation-mode:bicubic;}
 .photo-reqs strong{letter-spacing:.2px;}
+/* Recommended preflight fixes and article/profile expansions */
+.ws-preflight-solution{font-size:10px;line-height:1.45;color:var(--ws-text2);margin-top:5px;}
+.ws-preflight-fix{margin-top:7px;border:1px solid var(--ws-border2);background:var(--ws-surface2);color:var(--ws-text);border-radius:5px;padding:4px 7px;font-size:10px;font-weight:800;cursor:pointer;}
+.ws-preflight-fix:hover{border-color:var(--ws-accent);color:var(--ws-accent);}
+.mag-item-article p{margin:0 0 6px;}
+.mag-article-layout{orphans:3;widows:3;}
