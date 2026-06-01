@@ -846,6 +846,44 @@
           <div id="wsPageEditList" class="ws-page-edit-list"></div>
         </div>
       </div>
+      <!-- Image Production Panel -->
+      <div class="ws-panel" id="wsPanelImageProduction">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelImageProduction')">
+          <span>Image Production</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <div class="ws-profile-title">Page Images</div>
+          <select class="ws-font-select" id="wsImageSelect" onchange="wsSelectImageForEdit(this.value)"></select>
+          <div id="wsImageQuality" class="ws-image-quality">Select an image on this page.</div>
+          <div class="ws-image-preview" id="wsImagePreview"></div>
+          <label class="ws-font-label">Fit / crop</label>
+          <select class="ws-font-select" id="wsImageFit" onchange="wsSetImageEdit('fit',this.value)">
+            <option value="cover">Cover frame</option>
+            <option value="contain">Contain full image</option>
+            <option value="top">Top crop</option>
+            <option value="center">Center crop</option>
+          </select>
+          <label class="ws-font-label">Zoom</label>
+          <input class="ws-range" id="wsImageZoom" type="range" min="50" max="300" value="100" oninput="wsSetImageEdit('zoom',this.value/100)"/>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsNudgeImage(0,-5)">Up</button>
+            <button class="ws-prod-btn" onclick="wsNudgeImage(0,5)">Down</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsNudgeImage(-5,0)">Left</button>
+            <button class="ws-prod-btn" onclick="wsNudgeImage(5,0)">Right</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsRotateImage(-90)">Rotate Left</button>
+            <button class="ws-prod-btn" onclick="wsRotateImage(90)">Rotate Right</button>
+          </div>
+          <input type="file" id="wsImageReplaceInput" accept=".jpg,.jpeg,.png,.webp" style="display:none;" onchange="wsReplaceSelectedImage(event)"/>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="document.getElementById('wsImageReplaceInput').click()">Replace</button>
+            <button class="ws-prod-btn" onclick="wsResetImageEdit()">Reset</button>
+          </div>
+        </div>
+      </div>
       <!-- Text Editing Panel -->
       <div class="ws-panel" id="wsPanelTextEditing">
         <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelTextEditing')">
