@@ -949,13 +949,29 @@ let pinBuf='',pinMode=null;
 let reviewingId=null,reviewingDecision=null,currentLsTab='preview';
 let magPages=[],currentPageIdx=0,renamingKey=null,dragSrcIdx=null;
 let currentCustCat=null,editingCustomFieldId=null;
+let standaloneFormKey=null;
 /* AI Chat history for conversational layout assistant */
 let aiChatHistory=[];
 let aiPendingSuggestion=null;
 
 /* VIEW */
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);}
-function goLanding(){show('viewLanding');currentFormCategory=null;resetFormState();renderLandingCards();if(window.history&&window.history.replaceState){window.history.replaceState({},document.title,window.location.pathname);}}
+function isStandaloneForm(){return !!(standaloneFormKey&&CATEGORIES[standaloneFormKey]);}
+function updateStandaloneFormChrome(){
+  const locked=isStandaloneForm();
+  const back=document.getElementById('formBackBtn');
+  const home=document.getElementById('successHomeBtn');
+  if(back)back.style.display=locked?'none':'';
+  if(home)home.style.display=locked?'none':'';
+  document.body.classList.toggle('standalone-form-link',locked);
+}
+function goLanding(){
+  if(isStandaloneForm()){
+    openForm(standaloneFormKey);
+    return;
+  }
+  show('viewLanding');currentFormCategory=null;resetFormState();renderLandingCards();if(window.history&&window.history.replaceState){window.history.replaceState({},document.title,window.location.pathname);}
+}
 
 /* LANDING CARDS */
 function renderLandingCards(){
@@ -1025,6 +1041,10 @@ function openForm(k){
 
   /* Switch view and scroll to top */
   show('viewForm');
+  updateStandaloneFormChrome();
+  if(isStandaloneForm()&&window.history&&window.history.replaceState){
+    window.history.replaceState({},document.title,window.location.pathname+'?form='+encodeURIComponent(standaloneFormKey)+'&standalone=1');
+  }
   window.scrollTo(0,0);
 }
 function resetFormState(){photoFile=null;photoDataURL=null;photoMeta=null;photoFilesMulti=[];photoDataURLsMulti=[];photoMetasMulti=[];}
@@ -2706,8 +2726,9 @@ function exportZipByCategory(list,filename,heading){if(typeof JSZip==='undefined
 
 /* SHARE LINKS */
 function getBaseUrl(){try{return window.location.origin+window.location.pathname;}catch(e){return'';}}
-function copyShareLink(formKey){const base=getBaseUrl();const url=formKey===''?base:`${base}?form=${formKey}`;try{navigator.clipboard.writeText(url);const btn=document.getElementById('copy-'+(formKey||'landing'));if(btn){const orig=btn.textContent;btn.textContent='✓ Copied!';btn.style.background='var(--green)';btn.style.color='#fff';setTimeout(()=>{btn.textContent=orig;btn.style.background='';btn.style.color='';},1600);}}catch(e){alert('URL: '+url);}}
-function renderShareLinks(){const c=document.getElementById('shareLinksContainer');if(!c)return;const base=getBaseUrl();const entries=[{key:'',label:'Landing Page (all forms)',icon:'🏠',desc:'Full homepage with all category cards'},...CATEGORY_KEYS.map(k=>({key:k,label:getLabel('cat_label_'+k,CATEGORIES[k].label),icon:CATEGORIES[k].icon,desc:`Submission form for ${CATEGORIES[k].label}`}))];c.innerHTML=entries.map(e=>{const url=e.key===''?base:`${base}?form=${e.key}`;return`<div class="share-link-row"><div class="share-link-icon">${e.icon}</div><div class="share-link-body"><div class="share-link-label">${esc(e.label)}</div><div class="share-link-desc">${esc(e.desc)}</div><div class="share-link-url">${esc(url)}</div></div><button class="btn btn-primary" id="copy-${e.key||'landing'}" onclick="copyShareLink('${e.key}')">Copy</button></div>`;}).join('');}
+function formShareUrl(formKey){const base=getBaseUrl();return formKey===''?base:`${base}?form=${encodeURIComponent(formKey)}&standalone=1`;}
+function copyShareLink(formKey){const url=formShareUrl(formKey);try{navigator.clipboard.writeText(url);const btn=document.getElementById('copy-'+(formKey||'landing'));if(btn){const orig=btn.textContent;btn.textContent='✓ Copied!';btn.style.background='var(--green)';btn.style.color='#fff';setTimeout(()=>{btn.textContent=orig;btn.style.background='';btn.style.color='';},1600);}}catch(e){alert('URL: '+url);}}
+function renderShareLinks(){const c=document.getElementById('shareLinksContainer');if(!c)return;const entries=[{key:'',label:'Landing Page (all forms)',icon:'🏠',desc:'Full homepage with all category cards'},...CATEGORY_KEYS.map(k=>({key:k,label:getLabel('cat_label_'+k,CATEGORIES[k].label),icon:CATEGORIES[k].icon,desc:`Standalone submission form for ${CATEGORIES[k].label}`}))];c.innerHTML=entries.map(e=>{const url=formShareUrl(e.key);return`<div class="share-link-row"><div class="share-link-icon">${e.icon}</div><div class="share-link-body"><div class="share-link-label">${esc(e.label)}</div><div class="share-link-desc">${esc(e.desc)}</div><div class="share-link-url">${esc(url)}</div></div><button class="btn btn-primary" id="copy-${e.key||'landing'}" onclick="copyShareLink('${e.key}')">Copy</button></div>`;}).join('');}
 
 /* ═══════════════════════════════════════════════════════════
    WORKSPACE ENGINE — VS Code-style Design Studio
@@ -3950,7 +3971,7 @@ function wsExportWord(){
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* URL ROUTING — Admin access via ?admin or ?editor in URL */
-function checkUrlRouting(){try{const params=new URLSearchParams(window.location.search);const fp=params.get('form');const ap=params.get('admin');const ep=params.get('editor');if(ap!==null){openPIN('admin');return true;}if(ep!==null){openPIN('editor');return true;}if(fp&&CATEGORIES[fp]){return fp;}/* return form key, not open yet */}catch(e){console.warn('[MagicEditor] URL routing:',e.message);}return false;}
+function checkUrlRouting(){try{const params=new URLSearchParams(window.location.search);const fp=params.get('form');const ap=params.get('admin');const ep=params.get('editor');if(ap!==null){openPIN('admin');return true;}if(ep!==null){openPIN('editor');return true;}if(fp&&CATEGORIES[fp]){standaloneFormKey=fp;updateStandaloneFormChrome();return fp;}/* return form key, not open yet */}catch(e){console.warn('[MagicEditor] URL routing:',e.message);}return false;}
 
 /* KEYBOARD SHORTCUT — type "admin" or "editor" on landing page */
 let keyBuffer='';
