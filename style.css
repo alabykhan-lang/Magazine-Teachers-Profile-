@@ -1371,6 +1371,20 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .ws-prod-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
 .ws-prod-btn{background:var(--ws-surface3);border:1px solid var(--ws-border);color:var(--ws-text);border-radius:6px;padding:8px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;}
 .ws-prod-btn:hover{background:var(--ws-border);border-color:var(--ws-border2);}
+.ws-profile-controls{display:none;margin:10px 0 8px;padding:10px;border:1px solid var(--ws-border);border-radius:6px;background:var(--ws-surface3);}
+.ws-profile-controls.active{display:block;}
+.ws-profile-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--ws-text2);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--ws-border);}
+.ws-field-picker{display:grid;gap:5px;margin:7px 0 9px;}
+.ws-field-check{display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.35;color:var(--ws-text2);}
+.ws-field-check input{width:13px;height:13px;accent-color:var(--ws-accent);}
+.ws-student-photo-bg{margin:8px 0 9px;}
+.ws-student-photo-bg .ws-color-swatch{width:100%;height:32px;border-radius:6px;border:1px solid var(--ws-border);background:var(--ws-surface2);}
+.ws-profile-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px;}
+.ws-page-edit-list{display:grid;gap:6px;margin-top:9px;}
+.ws-page-edit-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(4,auto);gap:5px;align-items:center;padding:7px;border:1px solid var(--ws-border);border-radius:6px;background:var(--ws-surface3);}
+.ws-page-edit-row span{font-size:11px;color:var(--ws-text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ws-page-edit-row button{border:1px solid var(--ws-border);background:var(--ws-surface2);color:var(--ws-text);border-radius:5px;padding:4px 6px;font-size:10px;font-weight:700;cursor:pointer;}
+.ws-page-edit-row button:disabled{opacity:.35;cursor:not-allowed;}
 .ws-preflight-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
 .ws-preflight-item{border:1px solid var(--ws-border);border-radius:6px;padding:8px 9px;font-size:11px;line-height:1.4;background:var(--ws-surface3);color:var(--ws-text2);}
 .ws-preflight-item.ok{border-color:rgba(166,227,161,.35);color:var(--ws-green);}
@@ -1380,3 +1394,24 @@ h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.2;}
 .ws-page-status-pill.approved,.ws-page-status-pill.locked{color:var(--ws-green);}
 .ws-page-status-pill.needs-content,.ws-page-status-pill.needs-image,.ws-page-status-pill.text-overflow{color:var(--ws-red);}
 .ws-empty-mini{font-size:11px;color:var(--ws-text3);text-align:center;padding:10px 4px;}
+
+/* Image production controls */
+.ws-range{width:100%;accent-color:var(--ws-accent);margin:4px 0 10px;}
+.ws-image-preview{height:118px;border:1px solid var(--ws-border);border-radius:6px;background:var(--ws-surface2);display:flex;align-items:center;justify-content:center;overflow:hidden;margin:8px 0;}
+.ws-image-preview img{width:100%;height:100%;object-fit:contain;display:block;}
+.ws-image-quality{font-size:10px;line-height:1.4;color:var(--ws-text3);padding:6px 0 2px;}
+.ws-image-quality.ok{color:var(--ws-green);}
+.ws-image-quality.warn{color:var(--ws-yellow);}
+.ws-asset-quality{position:absolute;right:3px;bottom:3px;border-radius:999px;padding:2px 5px;font-size:8px;font-weight:800;letter-spacing:.4px;background:rgba(20,20,25,.75);color:var(--ws-text2);}
+.ws-asset-quality.ok{color:var(--ws-green);}
+.ws-asset-quality.warn{color:var(--ws-yellow);}
+/* Chapter 7 print preflight and photo quality */
+.ws-preflight-item.summary{font-weight:800;border-width:2px;background:rgba(255,255,255,.06);}
+.mag-page img,.mag-sheet img{image-rendering:auto!important;-ms-interpolation-mode:bicubic;}
+.photo-reqs strong{letter-spacing:.2px;}
+/* Recommended preflight fixes and article/profile expansions */
+.ws-preflight-solution{font-size:10px;line-height:1.45;color:var(--ws-text2);margin-top:5px;}
+.ws-preflight-fix{margin-top:7px;border:1px solid var(--ws-border2);background:var(--ws-surface2);color:var(--ws-text);border-radius:5px;padding:4px 7px;font-size:10px;font-weight:800;cursor:pointer;}
+.ws-preflight-fix:hover{border-color:var(--ws-accent);color:var(--ws-accent);}
+.mag-item-article p{margin:0 0 6px;}
+.mag-article-layout{orphans:3;widows:3;}

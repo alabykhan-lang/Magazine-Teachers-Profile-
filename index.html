@@ -549,7 +549,10 @@
             <option value="">— Select a category —</option>
             <option value="teachers">👨‍🏫 Staff Profiles</option>
             <option value="primary5">🧒 Primary 5 Graduates</option>
+            <option value="primary5_class_photo">P5 Primary 5 Full Class Picture</option>
             <option value="jss3">🎒 JSS3 Graduates</option>
+            <option value="jss3_class_photo">J3 JSS3 Full Class Picture</option>
+            <option value="ss3_class_message">SS3 Graduating Class Message</option>
             <option value="ss3">🎓 SS3 Graduates</option>
             <option value="speeches">🎤 Speeches &amp; Addresses</option>
             <option value="creative">✍️ Creative Corner</option>
@@ -558,6 +561,7 @@
             <option value="interviews">🎙️ Interviews</option>
             <option value="motivational">💡 Motivational Articles</option>
             <option value="gallery">🖼️ Photo Gallery</option>
+            <option value="advertisements">AD Advertisements</option>
           </select>
         </div>
         <div id="custFieldsList"></div>
@@ -731,10 +735,19 @@
           <select class="ws-font-select" id="wsPageTemplate" onchange="wsSetPageTemplate(this.value)">
             <option value="single">Single article</option>
             <option value="double">Two-column content</option>
+            <option value="article-columns">Article columns</option>
+            <option value="article-newspaper">Newspaper mix</option>
+            <option value="article-feature">Feature story</option>
+            <option value="article-photo-break">Picture break article</option>
+            <option value="article-briefs">Two/three content briefs</option>
+            <option value="article-ribbon">Segmented ribbon story</option>
             <option value="grid">Student grid</option>
             <option value="teacher-grid">Staff grid</option>
             <option value="gallery">Gallery</option>
             <option value="events">Event report</option>
+            <option value="class-photo">Full class picture</option>
+            <option value="class-message">Class message + picture</option>
+            <option value="advertisements">Advertisement flyers</option>
           </select>
           <label class="ws-font-label">Section title</label>
           <input class="ws-font-select" id="wsPageTitleInput" type="text" oninput="wsSetPageTitle(this.value)" placeholder="Section title"/>
@@ -744,10 +757,206 @@
             <option value="under">Under photo</option>
             <option value="photo-under">Only under photo</option>
           </select>
+          <div class="ws-profile-controls" id="wsProfileControls">
+            <div class="ws-profile-title">Profile Cards</div>
+            <label class="ws-font-label">Cards per page</label>
+            <select class="ws-font-select" id="wsProfileCardsPerPage" onchange="wsSetProfileCardsPerPage(this.value)">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+              <option value="10">10</option>
+              <option value="12">12</option>
+              <option value="15">15</option>
+            </select>
+            <label class="ws-font-label">Photo size</label>
+            <select class="ws-font-select" id="wsProfilePhotoSize" onchange="wsSetProfileControl('photoSize',this.value)">
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+            <label class="ws-font-label">Photo shape</label>
+            <select class="ws-font-select" id="wsProfilePhotoShape" onchange="wsSetProfileControl('photoShape',this.value)">
+              <option value="square">Square</option>
+              <option value="rounded">Rounded</option>
+              <option value="circle">Circle</option>
+            </select>
+            <label class="ws-font-label">Name size</label>
+            <select class="ws-font-select" id="wsProfileNameSize" onchange="wsSetProfileControl('nameSize',this.value)">
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+            <label class="ws-font-label">Card spacing</label>
+            <select class="ws-font-select" id="wsProfileCardSpacing" onchange="wsSetProfileControl('cardSpacing',this.value)">
+              <option value="compact">Compact</option>
+              <option value="normal">Normal</option>
+              <option value="roomy">Roomy</option>
+            </select>
+            <label class="ws-font-label">Card design</label>
+            <select class="ws-font-select" id="wsProfileCardDesign" onchange="wsSetProfileControl('cardDesign',this.value)">
+              <option value="classic">Classic side bar</option>
+              <option value="frame">Photo frame</option>
+              <option value="badge">Badge card</option>
+              <option value="editorial">Editorial card</option>
+              <option value="yearbook">Yearbook tile</option>
+              <option value="portrait-split">Portrait split</option>
+              <option value="ribbon">Ribbon label</option>
+              <option value="minimal">Minimal line</option>
+            </select>
+            <label class="ws-font-label">Fields under name</label>
+            <select class="ws-font-select" id="wsProfileFieldsMode" onchange="wsSetProfileControl('fieldsMode',this.value)">
+              <option value="all">All fields</option>
+              <option value="key">Key fields only</option>
+              <option value="custom">Choose fields</option>
+              <option value="name-only">Name only</option>
+            </select>
+            <div class="ws-field-picker" id="wsProfileFieldPicker"></div>
+            <div class="ws-student-photo-bg" id="wsStudentPhotoBgWrap">
+              <label class="ws-font-label">Student photo background</label>
+              <input type="color" class="ws-color-swatch" id="wsStudentPhotoBg" value="#ffffff" onchange="wsSetProfileControl('photoBg',this.value)"/>
+            </div>
+            <label class="ws-font-label">Preset</label>
+            <select class="ws-font-select" id="wsProfilePreset" onchange="wsApplyProfilePreset(this.value)">
+              <option value="custom">Custom</option>
+              <option value="student-balanced">Student balanced</option>
+              <option value="student-photo">Student photo focus</option>
+              <option value="student-yearbook">Student yearbook</option>
+              <option value="staff-compact">Staff compact</option>
+              <option value="staff-detailed">Staff detailed</option>
+              <option value="staff-editorial-ribbon">Staff editorial ribbon</option>
+            </select>
+            <div class="ws-profile-actions">
+              <button class="ws-prod-btn" onclick="wsApplyProfileToCategory()">Apply to Category</button>
+              <button class="ws-prod-btn" onclick="wsResetProfilePage()">Reset Page</button>
+            </div>
+          </div>
           <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="wsSetPageStatus('approved')">Approve Page</button>
             <button class="ws-prod-btn" onclick="wsTogglePageLock()" id="wsLockPageBtn">Lock Page</button>
           </div>
+        </div>
+      </div>
+      <!-- Page Editing Panel -->
+      <div class="ws-panel" id="wsPanelPageEditing">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelPageEditing')">
+          <span>Page Editing</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <button class="ws-export-btn" id="wsHidePageBtn" onclick="wsTogglePageHidden()">
+            <span class="ws-export-icon">?</span><span>Hide Page<span class="ws-export-desc">Exclude from final print/PDF</span></span>
+          </button>
+          <button class="ws-export-btn" onclick="wsDuplicateCurrentPage()">
+            <span class="ws-export-icon">?</span><span>Duplicate Page<span class="ws-export-desc">Create an extra editable copy</span></span>
+          </button>
+          <button class="ws-export-btn" onclick="wsDeleteCurrentPageCopy()">
+            <span class="ws-export-icon">?</span><span>Delete Copy<span class="ws-export-desc">Remove duplicated workspace page</span></span>
+          </button>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsMoveSelectedItemToPage(-1)">Move to Previous</button>
+            <button class="ws-prod-btn" onclick="wsMoveSelectedItemToPage(1)">Move to Next</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsAddManualTextBox()">Add Text Box</button>
+            <button class="ws-prod-btn" onclick="wsAddManualImageBox()">Add Image Box</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsAddManualCaption()">Add Caption</button>
+            <button class="ws-prod-btn" onclick="wsSplitLongTextToCopy()">Split Long Text</button>
+          </div>
+          <div id="wsPageEditList" class="ws-page-edit-list"></div>
+        </div>
+      </div>
+      <!-- Image Production Panel -->
+      <div class="ws-panel" id="wsPanelImageProduction">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelImageProduction')">
+          <span>Image Production</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <div class="ws-profile-title">Page Images</div>
+          <div class="ws-image-general">
+            <div class="ws-profile-title">General Image Style</div>
+            <label class="ws-font-label">General fit / crop</label>
+            <select class="ws-font-select" id="wsGlobalImageFit" onchange="wsSetGlobalImageDefault('fit',this.value)">
+              <option value="cover">Cover frame</option>
+              <option value="contain">Contain full image</option>
+              <option value="top">Top crop</option>
+              <option value="center">Center crop</option>
+            </select>
+            <label class="ws-font-label">General zoom</label>
+            <input class="ws-range" id="wsGlobalImageZoom" type="range" min="50" max="300" value="100" oninput="wsSetGlobalImageDefault('zoom',this.value/100)"/>
+            <div class="ws-prod-actions">
+              <button class="ws-prod-btn" onclick="wsApplyGlobalImageDefaults()">Apply General Style</button>
+              <button class="ws-prod-btn" onclick="wsResetGlobalImageDefaults()">Reset General</button>
+            </div>
+          </div>
+          <select class="ws-font-select" id="wsImageSelect" onchange="wsSelectImageForEdit(this.value)"></select>
+          <div id="wsImageQuality" class="ws-image-quality">Select an image on this page.</div>
+          <div class="ws-image-preview" id="wsImagePreview"></div>
+          <label class="ws-font-label">Fit / crop</label>
+          <select class="ws-font-select" id="wsImageFit" onchange="wsSetImageEdit('fit',this.value)">
+            <option value="cover">Cover frame</option>
+            <option value="contain">Contain full image</option>
+            <option value="top">Top crop</option>
+            <option value="center">Center crop</option>
+          </select>
+          <label class="ws-font-label">Zoom</label>
+          <input class="ws-range" id="wsImageZoom" type="range" min="50" max="300" value="100" oninput="wsSetImageEdit('zoom',this.value/100)"/>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsNudgeImage(0,-5)">Up</button>
+            <button class="ws-prod-btn" onclick="wsNudgeImage(0,5)">Down</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsNudgeImage(-5,0)">Left</button>
+            <button class="ws-prod-btn" onclick="wsNudgeImage(5,0)">Right</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsRotateImage(-90)">Rotate Left</button>
+            <button class="ws-prod-btn" onclick="wsRotateImage(90)">Rotate Right</button>
+          </div>
+          <input type="file" id="wsImageReplaceInput" accept=".jpg,.jpeg,.png,.webp" style="display:none;" onchange="wsReplaceSelectedImage(event)"/>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="document.getElementById('wsImageReplaceInput').click()">Replace</button>
+            <button class="ws-prod-btn" onclick="wsResetImageEdit()">Reset</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsApplyImageEdit('page')">Apply Page</button>
+            <button class="ws-prod-btn" onclick="wsApplyImageEdit('category')">Apply Category</button>
+          </div>
+          <button class="ws-export-btn" onclick="wsApplyImageEdit('all')">
+            <span class="ws-export-icon">?</span><span>Apply Image Style Globally<span class="ws-export-desc">Use current fit, zoom, and position for all page images</span></span>
+          </button>
+        </div>
+      </div>
+      <!-- Text Editing Panel -->
+      <div class="ws-panel" id="wsPanelTextEditing">
+        <div class="ws-panel-header" onclick="wsTogglePanel('wsPanelTextEditing')">
+          <span>Text Editing</span><span class="ws-chevron">?</span>
+        </div>
+        <div class="ws-panel-body">
+          <label class="ws-font-label">Text item</label>
+          <select class="ws-font-select" id="wsTextEditSelect" onchange="wsUpdateTextStats()"></select>
+          <div id="wsTextStats" class="ws-empty-mini">No editable text on this page.</div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsShortenSelectedText()">Shorten</button>
+            <button class="ws-prod-btn" onclick="wsExpandSelectedText()">Expand</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsProofreadSelectedText()">Proofread</button>
+            <button class="ws-prod-btn" onclick="wsRewriteSelectedText()">Rewrite</button>
+          </div>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsMagazineStyleText()">Magazine Style</button>
+            <button class="ws-prod-btn" onclick="wsSuggestHeadline()">Title Suggestion</button>
+          </div>
+          <button class="ws-export-btn" onclick="wsResetSelectedText()">
+            <span class="ws-export-icon">?</span><span>Reset Text<span class="ws-export-desc">Restore original submission text</span></span>
+          </button>
         </div>
       </div>
       <!-- Design Controls Panel -->
@@ -784,7 +993,7 @@
           <span>Print Check</span><span class="ws-chevron">?</span>
         </div>
         <div class="ws-panel-body">
-          <button class="ws-export-btn" onclick="wsRunPreflight()"><span class="ws-export-icon">?</span><span>Run Print Check<span class="ws-export-desc">Find missing images, long text, pending pages</span></span></button>
+          <button class="ws-export-btn" onclick="wsRunPreflight()"><span class="ws-export-icon">?</span><span>Run Print Check<span class="ws-export-desc">Press readiness, image quality, overflow, duplicates</span></span></button>
           <div id="wsPreflightList" class="ws-preflight-list"></div>
         </div>
       </div>
@@ -1031,7 +1240,7 @@
     }
   }
 </script>
-<script src="script.js?v=14"></script>
+<script src="script.js?v=15"></script>
 <script>
   (function landingFallback(){
     const cards = [
