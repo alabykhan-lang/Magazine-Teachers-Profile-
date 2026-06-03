@@ -724,7 +724,7 @@ async function ocrProcess(event,catKey){
     if(!transcribed){statusEl.className='ocr-status err';statusEl.textContent='✗ No text found. Try a clearer image.';return;}
     /* Inject into target field */
     const fieldId=OCR_TARGET_FIELDS[catKey];
-    const ta=document.getElementById(fieldId);
+    const ta=document.getElementById('ff-'+fieldId)||document.getElementById(fieldId);
     if(ta){
       const existing=ta.value.trim();
       ta.value=existing?(existing+'\n\n'+transcribed):transcribed;
@@ -950,6 +950,7 @@ let reviewingId=null,reviewingDecision=null,currentLsTab='preview';
 let magPages=[],currentPageIdx=0,renamingKey=null,dragSrcIdx=null;
 let currentCustCat=null,editingCustomFieldId=null;
 let standaloneFormKey=null;
+let bulkFormEntries=[];
 /* AI Chat history for conversational layout assistant */
 let aiChatHistory=[];
 let aiPendingSuggestion=null;
@@ -1047,7 +1048,9 @@ function openForm(k){
   }
   window.scrollTo(0,0);
 }
-function resetFormState(){photoFile=null;photoDataURL=null;photoMeta=null;photoFilesMulti=[];photoDataURLsMulti=[];photoMetasMulti=[];}
+function makeBulkFormEntry(){return{values:{},photoFile:null,photoDataURL:null,photoMeta:null,photoFilesMulti:[],photoDataURLsMulti:[],photoMetasMulti:[]};}
+function ensureBulkFormEntries(){if(!Array.isArray(bulkFormEntries)||!bulkFormEntries.length)bulkFormEntries=[makeBulkFormEntry()];return bulkFormEntries;}
+function resetFormState(){photoFile=null;photoDataURL=null;photoMeta=null;photoFilesMulti=[];photoDataURLsMulti=[];photoMetasMulti=[];bulkFormEntries=[makeBulkFormEntry()];}
 function buildForm(k){
   const cat=CATEGORIES[k];const c=document.getElementById('formContainer');
   bulkPhotos=[];/* reset bulk state */
@@ -1083,6 +1086,97 @@ function buildFieldHtml(f){
   if(f.type==='checkbox'){return`<div class="field" id="fw-${f.id}"><div style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="${id}"/><label for="${id}" style="font-weight:400;display:inline;cursor:pointer;">${esc(f.label)}</label></div>${hint}</div>`;}
   if(f.type==='number'){return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><input type="number" id="${id}" placeholder="${esc(f.placeholder||'')}" inputmode="numeric"/>${hint}${err}</div>`;}
   return`<div class="field" id="fw-${f.id}"><label>${esc(f.label)}${req}</label><input type="${f.type}" id="${id}" placeholder="${esc(f.placeholder||'')}"/>${hint}${err}</div>`;
+}
+
+function formFieldId(fieldId,idx){return idx?`ff-${idx}-${fieldId}`:`ff-${fieldId}`;}
+function formFieldWrapId(fieldId,idx){return idx?`fw-${idx}-${fieldId}`:`fw-${fieldId}`;}
+function photoDomId(base,idx){return idx?`${base}-${idx}`:base;}
+function buildForm(k){
+  const c=document.getElementById('formContainer');
+  bulkPhotos=[];
+  if(k==='gallery'){
+    let h=`<div class="f-card"><div class="f-card-title">Your Details</div>`;
+    getEffectiveFields(k).forEach(f=>{h+=buildFieldHtml(f,0);});h+=`</div>`;
+    h+=buildOCRPanel(k);
+    h+=buildGalleryTabs();
+    h+=`<button class="submit-btn" type="button" onclick="submitForm()" id="mainSubmitBtn">Submit</button>`;
+    c.innerHTML=h;
+    return;
+  }
+  const entries=ensureBulkFormEntries();
+  let h=`<div class="bulk-submit-wrap" id="bulkSubmitWrap">${entries.map((entry,idx)=>buildSubmissionFormEntry(k,idx)).join('')}</div>`;
+  h+=`<div class="bulk-submit-actions"><span class="bulk-count" id="bulkFormCount">${entries.length} of 10 forms</span></div>`;
+  h+=`<button class="submit-btn" type="button" onclick="submitForm()" id="mainSubmitBtn">Submit All</button>`;
+  c.innerHTML=h;
+}
+function buildSubmissionFormEntry(k,idx){
+  const entryNo=idx+1;
+  let h=`<div class="bulk-form-entry" data-entry="${idx}"><div class="bulk-form-head"><div><span class="bulk-form-kicker">Submission ${entryNo}</span><h3>${esc(getLabel('cat_label_'+k,CATEGORIES[k].label))}</h3></div>${idx?`<button type="button" class="bulk-remove-btn" onclick="removeBulkSubmissionForm(${idx})">Remove</button>`:''}</div>`;
+  h+=`<div class="f-card"><div class="f-card-title">Your Details</div>`;
+  getEffectiveFields(k).forEach(f=>{h+=buildFieldHtml(f,idx);});h+=`</div>`;
+  if(idx===0)h+=buildOCRPanel(k);
+  h+=buildPhotoCardForEntry(k,idx);
+  h+=`<div class="bulk-entry-actions"><button class="bulk-add-btn" type="button" onclick="addBulkSubmissionForm()">+ Add More</button></div>`;
+  h+=`</div>`;
+  return h;
+}
+function buildPhotoCardForEntry(k,idx){
+  const cat=CATEGORIES[k];if(!cat.photoRequired)return '';
+  const entry=bulkEntry(idx);
+  if(cat.photoMulti){
+    const max=cat.photoMax||5;
+    const hasPhotos=entry.photoDataURLsMulti.length>0;
+    const thumbs=entry.photoDataURLsMulti.map((url,i)=>`<div class="multi-photo-thumb"><img src="${url}" alt="Photo ${i+1}"/><button class="multi-photo-remove" type="button" onclick="removeMultiPhoto(${i},${max},${idx})">x</button></div>`).join('');
+    return `<div class="f-card"><div class="f-card-title">Event Photos (up to ${max})</div><div class="photo-drop" id="${photoDomId('photoDrop',idx)}" onclick="document.getElementById('${photoDomId('photoInputMulti',idx)}').click()" ondragover="dragOver(event,${idx})" ondragleave="dragLeave(${idx})" ondrop="dropPhoto(event,${idx})"><input type="file" id="${photoDomId('photoInputMulti',idx)}" accept=".jpg,.jpeg,.png,.webp" multiple onchange="handlePhotoMulti(event,${max},${idx})"/><div id="${photoDomId('photoPlaceholderMulti',idx)}" style="display:${hasPhotos?'none':'block'};"><span class="photo-drop-icon">Photos</span><h3>Upload event photos <span class="req">*</span></h3><p>Tap to choose 1-${max} photos</p><span class="photo-pill">Action shots - Group photos - Min 1200x1200px</span></div></div><div id="${photoDomId('multiPhotoGrid',idx)}" class="multi-photo-grid">${thumbs}</div><div id="${photoDomId('multiPhotoCount',idx)}" class="multi-photo-count${entry.photoDataURLsMulti.length>=max?' full':''}" style="display:${hasPhotos?'inline-block':'none'};">${entry.photoDataURLsMulti.length} of ${max} photos selected</div><div class="photo-err-msg" id="${photoDomId('photoErrMsg',idx)}"></div><div class="photo-reqs"><p><strong>For print quality:</strong> min 1200x1200px, JPG/PNG/WebP, original file preserved for print.</p></div></div>`;
+  }
+  const isClass=k.includes('_class_')||k==='ss3_class_message';
+  const isAdvert=k==='advertisements';
+  const photoTitle=isAdvert?'Business flyer':isClass?'Full class picture':'Profile photo';
+  const photoPrompt=isAdvert?'Upload business flyer':isClass?'Upload full class picture':'Upload your profile photo';
+  const photoPill=isAdvert?'Business flyer only - Min 1200x1200px':isClass?'Full group photo - Min 1200x1200px':'Passport-style - Clear face - Min 1200x1200px';
+  const hasPhoto=!!entry.photoDataURL;
+  const dims=entry.photoMeta?`${entry.photoMeta.w}x${entry.photoMeta.h}px - ${Math.round((entry.photoMeta.size||0)/1024)} KB - ${entry.photoMeta.printQuality||''}`:'';
+  return `<div class="f-card"><div class="f-card-title">${photoTitle}</div><div class="photo-drop${hasPhoto?' uploaded':''}" id="${photoDomId('photoDrop',idx)}" onclick="document.getElementById('${photoDomId('photoInput',idx)}').click()" ondragover="dragOver(event,${idx})" ondragleave="dragLeave(${idx})" ondrop="dropPhoto(event,${idx})"><input type="file" id="${photoDomId('photoInput',idx)}" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event,${idx})"/><div id="${photoDomId('photoPlaceholder',idx)}" style="display:${hasPhoto?'none':'block'};"><span class="photo-drop-icon">Photo</span><h3>${photoPrompt} <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">${photoPill}</span></div><div class="photo-preview-wrap" id="${photoDomId('photoPreviewWrap',idx)}" style="display:${hasPhoto?'flex':'none'};"><img id="${photoDomId('photoPreview',idx)}" src="${entry.photoDataURL||''}" alt="Preview"/><div class="photo-filename" id="${photoDomId('photoFilename',idx)}">${esc(entry.photoFile?.name||'')}</div><div class="photo-dims" id="${photoDomId('photoDims',idx)}">${esc(dims)}</div><button class="photo-change" onclick="resetPhoto(event,${idx})">Change photo</button></div></div><div class="photo-err-msg" id="${photoDomId('photoErrMsg',idx)}"></div><div class="photo-reqs"><p><strong>For print quality:</strong> minimum 1200x1200 pixels, original JPG/PNG/WebP kept for press output.</p></div></div>`;
+}
+function buildFieldHtml(f,idx){
+  idx=idx||0;
+  const saved=bulkEntry(idx)?.values?.[f.id]||'';
+  const req=f.required?'<span class="req"> *</span>':'<span class="opt">(optional)</span>';
+  const hint=f.hint?`<div class="field-hint">${esc(f.hint)}</div>`:'';
+  const err=`<div class="field-err">This field is required.</div>`;
+  const id=formFieldId(f.id,idx),wrapId=formFieldWrapId(f.id,idx);
+  if(f.type==='textarea'){return`<div class="field" id="${wrapId}"><label>${esc(f.label)}${req}</label><textarea id="${id}" class="${f.long?'long':''}" placeholder="${esc(f.placeholder||'')}">${esc(saved)}</textarea>${hint}${err}</div>`;}
+  if(f.type==='select'){let optsArr=Array.isArray(f.options)?f.options:typeof f.options==='string'?f.options.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean):[];const opts=optsArr.map(o=>`<option value="${esc(o)}"${String(saved)===String(o)?' selected':''}>${esc(o)}</option>`).join('');return`<div class="field" id="${wrapId}"><label>${esc(f.label)}${req}</label><select id="${id}"><option value="">-- Select --</option>${opts}</select>${hint}${err}</div>`;}
+  if(f.type==='checkbox'){return`<div class="field" id="${wrapId}"><div style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="${id}"${saved==='Yes'||saved===true?' checked':''}/><label for="${id}" style="font-weight:400;display:inline;cursor:pointer;">${esc(f.label)}</label></div>${hint}</div>`;}
+  if(f.type==='number'){return`<div class="field" id="${wrapId}"><label>${esc(f.label)}${req}</label><input type="number" id="${id}" placeholder="${esc(f.placeholder||'')}" inputmode="numeric" value="${esc(saved)}"/>${hint}${err}</div>`;}
+  return`<div class="field" id="${wrapId}"><label>${esc(f.label)}${req}</label><input type="${f.type}" id="${id}" placeholder="${esc(f.placeholder||'')}" value="${esc(saved)}"/>${hint}${err}</div>`;
+}
+function snapshotBulkFormValues(){
+  if(currentFormCategory==='gallery')return;
+  const fields=getEffectiveFields(currentFormCategory);
+  ensureBulkFormEntries().forEach((entry,idx)=>{
+    entry.values=entry.values||{};
+    fields.forEach(f=>{
+      const el=document.getElementById(formFieldId(f.id,idx));
+      if(!el)return;
+      entry.values[f.id]=f.type==='checkbox'?(el.checked?'Yes':'No'):(el.value||'');
+    });
+  });
+}
+function addBulkSubmissionForm(){
+  const entries=ensureBulkFormEntries();
+  if(entries.length>=10){alert('You can submit up to 10 forms at once.');return;}
+  snapshotBulkFormValues();
+  entries.push(makeBulkFormEntry());
+  buildForm(currentFormCategory);
+  setTimeout(()=>document.querySelector(`[data-entry="${entries.length-1}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),50);
+}
+function removeBulkSubmissionForm(idx){
+  const entries=ensureBulkFormEntries();
+  if(idx<=0||entries.length<=1)return;
+  snapshotBulkFormValues();
+  entries.splice(idx,1);
+  buildForm(currentFormCategory);
 }
 
 /* PHOTO */
@@ -1124,6 +1218,62 @@ function processPhotoForMulti(file,max){
   img.src=url;
 }function renderMultiPhotoGrid(max){const grid=document.getElementById('multiPhotoGrid');const ph=document.getElementById('photoPlaceholderMulti');const ctr=document.getElementById('multiPhotoCount');if(!grid)return;if(!photoDataURLsMulti.length){grid.innerHTML='';if(ph)ph.style.display='block';if(ctr)ctr.style.display='none';return;}if(ph)ph.style.display='none';grid.innerHTML=photoDataURLsMulti.map((url,i)=>`<div class="multi-photo-thumb"><img src="${url}" alt="Photo ${i+1}"/><button class="multi-photo-remove" type="button" onclick="removeMultiPhoto(${i},${max})">×</button></div>`).join('');if(ctr){ctr.style.display='inline-block';ctr.textContent=`${photoDataURLsMulti.length} of ${max} photos selected`;ctr.classList.toggle('full',photoDataURLsMulti.length>=max);}}
 function removeMultiPhoto(i,max){photoFilesMulti.splice(i,1);photoDataURLsMulti.splice(i,1);photoMetasMulti.splice(i,1);renderMultiPhotoGrid(max);}
+
+function bulkEntry(idx){return ensureBulkFormEntries()[idx||0]||ensureBulkFormEntries()[0];}
+function syncPrimaryPhotoGlobals(){
+  const e=bulkEntry(0);
+  photoFile=e.photoFile;photoDataURL=e.photoDataURL;photoMeta=e.photoMeta;
+  photoFilesMulti=e.photoFilesMulti;photoDataURLsMulti=e.photoDataURLsMulti;photoMetasMulti=e.photoMetasMulti;
+}
+function dragOver(e,idx){e.preventDefault();document.getElementById(photoDomId('photoDrop',idx||0))?.classList.add('drag');}
+function dragLeave(idx){document.getElementById(photoDomId('photoDrop',idx||0))?.classList.remove('drag');}
+function dropPhoto(e,idx){e.preventDefault();dragLeave(idx||0);const f=e.dataTransfer.files[0];if(f)processPhoto(f,idx||0);}
+function handlePhoto(e,idx){if(e.target.files[0])processPhoto(e.target.files[0],idx||0);}
+function processPhoto(file,idx){
+  idx=idx||0;const entry=bulkEntry(idx);const err=document.getElementById(photoDomId('photoErrMsg',idx));if(err)err.style.display='none';
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['jpg','jpeg','png','webp'].includes(ext)){if(err){err.textContent='Invalid format. Use JPG, PNG, or WebP.';err.style.display='block';}return;}
+  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(err){err.textContent=`File too large. Max ${PRINT_MAX_IMAGE_MB} MB.`;err.style.display='block';}return;}
+  const img=new Image(),url=URL.createObjectURL(file);
+  img.onload=function(){
+    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Image too small for print. Minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
+    entry.photoFile=file;entry.photoMeta={w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)};
+    const r=new FileReader();
+    r.onload=ev=>{
+      entry.photoDataURL=ev.target.result;if(idx===0)syncPrimaryPhotoGlobals();
+      const prev=document.getElementById(photoDomId('photoPreview',idx)),fn=document.getElementById(photoDomId('photoFilename',idx)),dims=document.getElementById(photoDomId('photoDims',idx)),ph=document.getElementById(photoDomId('photoPlaceholder',idx)),wrap=document.getElementById(photoDomId('photoPreviewWrap',idx)),drop=document.getElementById(photoDomId('photoDrop',idx));
+      if(prev)prev.src=entry.photoDataURL;if(fn)fn.textContent=file.name;if(dims)dims.textContent=`${img.width}x${img.height}px - ${(file.size/1024).toFixed(0)} KB - ${entry.photoMeta.printQuality}`;if(ph)ph.style.display='none';if(wrap)wrap.style.display='flex';if(drop)drop.classList.add('uploaded');
+    };
+    r.readAsDataURL(file);URL.revokeObjectURL(url);
+  };
+  img.onerror=()=>{if(err){err.textContent='Could not read this image. Try another JPG, PNG, or WebP.';err.style.display='block';}URL.revokeObjectURL(url);};
+  img.src=url;
+}
+function resetPhoto(e,idx){
+  if(e)e.stopPropagation();idx=idx||0;const entry=bulkEntry(idx);
+  entry.photoFile=null;entry.photoDataURL=null;entry.photoMeta=null;if(idx===0)syncPrimaryPhotoGlobals();
+  const input=document.getElementById(photoDomId('photoInput',idx)),prev=document.getElementById(photoDomId('photoPreview',idx)),ph=document.getElementById(photoDomId('photoPlaceholder',idx)),wrap=document.getElementById(photoDomId('photoPreviewWrap',idx)),drop=document.getElementById(photoDomId('photoDrop',idx));
+  if(input)input.value='';if(prev)prev.src='';if(ph)ph.style.display='block';if(wrap)wrap.style.display='none';if(drop)drop.classList.remove('uploaded');
+}
+function handlePhotoMulti(event,max,idx){idx=idx||0;const files=Array.from(event.target.files||[]);if(!files.length)return;const entry=bulkEntry(idx),err=document.getElementById(photoDomId('photoErrMsg',idx));if(err)err.style.display='none';const rem=max-entry.photoFilesMulti.length;if(rem<=0){if(err){err.textContent=`Maximum ${max} photos reached.`;err.style.display='block';}event.target.value='';return;}const toAdd=files.slice(0,rem);if(files.length>rem&&err){err.textContent=`Only ${rem} more can be added.`;err.style.display='block';}toAdd.forEach(f=>processPhotoForMulti(f,max,idx));event.target.value='';}
+function processPhotoForMulti(file,max,idx){
+  idx=idx||0;const entry=bulkEntry(idx),err=document.getElementById(photoDomId('photoErrMsg',idx));
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['jpg','jpeg','png','webp'].includes(ext)){if(err){err.textContent=`Skipped "${file.name}": invalid format.`;err.style.display='block';}return;}
+  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(err){err.textContent=`Skipped "${file.name}": too large (max ${PRINT_MAX_IMAGE_MB} MB).`;err.style.display='block';}return;}
+  const img=new Image();const url=URL.createObjectURL(file);
+  img.onload=function(){
+    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Skipped "${file.name}": minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px for print.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
+    const meta={w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)};
+    const r=new FileReader();
+    r.onload=ev=>{entry.photoFilesMulti.push(file);entry.photoDataURLsMulti.push(ev.target.result);entry.photoMetasMulti.push(meta);if(idx===0)syncPrimaryPhotoGlobals();renderMultiPhotoGrid(max,idx);};
+    r.readAsDataURL(file);URL.revokeObjectURL(url);
+  };
+  img.onerror=()=>{if(err){err.textContent=`Skipped "${file.name}".`;err.style.display='block';}URL.revokeObjectURL(url);};
+  img.src=url;
+}
+function renderMultiPhotoGrid(max,idx){idx=idx||0;const entry=bulkEntry(idx),grid=document.getElementById(photoDomId('multiPhotoGrid',idx)),ph=document.getElementById(photoDomId('photoPlaceholderMulti',idx)),ctr=document.getElementById(photoDomId('multiPhotoCount',idx));if(!grid)return;if(!entry.photoDataURLsMulti.length){grid.innerHTML='';if(ph)ph.style.display='block';if(ctr)ctr.style.display='none';return;}if(ph)ph.style.display='none';grid.innerHTML=entry.photoDataURLsMulti.map((url,i)=>`<div class="multi-photo-thumb"><img src="${url}" alt="Photo ${i+1}"/><button class="multi-photo-remove" type="button" onclick="removeMultiPhoto(${i},${max},${idx})">x</button></div>`).join('');if(ctr){ctr.style.display='inline-block';ctr.textContent=`${entry.photoDataURLsMulti.length} of ${max} photos selected`;ctr.classList.toggle('full',entry.photoDataURLsMulti.length>=max);}}
+function removeMultiPhoto(i,max,idx){idx=idx||0;const entry=bulkEntry(idx);entry.photoFilesMulti.splice(i,1);entry.photoDataURLsMulti.splice(i,1);entry.photoMetasMulti.splice(i,1);if(idx===0)syncPrimaryPhotoGlobals();renderMultiPhotoGrid(max,idx);}
 
 /* SUBMIT */
 async function submitForm(){
@@ -1215,6 +1365,123 @@ async function submitForm(){
     },1200);
     releaseSubmit();
   }
+}
+
+function collectBulkSubmissionPayloads(){
+  const cat=CATEGORIES[currentFormCategory],fields=getEffectiveFields(currentFormCategory),items=[];let valid=true;
+  ensureBulkFormEntries().forEach((entry,idx)=>{
+    const data={};
+    fields.forEach(f=>{
+      const el=document.getElementById(formFieldId(f.id,idx)),w=document.getElementById(formFieldWrapId(f.id,idx));
+      if(!el)return;
+      const val=f.type==='checkbox'?el.checked?'Yes':'No':(el.value||'').trim();
+      data[f.id]={label:f.label,value:val,type:f.type};
+      if(f.required&&f.type!=='checkbox'&&!val){if(w)w.classList.add('has-error');valid=false;}else if(w)w.classList.remove('has-error');
+    });
+    const err=document.getElementById(photoDomId('photoErrMsg',idx));
+    if(err){err.style.display='none';err.textContent='';}
+    if(cat.photoRequired&&cat.photoMulti&&!entry.photoDataURLsMulti.length){if(err){err.textContent='At least one event photo is required.';err.style.display='block';}valid=false;}
+    else if(cat.photoRequired&&!cat.photoMulti&&!entry.photoDataURL){if(err){const isClass=currentFormCategory.includes('_class_')||currentFormCategory==='ss3_class_message';const isAdvert=currentFormCategory==='advertisements';err.textContent=(isAdvert?'A business flyer':isClass?'A full class picture':'A profile photo')+' is required.';err.style.display='block';}valid=false;}
+    items.push({entry,data});
+  });
+  return{valid,items};
+}
+
+async function buildSubmissionPayload(data,entry,batchIndex){
+  const cat=CATEGORIES[currentFormCategory],subId=genId();
+  let finalPhotoData=entry.photoDataURL||null;
+  if(entry.photoFile&&!cat.photoMulti){
+    try{finalPhotoData=await uploadToStorage(entry.photoFile,subId);}
+    catch(e){console.warn('[Storage] Upload failed, using base64:',e.message);}
+  }
+  let finalPhotos=null;
+  if(cat.photoMulti&&entry.photoFilesMulti.length){
+    finalPhotos=[];
+    for(let i=0;i<entry.photoFilesMulti.length;i++){
+      try{
+        const url=await uploadToStorage(entry.photoFilesMulti[i],subId+'_'+i);
+        finalPhotos.push({url:url,name:entry.photoFilesMulti[i]?.name||`photo_${i+1}.jpg`,meta:entry.photoMetasMulti[i]||null});
+      }catch(e){
+        finalPhotos.push({data:entry.photoDataURLsMulti[i],name:entry.photoFilesMulti[i]?.name||`photo_${i+1}.jpg`,meta:entry.photoMetasMulti[i]||null});
+      }
+    }
+  }
+  return{id:subId,category:currentFormCategory,
+    ts:new Date().toLocaleString(),createdAt:Date.now()+batchIndex,
+    status:'pending',
+    reviewerNote:'',reviewedAt:null,data,
+    photoData:finalPhotoData,photoName:entry.photoFile?.name||null,photoMeta:entry.photoMeta,
+    photos:finalPhotos
+  };
+}
+
+async function saveSubmissionBatch(submissions,releaseSubmit){
+  document.getElementById('formContainer').style.display='none';
+  document.getElementById('successWrap').style.display='block';
+  document.getElementById('successUploading').style.display='block';
+  document.getElementById('successDone').style.display='none';
+  window.scrollTo({top:0,behavior:'smooth'});
+
+  const bar=document.getElementById('uploadProgressBar');
+  const txt=document.getElementById('uploadProgressText');
+  let prog=0;
+  const tick=setInterval(()=>{
+    prog=Math.min(prog+8,85);
+    if(bar)bar.style.width=prog+'%';
+  },180);
+
+  try{
+    for(let i=0;i<submissions.length;i++){
+      if(txt)txt.textContent='Uploading submission '+(i+1)+' of '+submissions.length+'...';
+      await dbSaveSubmission(submissions[i]);
+    }
+    clearInterval(tick);
+    if(bar)bar.style.width='100%';
+    if(txt)txt.textContent=submissions.length+' submission'+(submissions.length>1?'s':'')+' saved successfully!';
+    setTimeout(()=>{
+      document.getElementById('successUploading').style.display='none';
+      document.getElementById('successDone').style.display='block';
+    },600);
+    resetFormState();
+    releaseSubmit();
+  }catch(e){
+    clearInterval(tick);
+    if(bar){bar.style.width='100%';bar.style.background='var(--school-mint3)';}
+    if(txt)txt.textContent='Saved locally. Cloud sync will retry.';
+    setTimeout(()=>{
+      document.getElementById('successUploading').style.display='none';
+      document.getElementById('successDone').style.display='block';
+    },1200);
+    releaseSubmit();
+  }
+}
+
+async function submitForm(){
+  if(window.__meSubmitting)return;
+  const cat=CATEGORIES[currentFormCategory];
+  const submitBtn=document.getElementById('mainSubmitBtn');
+  const originalSubmitText=submitBtn?submitBtn.textContent:'Submit';
+  window.__meSubmitting=true;
+  if(submitBtn){submitBtn.disabled=true;submitBtn.classList.add('is-submitting');submitBtn.textContent='Submitting...';}
+  const releaseSubmit=()=>{window.__meSubmitting=false;if(submitBtn){submitBtn.disabled=false;submitBtn.classList.remove('is-submitting');submitBtn.textContent=originalSubmitText;}};
+
+  if(currentFormCategory==='gallery'){
+    let valid=true;const data={};
+    getEffectiveFields(currentFormCategory).forEach(f=>{const el=document.getElementById('ff-'+f.id);const w=document.getElementById('fw-'+f.id);if(!el)return;const val=f.type==='checkbox'?el.checked?'Yes':'No':(el.value||'').trim();data[f.id]={label:f.label,value:val,type:f.type};if(f.required&&f.type!=='checkbox'&&!val){if(w)w.classList.add('has-error');valid=false;}else if(w)w.classList.remove('has-error');});
+    const onBulk=document.getElementById('gpane-bulk')?.classList.contains('active');
+    if(onBulk){releaseSubmit();submitBulkGallery();return;}
+    if(cat.photoRequired&&!photoDataURL){const e=document.getElementById('photoErrMsg');if(e){e.textContent='A photo is required.';e.style.display='block';}valid=false;}
+    if(!valid){const fe=document.querySelector('.has-error')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});releaseSubmit();return;}
+    const sub=await buildSubmissionPayload(data,bulkEntry(0),0);
+    return saveSubmissionBatch([sub],releaseSubmit);
+  }
+
+  snapshotBulkFormValues();
+  const collected=collectBulkSubmissionPayloads();
+  if(!collected.valid){const fe=document.querySelector('.has-error')||document.querySelector('.photo-err-msg[style*="block"]')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});releaseSubmit();return;}
+  const submissions=[];
+  for(let i=0;i<collected.items.length;i++)submissions.push(await buildSubmissionPayload(collected.items[i].data,collected.items[i].entry,i));
+  return saveSubmissionBatch(submissions,releaseSubmit);
 }
 
 /* PIN */
