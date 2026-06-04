@@ -1494,14 +1494,17 @@ function checkPIN(){const adminOk=pinBuf===cfg.adminPin||pinBuf==='1234';const e
 
 /* ADMIN */
 function adminRefresh(){
+  const list=document.getElementById('adminSubList');
+  if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">☁️</div><h3>Refreshing…</h3><p>Fetching latest submissions from cloud.</p></div>';
   dbLoadAll().then(cloudList=>{
     subs=cloudList;
+    const banner=document.getElementById('cloudRetryBanner');
+    if(banner)banner.remove();
     renderAdmin();
     const btn=document.getElementById('tab-all');
     if(btn){btn.style.background='var(--school-mint2)';setTimeout(()=>btn.style.background='',800);}
   }).catch(()=>{subs=loadAll();renderAdmin();});
 }
-function enterAdmin(){subs=loadAll();renderAdmin();show('viewAdmin');}
 function hideAllAdminModes(){['adminModeSubs','adminModeEditorial','adminModeLayout','adminModeShareLinks','adminModeSettings'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 function setCategory(cat){currentAdminCat=cat;document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));const btn=document.getElementById('tab-'+cat);if(btn)btn.classList.add('active');hideAllAdminModes();if(cat==='editorial'){document.getElementById('adminModeEditorial').style.display='block';renderEditorialMode();}else{document.getElementById('adminModeSubs').style.display='block';renderAdmin();}}
 function openLayoutStudio(){document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-layout').classList.add('active');hideAllAdminModes();document.getElementById('adminModeLayout').style.display='block';loadLsSettingsToUI();renderSectionManager();renderLabelRenameList();renderAIContentSummary();}
@@ -1635,7 +1638,25 @@ function deleteSubmission(id){if(!confirm('Permanently delete this submission?')
 /* ADMIN ENTER — pulls fresh cloud data */
 function enterAdmin(){
   show('viewAdmin');
-  dbLoadAll().then(list=>{subs=list;renderAdmin();});
+  /* Show a loading placeholder immediately so the list doesn't appear empty */
+  const list=document.getElementById('adminSubList');
+  if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">☁️</div><h3>Loading submissions…</h3><p>Fetching latest from cloud.</p></div>';
+  dbLoadAll().then(cloudList=>{
+    subs=cloudList;
+    renderAdmin();
+  }).catch(()=>{
+    /* Cloud failed — fall back to local cache and surface a retry banner */
+    subs=loadAll();
+    renderAdmin();
+    const main=document.querySelector('#viewAdmin .admin-main');
+    if(main&&!document.getElementById('cloudRetryBanner')){
+      const banner=document.createElement('div');
+      banner.id='cloudRetryBanner';
+      banner.style.cssText='background:#b0282a;color:#fff;padding:10px 20px;text-align:center;font-size:13px;font-family:Lato,sans-serif;display:flex;align-items:center;justify-content:center;gap:12px;';
+      banner.innerHTML='<span>⚠ Cloud unavailable — showing cached submissions.</span><button onclick="adminRefresh()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;font-family:Lato,sans-serif;">Retry Sync</button>';
+      main.prepend(banner);
+    }
+  });
 }
 
 /* EDITOR ENTER — pulls fresh cloud data, defaults to pending */
