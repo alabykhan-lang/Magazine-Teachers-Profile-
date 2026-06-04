@@ -150,6 +150,10 @@ let formConfig;
 const PRINT_IMAGE_MIN_PX=600;
 const PRINT_IMAGE_RECOMMENDED_PX=1200;
 const PRINT_MAX_IMAGE_MB=25;
+const BULK_CLOUD_CONCURRENCY=6;
+const CLOUD_RETRY_DELAYS=[500,1000,2000];
+const CLOUD_TIMEOUT_MS=9000;
+const cloudHealth={database:'unknown',auth:'unknown',realtime:'unknown',edge:'unknown'};
 
 function loadLsSettingsFromStorage(){
   try{
@@ -181,29 +185,63 @@ async function uploadToStorage(file, subId){
   const sb=getSupa();if(!sb)throw new Error('No Supabase client');
   const ext=(file.name||'photo.jpg').split('.').pop().toLowerCase();
   const path=`submissions/${subId}.${ext}`;
-  const{error}=await sb.storage.from('photos').upload(path,file,{cacheControl:'31536000',upsert:true});
-  if(error)throw error;
+  await fetchWithRetry(async()=>{
+    const{error}=await sb.storage.from('photos').upload(path,file,{cacheControl:'31536000',upsert:true});
+    if(error)throw error;
+  },'Uploading photo');
   const{data}=sb.storage.from('photos').getPublicUrl(path);
   return data.publicUrl;
 }
+async function mapWithConcurrency(items,limit,worker){
+  const list=Array.from(items||[]),out=new Array(list.length);
+  let next=0;
+  const runners=Array.from({length:Math.min(Math.max(1,limit||1),list.length)},async()=>{
+    while(next<list.length){
+      const i=next++;
+      out[i]=await worker(list[i],i);
+    }
+  });
+  await Promise.all(runners);
+  return out;
+}
 /* Retry helper for resilient cloud operations */
-async function withRetry(operation,label,retries=3){
+function wait(ms){return new Promise(r=>setTimeout(r,ms));}
+function isNetworkTrulyOffline(){
+  return typeof navigator!=='undefined'&&navigator.onLine===false;
+}
+function isTransientCloudError(err){
+  const text=String(err?.message||err?.status||err?.code||err||'').toLowerCase();
+  return text.includes('521')||text.includes('522')||text.includes('timeout')||text.includes('network')||text.includes('failed to fetch')||text.includes('load failed');
+}
+async function withTimeout(promise,label,timeoutMs=CLOUD_TIMEOUT_MS){
+  let timer;
+  try{
+    return await Promise.race([
+      promise,
+      new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error((label||'Cloud request')+' timeout')),timeoutMs);})
+    ]);
+  }finally{
+    clearTimeout(timer);
+  }
+}
+async function fetchWithRetry(operation,label,retries=3,timeoutMs=CLOUD_TIMEOUT_MS){
   let lastErr;
   for(let i=0;i<retries;i++){
     try{
-      const result=await operation();
-      return result;
+      return await withTimeout(Promise.resolve().then(operation),label,timeoutMs);
     }catch(e){
       lastErr=e;
-      const delay=Math.min(1000*Math.pow(2,i),8000);
+      if(i===retries-1)break;
+      const delay=CLOUD_RETRY_DELAYS[i]||CLOUD_RETRY_DELAYS[CLOUD_RETRY_DELAYS.length-1];
       const msg=`${label} failed (try ${i+1}/${retries}): ${e.message||e}. Retrying in ${delay/1000}s…`;
-      console.warn('[DB]',msg);
+      console.warn('[DB]',msg,e.message||e);
       showSync('syncing',msg);
-      await new Promise(r=>setTimeout(r,delay));
+      await wait(delay);
     }
   }
   throw lastErr;
 }
+const withRetry=fetchWithRetry;
 
 
 /* UUID generator for submission IDs */
@@ -365,20 +403,22 @@ function handleRealtimeSetting(payload) {
 
 /* ── Submissions (cloud + local mirror) ── */
 async function dbLoadAll(){
+  const cached=loadSubCache();
   showSync('syncing','Connecting to cloud…');
   try{
     const sb=getSupa();
     if(!sb) throw new Error('Supabase client not available — check internet');
 
-    const res = await Promise.race([
-      sb.from('submissions').select('*').order('created_at', { ascending: true }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 8000))
-    ]);
+    const res = await fetchWithRetry(
+      () => sb.from('submissions').select('*').order('created_at', { ascending: true }),
+      'Loading submissions'
+    );
 
     if(res.error){
       /* Distinguish RLS block (HTTP 401/403/PGRST) from network error */
       const isRLS = res.error.code==='42501'||res.error.message?.includes('permission')||res.error.message?.includes('policy');
       if(isRLS){
+        cloudHealth.database='blocked';
         showSync('err','⚠ Supabase RLS is blocking access — run fix SQL in Supabase (see console)');
         console.error('[DB] RLS BLOCK — To fix, go to Supabase Dashboard → SQL Editor and run:\n\n' +
           '-- Allow all reads and writes for anonymous users:\n' +
@@ -389,10 +429,12 @@ async function dbLoadAll(){
           'DROP POLICY IF EXISTS "public_access" ON public.settings;\n' +
           'CREATE POLICY "public_access" ON public.settings FOR ALL TO anon USING (true) WITH CHECK (true);\n');
       } else {
-        showSync('err','Cloud error: '+(res.error.message||'unknown'));
+        cloudHealth.database='degraded';
+        showSync('syncing','Cloud is slow - keeping cached submissions visible');
       }
       throw res.error;
     }
+    cloudHealth.database='ok';
 
     const cloudRows = res.data || [];
 
@@ -410,10 +452,11 @@ async function dbLoadAll(){
     showSync('ok','✓ Cloud synced — '+mapped.length+' submissions');
     return mapped;
   }catch(e){
-    console.warn('[DB] Cloud load failed:',e.message);
-    const cached=loadSubCache();
-    if(cached.length){subs=cached;showSync('err','Cloud unreachable - using local cache');return cached;}
-    showSync('err','Cloud unreachable - cannot load data');
+    cloudHealth.database=isNetworkTrulyOffline()?'offline':'degraded';
+    console.warn('[DB] Cloud load exhausted retries:',e.message);
+    if(cached.length){subs=cached;showSync('syncing','Showing cached submissions while cloud recovers');return cached;}
+    if(isNetworkTrulyOffline())showSync('err','No network connection - no cached submissions found');
+    else showSync('syncing','Cloud is taking longer than usual - showing empty dashboard');
     return subs || [];
   }
 }
@@ -428,29 +471,50 @@ async function dbSaveSubmission(sub){
   showSync('syncing','Syncing to cloud…');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const row={
-      id:sub.id,category:sub.category,ts:sub.ts,
-      created_at:new Date(sub.createdAt||Date.now()).toISOString(),
-      status:sub.status,reviewer_note:sub.reviewerNote||'',
-      reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
-      data:JSON.stringify(sub.data),
-      photo_url:sub.photoData||null,photo_name:sub.photoName||null,
-      photos:sub.photos?JSON.stringify(sub.photos):null
-    };
+    const row=submissionToDbRow(sub);
     
-    const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
-    if(error) {
-      await withRetry(async()=>{
-        const{error:e2,data:d2}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
-        if(e2)throw e2;
-        return d2;
-      }, 'Saving submission');
-    }
+    await fetchWithRetry(async()=>{
+      const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
+      if(error)throw error;
+      return data;
+    }, 'Saving submission');
     
     showSync('ok','✓ Cloud synced');
   }catch(e){
     console.warn('[DB] Cloud save failed:',e.message);
-    showSync('err','Failed to sync to cloud');
+    showSync('syncing','Saved locally - cloud sync pending');
+  }
+}
+function submissionToDbRow(sub){
+  return{
+    id:sub.id,category:sub.category,ts:sub.ts,
+    created_at:new Date(sub.createdAt||Date.now()).toISOString(),
+    status:sub.status,reviewer_note:sub.reviewerNote||'',
+    reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
+    data:JSON.stringify(sub.data),
+    photo_url:sub.photoData||null,photo_name:sub.photoName||null,
+    photos:sub.photos?JSON.stringify(sub.photos):null
+  };
+}
+async function dbSaveSubmissionsBulk(list){
+  if(!list||!list.length)return;
+  list.forEach(sub=>{
+    const idx=subs.findIndex(s=>String(s.id)===String(sub.id));
+    if(idx>=0)subs[idx]=sub;else subs.push(sub);
+  });
+  persistSubCache(subs);
+  showSync('syncing','Syncing '+list.length+' submissions to cloud...');
+  try{
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
+    const rows=list.map(submissionToDbRow);
+    await withRetry(async()=>{
+      const{error}=await sb.from('submissions').upsert(rows,{onConflict:'id'});
+      if(error)throw error;
+    },'Bulk saving submissions');
+    showSync('ok','Cloud synced');
+  }catch(e){
+    console.warn('[DB] Bulk cloud save failed:',e.message);
+    showSync('syncing','Saved locally - cloud sync pending');
   }
 }
 async function dbDeleteSubmission(id){
@@ -462,18 +526,15 @@ async function dbDeleteSubmission(id){
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
     
-    const{error}=await sb.from('submissions').delete().eq('id',String(id));
-    if(error){
-      await withRetry(async()=>{
-        const{error:e2}=await sb.from('submissions').delete().eq('id',String(id));
-        if(e2)throw e2;
-      },'Deleting submission');
-    }
+    await fetchWithRetry(async()=>{
+      const{error}=await sb.from('submissions').delete().eq('id',String(id));
+      if(error)throw error;
+    },'Deleting submission');
     
     showSync('ok','✓ Deleted from cloud');
   }catch(e){
     console.warn('[DB] Cloud delete failed:',e.message);
-    showSync('err','Failed to delete from cloud');
+    showSync('syncing','Deleted locally - cloud delete pending');
   }
 }
 async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
@@ -495,18 +556,15 @@ async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
       reviewed_at:reviewedAt?new Date(reviewedAt).toISOString():null
     };
     
-    const{error}=await sb.from('submissions').update(updateData).eq('id',String(id));
-    if(error){
-      await withRetry(async()=>{
-        const{error:e2}=await sb.from('submissions').update(updateData).eq('id',String(id));
-        if(e2)throw e2;
-      },'Updating status');
-    }
+    await fetchWithRetry(async()=>{
+      const{error}=await sb.from('submissions').update(updateData).eq('id',String(id));
+      if(error)throw error;
+    },'Updating status');
     
     showSync('ok','✓ Updated in cloud');
   }catch(e){
     console.warn('[DB] Cloud update failed:',e.message);
-    showSync('err','Failed to update cloud');
+    showSync('syncing','Updated locally - cloud sync pending');
   }
 }
 
@@ -514,14 +572,14 @@ async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
 async function dbLoadSettings(key){
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const data = await Promise.race([
-      (async () => {
+    const data = await fetchWithRetry(
+      async () => {
         const { data, error } = await sb.from('settings').select('value').eq('key', key).maybeSingle();
         if (error) throw error;
         return data;
-      })(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch timeout')), 6000))
-    ]);
+      },
+      'Loading setting '+key
+    );
     if(data?.value){
       const parsed=typeof data.value==='string'?JSON.parse(data.value):data.value;
       return parsed;
@@ -562,7 +620,7 @@ async function dbSaveAllToCloud(list){
     showSync('ok','✓ Synced all to cloud');
   }catch(e){
     console.warn('[DB] Bulk upsert failed:',e.message);
-    showSync('err','Cloud unreachable — saved locally');
+    showSync('syncing','Saved locally - cloud sync pending');
   }
 }
 
@@ -626,6 +684,53 @@ function getLabel(key,fallback){
   return labelOverrides[key]||fallback;
 }
 
+async function checkDatabaseHealth(){
+  try{
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
+    await fetchWithRetry(async()=>{
+      const{error}=await sb.from('submissions').select('id',{head:true,count:'exact'}).limit(1);
+      if(error)throw error;
+    },'Database health check',3,6000);
+    cloudHealth.database='ok';
+  }catch(e){
+    cloudHealth.database=isNetworkTrulyOffline()?'offline':'degraded';
+    console.warn('[DB] Database health degraded:',e.message);
+  }
+  return cloudHealth.database;
+}
+async function checkAuthHealth(){
+  try{
+    const sb=getSupa();if(!sb||!sb.auth)throw new Error('Auth client not available');
+    await fetchWithRetry(()=>sb.auth.getSession(),'Auth health check',3,5000);
+    cloudHealth.auth='ok';
+  }catch(e){
+    cloudHealth.auth=isNetworkTrulyOffline()?'offline':'degraded';
+    console.warn('[DB] Auth health degraded:',e.message);
+  }
+  return cloudHealth.auth;
+}
+async function checkRealtimeHealth(){
+  try{
+    const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
+    cloudHealth.realtime=_subChannel?'ok':'available';
+  }catch(e){
+    cloudHealth.realtime='degraded';
+    console.warn('[DB] Realtime health degraded:',e.message);
+  }
+  return cloudHealth.realtime;
+}
+async function checkEdgeFunctionHealth(){
+  cloudHealth.edge='optional';
+  return cloudHealth.edge;
+}
+function runBackfillSubmissionPhotosBackground(){
+  const sb=getSupa();
+  if(!sb?.functions?.invoke)return;
+  fetchWithRetry(()=>sb.functions.invoke('backfill-submission-photos'),'Photo backfill',3,12000)
+    .then(({error})=>{if(error)console.warn('[DB] Photo backfill reported:',error.message||error);})
+    .catch(e=>console.warn('[DB] Photo backfill skipped:',e.message));
+}
+
 /* ── Async init: pull cloud data on page load ── */
 async function initCloudSync(){
   const statusEl = document.getElementById('bootLoadingStatus');
@@ -634,6 +739,12 @@ async function initCloudSync(){
   try{
     /* Start Realtime listeners early */
     initRealtime();
+    Promise.allSettled([
+      checkDatabaseHealth(),
+      checkAuthHealth(),
+      checkRealtimeHealth(),
+      checkEdgeFunctionHealth()
+    ]).then(()=>console.log('[DB] Cloud health:',JSON.stringify(cloudHealth)));
 
     /* Pull settings first */
     const settingsToLoad = ['cfg','ls_settings','labels','section_order','form_config'];
@@ -669,7 +780,9 @@ async function initCloudSync(){
     if(document.getElementById('viewLanding')?.classList.contains('active'))renderLandingCards();
   }catch(e){
     console.warn('[DB] Init sync failed:', e.message);
-    showSync('err','Running offline — using local cache');
+    if(loadSubCache().length)showSync('syncing','Showing cached data while cloud recovers');
+    else if(isNetworkTrulyOffline())showSync('err','No network connection - no cached data found');
+    else showSync('syncing','Cloud is taking longer than usual');
   } finally {
     /* ALWAYS remove overlay after sync attempt (success or fail) */
     if(typeof removeBootOverlay === 'function') removeBootOverlay();
@@ -885,19 +998,19 @@ async function submitBulkGallery(){
   if(!submitterName){alert('Please enter your name before submitting.');document.getElementById('ff-submitterName')?.focus();return;}
   const submitterRole=(document.getElementById('ff-submitterRole')?.value||'').trim()||'';
   const ts=new Date().toLocaleString();
-  let count=0;let errors=0;
+  let errors=0;
   showSync('syncing','Uploading '+bulkPhotos.length+' photos…');
-  for(const p of bulkPhotos){
+  const prepared=await mapWithConcurrency(bulkPhotos,BULK_CLOUD_CONCURRENCY,async(p,i)=>{
     try{
       const subId=genId();
       /* Upload to Storage for full quality */
       let photoData=p.dataURL;
       if(p.file){
-        try{photoData=await uploadToStorage(p.file,subId);}catch(e){console.warn('[Storage] Bulk photo upload failed:',e.message);}
+        try{photoData=await uploadToStorage(p.file,subId);}catch(e){console.warn('[Storage] Bulk photo upload failed:',e.message);errors++;}
       }
-      const sub={
+      return{
         id:subId,
-        category:'gallery',ts,createdAt:Date.now()+count,
+        category:'gallery',ts,createdAt:Date.now()+i,
         status:'pending',
         reviewerNote:'',reviewedAt:null,
         data:{
@@ -907,22 +1020,23 @@ async function submitBulkGallery(){
           photoCategory:{label:'Category',value:'Other'},
           photoDate:{label:'Date',value:''}
         },
-        photoData:photoData,photoName:p.fileName||('photo_'+(count+1)+'.jpg'),photoMeta:p.meta||null,photos:null
+        photoData:photoData,photoName:p.fileName||('photo_'+(i+1)+'.jpg'),photoMeta:p.meta||null,photos:null
       };
-      await dbSaveSubmission(sub);
-      count++;
     }catch(e){
-      console.warn('[Gallery] Failed to save photo '+(count+1)+':',e.message);
+      console.warn('[Gallery] Failed to prepare photo '+(i+1)+':',e.message);
       errors++;
+      return null;
     }
-  }
+  });
+  const ready=prepared.filter(Boolean);
+  if(ready.length)await dbSaveSubmissionsBulk(ready);
   bulkPhotos=[];renderBulkGrid();
   if(errors){
-    alert(`${count} photos submitted, ${errors} failed. Failed items saved locally and will sync later.`);
+    alert(`${ready.length} photos submitted, ${errors} had upload issues. Storage fallbacks were saved with the submissions.`);
   } else {
-    alert(`✓ ${count} photos submitted successfully! They are now awaiting Editor review.`);
+    alert(`${ready.length} photos submitted successfully! They are now awaiting Editor review.`);
   }
-  showSync('ok','✓ '+count+' photos uploaded');
+  showSync('ok',ready.length+' photos uploaded');
   document.getElementById('formContainer').style.display='none';
   document.getElementById('successWrap').style.display='block';
   window.scrollTo({top:0,behavior:'smooth'});
@@ -1430,15 +1544,14 @@ async function buildSubmissionPayload(data,entry,batchIndex){
   }
   let finalPhotos=null;
   if(cat.photoMulti&&entry.photoFilesMulti.length){
-    finalPhotos=[];
-    for(let i=0;i<entry.photoFilesMulti.length;i++){
+    finalPhotos=await mapWithConcurrency(entry.photoFilesMulti,Math.min(BULK_CLOUD_CONCURRENCY,4),async(file,i)=>{
       try{
-        const url=await uploadToStorage(entry.photoFilesMulti[i],subId+'_'+i);
-        finalPhotos.push({url:url,name:entry.photoFilesMulti[i]?.name||`photo_${i+1}.jpg`,meta:entry.photoMetasMulti[i]||null});
+        const url=await uploadToStorage(file,subId+'_'+i);
+        return{url:url,name:file?.name||`photo_${i+1}.jpg`,meta:entry.photoMetasMulti[i]||null};
       }catch(e){
-        finalPhotos.push({data:entry.photoDataURLsMulti[i],name:entry.photoFilesMulti[i]?.name||`photo_${i+1}.jpg`,meta:entry.photoMetasMulti[i]||null});
+        return{data:entry.photoDataURLsMulti[i],name:file?.name||`photo_${i+1}.jpg`,meta:entry.photoMetasMulti[i]||null};
       }
-    }
+    });
   }
   return{id:subId,category:currentFormCategory,
     ts:new Date().toLocaleString(),createdAt:Date.now()+batchIndex,
@@ -1465,10 +1578,8 @@ async function saveSubmissionBatch(submissions,releaseSubmit){
   },180);
 
   try{
-    for(let i=0;i<submissions.length;i++){
-      if(txt)txt.textContent='Uploading submission '+(i+1)+' of '+submissions.length+'...';
-      await dbSaveSubmission(submissions[i]);
-    }
+    if(txt)txt.textContent='Saving '+submissions.length+' submission'+(submissions.length>1?'s':'')+' to cloud...';
+    await dbSaveSubmissionsBulk(submissions);
     clearInterval(tick);
     if(bar)bar.style.width='100%';
     if(txt)txt.textContent=submissions.length+' submission'+(submissions.length>1?'s':'')+' saved successfully!';
@@ -1513,8 +1624,7 @@ async function submitForm(){
   snapshotBulkFormValues();
   const collected=collectBulkSubmissionPayloads();
   if(!collected.valid){const fe=document.querySelector('.has-error')||document.querySelector('.photo-err-msg[style*="block"]')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});releaseSubmit();return;}
-  const submissions=[];
-  for(let i=0;i<collected.items.length;i++)submissions.push(await buildSubmissionPayload(collected.items[i].data,collected.items[i].entry,i));
+  const submissions=await mapWithConcurrency(collected.items,BULK_CLOUD_CONCURRENCY,(item,i)=>buildSubmissionPayload(item.data,item.entry,i));
   return saveSubmissionBatch(submissions,releaseSubmit);
 }
 
@@ -1686,8 +1796,8 @@ function enterAdmin(){
     if(main&&!document.getElementById('cloudRetryBanner')){
       const banner=document.createElement('div');
       banner.id='cloudRetryBanner';
-      banner.style.cssText='background:#b0282a;color:#fff;padding:10px 20px;text-align:center;font-size:13px;font-family:Lato,sans-serif;display:flex;align-items:center;justify-content:center;gap:12px;';
-      banner.innerHTML='<span>⚠ Cloud unavailable — showing cached submissions.</span><button onclick="adminRefresh()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;font-family:Lato,sans-serif;">Retry Sync</button>';
+      banner.style.cssText='background:#6b5b16;color:#fff;padding:10px 20px;text-align:center;font-size:13px;font-family:Lato,sans-serif;display:flex;align-items:center;justify-content:center;gap:12px;';
+      banner.innerHTML='<span>Cloud sync is delayed - showing cached submissions.</span><button onclick="adminRefresh()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;font-family:Lato,sans-serif;">Retry Sync</button>';
       main.prepend(banner);
     }
   });
@@ -4339,19 +4449,17 @@ setTimeout(async () => {
     const supaReady = await waitForSupabase(6000);
     if(!supaReady){
       console.warn('[BOOT] Supabase CDN did not load in time');
-      if(statusEl) statusEl.textContent = 'Cloud unavailable — opening offline';
+      if(statusEl) statusEl.textContent = 'Opening with cached data while cloud loads';
     } else {
       console.log('[BOOT] Supabase CDN loaded. Starting cloud sync...');
-      /* Strict timeout for the entire sync process */
-      await Promise.race([
-        initCloudSync(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Boot timeout')), 8000))
-      ]);
+      await initCloudSync();
       console.log('[BOOT] Cloud sync finished.');
     }
   } catch (e) {
     console.warn('[BOOT] Sync failed or timed out:', e.message);
-    showSync('err', 'Running offline — check internet');
+    if(loadSubCache().length)showSync('syncing', 'Showing cached data while cloud recovers');
+    else if(isNetworkTrulyOffline())showSync('err', 'No network connection - no cached data found');
+    else showSync('syncing', 'Cloud is taking longer than usual');
   } finally {
     try {
       /* If a ?form= link was shared externally, open it now with up-to-date cloud settings */
