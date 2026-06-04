@@ -251,11 +251,8 @@ function initRealtime() {
 
   console.log('[DB] Initializing Realtime listeners…');
   
+  /* Subscribe to lightweight pg_notify channel — no large photo payloads broadcast */
   _subChannel = sb.channel('db-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, payload => {
-      console.log('[DB] Realtime Submission:', payload.eventType);
-      handleRealtimeSubmission(payload);
-    })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
       console.log('[DB] Realtime Setting:', payload.eventType);
       handleRealtimeSetting(payload);
@@ -268,6 +265,14 @@ function initRealtime() {
         console.warn('[DB] Realtime Status:', status);
       }
     });
+
+  /* Listen on the lightweight submission_changes notify channel (trigger sends only id/status/category/created_at) */
+  sb.channel('submission-notify')
+    .on('broadcast', { event: 'submission_changes' }, ({ payload }) => {
+      console.log('[DB] Submission notify:', payload);
+      handleRealtimeNotify(payload);
+    })
+    .subscribe();
 }
 
 function handleRealtimeSubmission(payload) {
@@ -279,26 +284,55 @@ function handleRealtimeSubmission(payload) {
       createdAt: newRow.created_at ? new Date(newRow.created_at).getTime() : newRow.created_at_ms || Date.now(),
       status: newRow.status || 'draft', reviewerNote: newRow.reviewer_note || '', reviewedAt: newRow.reviewed_at || null,
       data: typeof newRow.data === 'string' ? JSON.parse(newRow.data) : newRow.data || {},
-      photoData: newRow.photo_data || null, photoName: newRow.photo_name || null,
+      photoData: newRow.photo_url || newRow.photo_data || null, photoName: newRow.photo_name || null,
       photos: newRow.photos ? (typeof newRow.photos === 'string' ? JSON.parse(newRow.photos) : newRow.photos) : null
     };
     
     const idx = subs.findIndex(s => String(s.id) === String(sub.id));
-    if (idx >= 0) {
-      subs[idx] = sub;
-    } else {
-      subs.push(sub);
-    }
+    if (idx >= 0) { subs[idx] = sub; } else { subs.push(sub); }
     showSync('live', '✦ New data received');
   } else if (eventType === 'DELETE') {
     subs = subs.filter(s => String(s.id) !== String(oldRow.id));
     showSync('live', '✦ Data removed');
   }
 
-  // Refresh active views
   if (document.getElementById('viewAdmin')?.classList.contains('active')) renderAdmin();
   if (document.getElementById('viewEditor')?.classList.contains('active')) renderEditor();
   if (document.getElementById('viewWorkspace')?.classList.contains('active')) wsGeneratePreview();
+}
+
+/* Handles lightweight pg_notify pings — re-fetches only the affected row from cloud */
+async function handleRealtimeNotify(payload) {
+  if (!payload || !payload.id) return;
+  const sb = getSupa(); if (!sb) return;
+  const { event, id } = payload;
+  console.log('[DB] Notify event:', event, id);
+
+  if (event === 'DELETE') {
+    subs = subs.filter(s => String(s.id) !== String(id));
+    showSync('live', '✦ Submission removed');
+  } else {
+    /* Re-fetch only this single row — small, no photo payload issues */
+    try {
+      const { data, error } = await sb.from('submissions').select('*').eq('id', id).single();
+      if (error || !data) return;
+      const r = data;
+      const sub = {
+        id: r.id, category: r.category, ts: r.ts || new Date(r.created_at).toLocaleString(),
+        createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+        status: r.status || 'pending', reviewerNote: r.reviewer_note || '', reviewedAt: r.reviewed_at || null,
+        data: typeof r.data === 'string' ? JSON.parse(r.data) : r.data || {},
+        photoData: r.photo_url || r.photo_data || null, photoName: r.photo_name || null,
+        photos: r.photos ? (typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos) : null
+      };
+      const idx = subs.findIndex(s => String(s.id) === String(sub.id));
+      if (idx >= 0) { subs[idx] = sub; } else { subs.push(sub); }
+      showSync('live', '✦ New submission received');
+    } catch(e) { console.warn('[DB] Notify re-fetch failed:', e.message); }
+  }
+
+  if (document.getElementById('viewAdmin')?.classList.contains('active')) renderAdmin();
+  if (document.getElementById('viewEditor')?.classList.contains('active')) renderEditor();
 }
 
 function handleRealtimeSetting(payload) {
@@ -368,7 +402,7 @@ async function dbLoadAll(){
       createdAt:r.created_at?new Date(r.created_at).getTime():r.created_at_ms||Date.now(),
       status:r.status||'pending',reviewerNote:r.reviewer_note||'',reviewedAt:r.reviewed_at||null,
       data:typeof r.data==='string'?JSON.parse(r.data):r.data||{},
-      photoData:r.photo_data||null,photoName:r.photo_name||null,
+      photoData:r.photo_url||r.photo_data||null,photoName:r.photo_name||null,
       photos:r.photos?(typeof r.photos==='string'?JSON.parse(r.photos):r.photos):null
     }));
 
@@ -400,7 +434,7 @@ async function dbSaveSubmission(sub){
       status:sub.status,reviewer_note:sub.reviewerNote||'',
       reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
       data:JSON.stringify(sub.data),
-      photo_data:sub.photoData||null,photo_name:sub.photoName||null,
+      photo_url:sub.photoData||null,photo_name:sub.photoName||null,
       photos:sub.photos?JSON.stringify(sub.photos):null
     };
     
@@ -518,7 +552,7 @@ async function dbSaveAllToCloud(list){
       created_at:new Date(sub.createdAt||Date.now()).toISOString(),
       status:sub.status,reviewer_note:sub.reviewerNote||'',
       reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
-      data:JSON.stringify(sub.data),photo_data:sub.photoData||null,photo_name:sub.photoName||null,
+      data:JSON.stringify(sub.data),photo_url:sub.photoData||null,photo_name:sub.photoName||null,
       photos:sub.photos?JSON.stringify(sub.photos):null
     }));
     await withRetry(async()=>{
