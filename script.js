@@ -152,7 +152,7 @@ const PRINT_IMAGE_RECOMMENDED_PX=1200;
 const PRINT_MAX_IMAGE_MB=25;
 const BULK_CLOUD_CONCURRENCY=6;
 const CLOUD_RETRY_DELAYS=[500,1000,2000];
-const CLOUD_TIMEOUT_MS=15000;
+const CLOUD_TIMEOUT_MS=9000;
 const cloudHealth={database:'unknown',auth:'unknown',realtime:'unknown',edge:'unknown'};
 
 function loadLsSettingsFromStorage(){
@@ -166,28 +166,9 @@ function loadLsSettingsFromStorage(){
 function getSupa(){
   if(_supa)return _supa;
   if(!window.supabase){console.warn('[DB] Supabase CDN not yet loaded');return null;}
-  try{_supa=window.supabase.createClient(SUPA_URL,SUPA_KEY,{realtime:{heartbeatIntervalMs:20000}});return _supa;}
+  try{_supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);return _supa;}
   catch(e){console.warn('[DB] Supabase init failed:',e.message);return null;}
 }
-function resetSupa(){
-  /* Force a fresh client — called after long inactivity so stale WebSocket is replaced */
-  try{if(_supa)_supa.removeAllChannels();}catch(e){}
-  _supa=null;
-  return getSupa();
-}
-/* Reconnect when tab becomes visible after phone sleep or tab switch */
-let _lastHidden=0;
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='hidden'){_lastHidden=Date.now();return;}
-  /* Only reset if hidden for more than 2 minutes */
-  if(Date.now()-_lastHidden<120000)return;
-  console.log('[DB] Tab restored after inactivity — resetting Supabase client');
-  resetSupa();
-  dbLoadAll().then(fresh=>{
-    subs=fresh;
-    if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
-  }).catch(()=>{});
-});
 /* Wait for async Supabase CDN to load (max ~6s) */
 function waitForSupabase(maxMs){
   return new Promise(resolve=>{
@@ -283,6 +264,7 @@ function showSync(state,msg){
     document.body.appendChild(bar);
   }
   bar.classList.add('visible');
+  bar.dataset.syncState=state;
   const dot = document.getElementById('syncDot');
   dot.className='sync-dot '+state;
   document.getElementById('syncMsg').textContent=msg;
@@ -302,36 +284,74 @@ let currentAdminCat = 'all';
 let currentEditorCat = 'all';
 
 
-function initRealtime() {
-  const sb = getSupa();
-  if (!sb || _subChannel) return;
+let _rtFailCount=0;
+let _rtReconnectTimer=null;
+let _healthTimer=null;
+let _subNotifyChannel=null;
 
-  console.log('[DB] Initializing Realtime listeners…');
-  
-  /* Subscribe to lightweight pg_notify channel — no large photo payloads broadcast */
-  _subChannel = sb.channel('db-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
-      console.log('[DB] Realtime Setting:', payload.eventType);
+function _scheduleReconnect(){
+  if(_rtReconnectTimer)clearTimeout(_rtReconnectTimer);
+  const delay=Math.min(5000*Math.pow(2,_rtFailCount),60000);
+  console.warn('[RT] Reconnect in '+delay+'ms (attempt '+(_rtFailCount+1)+')');
+  _rtReconnectTimer=setTimeout(()=>{ _subChannel=null; _subNotifyChannel=null; initRealtime(); },delay);
+}
+
+function _startHealthCheck(){
+  if(_healthTimer)clearInterval(_healthTimer);
+  _healthTimer=setInterval(async()=>{
+    const sb=getSupa();if(!sb)return;
+    try{
+      const{error}=await sb.from('settings').select('id').limit(1);
+      if(error)return;
+      const bar=document.getElementById('syncBar');
+      if(bar&&bar.dataset.syncState==='syncing'){
+        dbLoadAll().then(fresh=>{
+          subs=fresh;
+          showSync('live','❖ Reconnected');
+          if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
+        }).catch(()=>{});
+      }
+      if(!_subChannel){_rtFailCount=0;initRealtime();}
+    }catch(e){console.warn('[HEALTH]',e.message);}
+  },30000);
+}
+
+function initRealtime(){
+  const sb=getSupa();
+  if(!sb||_subChannel)return;
+  console.log('[RT] Initializing Realtime listeners...');
+
+  _subChannel=sb.channel('db-changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'settings'},payload=>{
+      console.log('[RT] Setting:',payload.eventType);
       handleRealtimeSetting(payload);
     })
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        showSync('live', '✦ Connected Live');
-        console.log('[DB] Realtime Subscribed');
-      } else {
-        console.warn('[DB] Realtime Status:', status);
+    .subscribe(status=>{
+      console.log('[RT] db-changes:',status);
+      if(status==='SUBSCRIBED'){
+        _rtFailCount=0;
+        showSync('live','❖ Connected Live');
+      }else if(status==='CLOSED'||status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        console.warn('[RT] Channel dropped:',status);
+        _rtFailCount++;
+        _subChannel=null;
+        _scheduleReconnect();
       }
     });
 
-  /* Listen on the lightweight submission_changes notify channel (trigger sends only id/status/category/created_at) */
-  sb.channel('submission-notify')
-    .on('broadcast', { event: 'submission_changes' }, ({ payload }) => {
-      console.log('[DB] Submission notify:', payload);
+  _subNotifyChannel=sb.channel('submission-notify')
+    .on('broadcast',{event:'submission_changes'},({payload})=>{
+      console.log('[RT] Submission notify:',payload);
       handleRealtimeNotify(payload);
     })
-    .subscribe();
-}
+    .subscribe(status=>{
+      if(status==='CLOSED'||status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        _rtFailCount++;_subNotifyChannel=null;_scheduleReconnect();
+      }
+    });
 
+  _startHealthCheck();
+}
 function handleRealtimeSubmission(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
   
@@ -4482,7 +4502,7 @@ setTimeout(async () => {
   } finally {
     try {
       /* If a ?form= link was shared externally, open it now with up-to-date cloud settings */
-      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey] && document.querySelector('.view.active')?.id === 'viewForm'){
+      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey]){
         openForm(_pendingFormKey);
       }
       /* Ensure UI is rendered with latest data */
