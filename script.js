@@ -264,6 +264,7 @@ function showSync(state,msg){
     document.body.appendChild(bar);
   }
   bar.classList.add('visible');
+  bar.dataset.state = state; /* health check reads this */
   const dot = document.getElementById('syncDot');
   dot.className='sync-dot '+state;
   document.getElementById('syncMsg').textContent=msg;
@@ -283,35 +284,122 @@ let currentAdminCat = 'all';
 let currentEditorCat = 'all';
 
 
+/* ═══════════════════════════════════════════════════════════
+   REALTIME — Auto-reconnect + Health Check + Background Retry
+   ═══════════════════════════════════════════════════════════ */
+
+let _subChannel = null;         // already declared above, this shadows safely
+let _subNotifyChannel = null;
+let _healthInterval = null;
+let _realtimeReconnectTimer = null;
+let _realtimeFailCount = 0;
+
+function destroyRealtime() {
+  const sb = getSupa();
+  if(_subChannel){ try{ sb?.removeChannel(_subChannel); }catch(e){} _subChannel=null; }
+  if(_subNotifyChannel){ try{ sb?.removeChannel(_subNotifyChannel); }catch(e){} _subNotifyChannel=null; }
+  if(_realtimeReconnectTimer){ clearTimeout(_realtimeReconnectTimer); _realtimeReconnectTimer=null; }
+}
+
+function scheduleRealtimeReconnect(delayMs) {
+  if(_realtimeReconnectTimer) clearTimeout(_realtimeReconnectTimer);
+  const delay = delayMs || Math.min(5000 * Math.pow(2, _realtimeFailCount), 60000); /* cap at 60s */
+  console.warn(`[RT] Reconnecting in ${delay/1000}s (attempt ${_realtimeFailCount+1})`);
+  _realtimeReconnectTimer = setTimeout(() => {
+    destroyRealtime();
+    initRealtime();
+  }, delay);
+}
+
 function initRealtime() {
   const sb = getSupa();
-  if (!sb || _subChannel) return;
+  if(!sb) return;
+  if(_subChannel) return; /* already running */
 
-  console.log('[DB] Initializing Realtime listeners…');
-  
-  /* Subscribe to lightweight pg_notify channel — no large photo payloads broadcast */
+  console.log('[RT] Initializing Realtime listeners...');
+
+  /* ── Settings channel ── */
   _subChannel = sb.channel('db-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
-      console.log('[DB] Realtime Setting:', payload.eventType);
+      console.log('[RT] Setting change:', payload.eventType);
       handleRealtimeSetting(payload);
     })
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
+      console.log('[RT] db-changes status:', status);
+      if(status === 'SUBSCRIBED'){
+        _realtimeFailCount = 0;
         showSync('live', '✦ Connected Live');
-        console.log('[DB] Realtime Subscribed');
-      } else {
-        console.warn('[DB] Realtime Status:', status);
+      } else if(status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'){
+        console.warn('[RT] Channel dropped:', status);
+        _realtimeFailCount++;
+        _subChannel = null; /* allow re-init */
+        scheduleRealtimeReconnect();
       }
     });
 
-  /* Listen on the lightweight submission_changes notify channel (trigger sends only id/status/category/created_at) */
-  sb.channel('submission-notify')
+  /* ── Submission notify channel ── */
+  _subNotifyChannel = sb.channel('submission-notify')
     .on('broadcast', { event: 'submission_changes' }, ({ payload }) => {
-      console.log('[DB] Submission notify:', payload);
+      console.log('[RT] Submission notify:', payload);
       handleRealtimeNotify(payload);
     })
-    .subscribe();
+    .subscribe((status) => {
+      console.log('[RT] submission-notify status:', status);
+      if(status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'){
+        _realtimeFailCount++;
+        _subNotifyChannel = null;
+        scheduleRealtimeReconnect();
+      }
+    });
 }
+
+/* ── B. Health check every 30s ── */
+function startHealthCheck() {
+  if(_healthInterval) clearInterval(_healthInterval);
+  _healthInterval = setInterval(async () => {
+    const sb = getSupa();
+    if(!sb) return;
+    try{
+      const { error } = await sb.from('settings').select('id').limit(1);
+      if(!error){
+        /* Cloud is reachable — dismiss any error banner silently */
+        const bar = document.getElementById('syncBar');
+        if(bar && bar.dataset.state === 'err'){
+          showSync('live', '✦ Reconnected');
+          /* Re-pull fresh submissions in background */
+          dbLoadAll().then(fresh => {
+            subs = fresh;
+            if(document.getElementById('viewAdmin')?.classList.contains('active')) renderAdmin();
+          }).catch(()=>{});
+        }
+        /* Reconnect realtime if it dropped */
+        if(!_subChannel){ _realtimeFailCount=0; initRealtime(); }
+      }
+    }catch(e){
+      console.warn('[HEALTH] Check failed:', e.message);
+    }
+  }, 30000); /* every 30 seconds */
+}
+
+/* ── D. Reconnect when tab regains focus (handles phone sleep/tab switch) ── */
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible'){
+    console.log('[RT] Tab visible — checking connection...');
+    const sb = getSupa();
+    if(!sb) return;
+    /* Lightweight ping */
+    sb.from('settings').select('id').limit(1).then(({ error }) => {
+      if(!error){
+        if(!_subChannel){ _realtimeFailCount=0; initRealtime(); }
+        /* Silently refresh submissions if admin portal is open */
+        if(document.getElementById('viewAdmin')?.classList.contains('active')){
+          dbLoadAll().then(fresh=>{ subs=fresh; renderAdmin(); }).catch(()=>{});
+        }
+      }
+    }).catch(()=>{});
+  }
+});
+
 
 function handleRealtimeSubmission(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
@@ -737,8 +825,9 @@ async function initCloudSync(){
   if(statusEl) statusEl.textContent = 'Syncing settings…';
   showSync('syncing','Connecting to cloud…');
   try{
-    /* Start Realtime listeners early */
+    /* Start Realtime listeners + persistent health check */
     initRealtime();
+    startHealthCheck();
     Promise.allSettled([
       checkDatabaseHealth(),
       checkAuthHealth(),
