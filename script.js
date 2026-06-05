@@ -284,16 +284,13 @@ let currentAdminCat = 'all';
 let currentEditorCat = 'all';
 
 
-let _rtFailCount=0;
-let _rtReconnectTimer=null;
-let _healthTimer=null;
-let _subNotifyChannel=null;
+let _rtFailCount=0,_rtReconnectTimer=null,_healthTimer=null,_subNotifyChannel=null;
 
-function _scheduleReconnect(){
+function _scheduleRtReconnect(){
   if(_rtReconnectTimer)clearTimeout(_rtReconnectTimer);
   const delay=Math.min(5000*Math.pow(2,_rtFailCount),60000);
-  console.warn('[RT] Reconnect in '+delay+'ms (attempt '+(_rtFailCount+1)+')');
-  _rtReconnectTimer=setTimeout(()=>{ _subChannel=null; _subNotifyChannel=null; initRealtime(); },delay);
+  console.warn('[RT] Reconnect scheduled in '+delay+'ms');
+  _rtReconnectTimer=setTimeout(()=>{_subChannel=null;_subNotifyChannel=null;initRealtime();},delay);
 }
 
 function _startHealthCheck(){
@@ -303,13 +300,10 @@ function _startHealthCheck(){
     try{
       const{error}=await sb.from('settings').select('id').limit(1);
       if(error)return;
+      /* Cloud reachable — clear cached banner and refresh */
       const bar=document.getElementById('syncBar');
-      if(bar&&bar.dataset.syncState==='syncing'){
-        dbLoadAll().then(fresh=>{
-          subs=fresh;
-          showSync('live','❖ Reconnected');
-          if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
-        }).catch(()=>{});
+      if(bar&&(bar.dataset.syncState==='syncing'||bar.dataset.syncState==='err')){
+        dbLoadAll().then(fresh=>{subs=fresh;showSync('live','❖ Reconnected');if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();}).catch(()=>{});
       }
       if(!_subChannel){_rtFailCount=0;initRealtime();}
     }catch(e){console.warn('[HEALTH]',e.message);}
@@ -319,39 +313,27 @@ function _startHealthCheck(){
 function initRealtime(){
   const sb=getSupa();
   if(!sb||_subChannel)return;
-  console.log('[RT] Initializing Realtime listeners...');
-
+  console.log('[RT] Initializing Realtime...');
   _subChannel=sb.channel('db-changes')
     .on('postgres_changes',{event:'*',schema:'public',table:'settings'},payload=>{
-      console.log('[RT] Setting:',payload.eventType);
       handleRealtimeSetting(payload);
     })
     .subscribe(status=>{
-      console.log('[RT] db-changes:',status);
-      if(status==='SUBSCRIBED'){
-        _rtFailCount=0;
-        showSync('live','❖ Connected Live');
-      }else if(status==='CLOSED'||status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
-        console.warn('[RT] Channel dropped:',status);
-        _rtFailCount++;
-        _subChannel=null;
-        _scheduleReconnect();
+      if(status==='SUBSCRIBED'){_rtFailCount=0;showSync('live','❖ Connected Live');}
+      else if(status==='CLOSED'||status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        console.warn('[RT] Dropped:',status);_rtFailCount++;_subChannel=null;_scheduleRtReconnect();
       }
     });
-
   _subNotifyChannel=sb.channel('submission-notify')
-    .on('broadcast',{event:'submission_changes'},({payload})=>{
-      console.log('[RT] Submission notify:',payload);
-      handleRealtimeNotify(payload);
-    })
+    .on('broadcast',{event:'submission_changes'},({payload})=>{handleRealtimeNotify(payload);})
     .subscribe(status=>{
       if(status==='CLOSED'||status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
-        _rtFailCount++;_subNotifyChannel=null;_scheduleReconnect();
+        _rtFailCount++;_subNotifyChannel=null;_scheduleRtReconnect();
       }
     });
-
   _startHealthCheck();
 }
+
 function handleRealtimeSubmission(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
   
@@ -4502,7 +4484,7 @@ setTimeout(async () => {
   } finally {
     try {
       /* If a ?form= link was shared externally, open it now with up-to-date cloud settings */
-      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey]){
+      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey] && document.querySelector('.view.active')?.id==='viewForm'){
         openForm(_pendingFormKey);
       }
       /* Ensure UI is rendered with latest data */
