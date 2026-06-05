@@ -166,9 +166,28 @@ function loadLsSettingsFromStorage(){
 function getSupa(){
   if(_supa)return _supa;
   if(!window.supabase){console.warn('[DB] Supabase CDN not yet loaded');return null;}
-  try{_supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);return _supa;}
+  try{_supa=window.supabase.createClient(SUPA_URL,SUPA_KEY,{realtime:{heartbeatIntervalMs:20000}});return _supa;}
   catch(e){console.warn('[DB] Supabase init failed:',e.message);return null;}
 }
+function resetSupa(){
+  /* Force a fresh client — called after long inactivity so stale WebSocket is replaced */
+  try{if(_supa)_supa.removeAllChannels();}catch(e){}
+  _supa=null;
+  return getSupa();
+}
+/* Reconnect when tab becomes visible after phone sleep or tab switch */
+let _lastHidden=0;
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){_lastHidden=Date.now();return;}
+  /* Only reset if hidden for more than 2 minutes */
+  if(Date.now()-_lastHidden<120000)return;
+  console.log('[DB] Tab restored after inactivity — resetting Supabase client');
+  resetSupa();
+  dbLoadAll().then(fresh=>{
+    subs=fresh;
+    if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
+  }).catch(()=>{});
+});
 /* Wait for async Supabase CDN to load (max ~6s) */
 function waitForSupabase(maxMs){
   return new Promise(resolve=>{
