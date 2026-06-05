@@ -151,7 +151,7 @@ const PRINT_IMAGE_MIN_PX=600;
 const PRINT_IMAGE_RECOMMENDED_PX=1200;
 const PRINT_MAX_IMAGE_MB=25;
 const BULK_CLOUD_CONCURRENCY=6;
-const CLOUD_RETRY_DELAYS=[1000,2000,4000];
+const CLOUD_RETRY_DELAYS=[500,1000,2000];
 const CLOUD_TIMEOUT_MS=15000;
 const cloudHealth={database:'unknown',auth:'unknown',realtime:'unknown',edge:'unknown'};
 
@@ -404,10 +404,6 @@ function handleRealtimeSetting(payload) {
 /* ── Submissions (cloud + local mirror) ── */
 async function dbLoadAll(){
   const cached=loadSubCache();
-  /* Stale-while-revalidate: surface cached data immediately so UI is never blank */
-  const cached = loadSubCache();
-  if(cached.length && !subs.length){ subs = cached; }
-
   showSync('syncing','Connecting to cloud…');
   try{
     const sb=getSupa();
@@ -4466,16 +4462,12 @@ setTimeout(async () => {
     else showSync('syncing', 'Cloud is taking longer than usual');
   } finally {
     try {
-      /* If a ?form= link was shared externally, open it now with up-to-date cloud settings.
-         Only fire if the URL actually contained ?form= AND the user hasn't navigated away. */
-      const _activeView = document.querySelector('.view.active');
-      const _alreadyOnForm = _activeView && _activeView.id === 'viewForm';
-      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey] && _alreadyOnForm){
-        openForm(_pendingFormKey); /* re-open to pick up fresh cloud settings */
-      } else if(!_pendingFormKey) {
-        /* Normal visit — make sure landing is shown */
-        renderLandingCards();
+      /* If a ?form= link was shared externally, open it now with up-to-date cloud settings */
+      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey] && document.querySelector('.view.active')?.id === 'viewForm'){
+        openForm(_pendingFormKey);
       }
+      /* Ensure UI is rendered with latest data */
+      renderLandingCards();
     } catch (err) {
       console.error('[BOOT] Render error:', err.message);
     }
