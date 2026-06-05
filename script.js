@@ -151,8 +151,8 @@ const PRINT_IMAGE_MIN_PX=600;
 const PRINT_IMAGE_RECOMMENDED_PX=1200;
 const PRINT_MAX_IMAGE_MB=25;
 const BULK_CLOUD_CONCURRENCY=6;
-const CLOUD_RETRY_DELAYS=[500,1000,2000];
-const CLOUD_TIMEOUT_MS=9000;
+const CLOUD_RETRY_DELAYS=[1000,2000,4000];
+const CLOUD_TIMEOUT_MS=15000;
 const cloudHealth={database:'unknown',auth:'unknown',realtime:'unknown',edge:'unknown'};
 
 function loadLsSettingsFromStorage(){
@@ -264,7 +264,6 @@ function showSync(state,msg){
     document.body.appendChild(bar);
   }
   bar.classList.add('visible');
-  bar.dataset.syncState = state;
   const dot = document.getElementById('syncDot');
   dot.className='sync-dot '+state;
   document.getElementById('syncMsg').textContent=msg;
@@ -279,8 +278,6 @@ function showSync(state,msg){
    Keeps all devices in sync without refreshes
 ═══════════════════════════════════════════════════════════ */
 let _subChannel = null;
-let _rtFailCount = 0;
-let _healthInterval = null;
 let currentFormCategory = null;
 let currentAdminCat = 'all';
 let currentEditorCat = 'all';
@@ -302,11 +299,6 @@ function initRealtime() {
       if (status === 'SUBSCRIBED') {
         showSync('live', '✦ Connected Live');
         console.log('[DB] Realtime Subscribed');
-      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.warn('[DB] Realtime dropped:', status, '— scheduling reconnect');
-        _subChannel = null;
-        const delay = Math.min(5000 * Math.pow(2, _rtFailCount++), 60000);
-        setTimeout(() => { getSupa()?.removeAllChannels(); initRealtime(); }, delay);
       } else {
         console.warn('[DB] Realtime Status:', status);
       }
@@ -320,47 +312,6 @@ function initRealtime() {
     })
     .subscribe();
 }
-
-/* B. Health check every 30s — clears error banner and reconnects if cloud recovers */
-function startHealthCheck() {
-  if(_healthInterval) clearInterval(_healthInterval);
-  _healthInterval = setInterval(async () => {
-    const sb = getSupa();
-    if(!sb) return;
-    try {
-      const { error } = await sb.from('settings').select('id').limit(1);
-      if(!error) {
-        /* Cloud is reachable — if error banner is showing, recover silently */
-        const bar = document.getElementById('syncBar');
-        if(bar && (bar.dataset.syncState === 'err')) {
-          showSync('live', '✦ Reconnected to cloud');
-          dbLoadAll().then(fresh => {
-            subs = fresh;
-            if(document.getElementById('viewAdmin')?.classList.contains('active')) renderAdmin();
-          }).catch(() => {});
-        }
-        /* Reconnect realtime if it dropped */
-        if(!_subChannel) { _rtFailCount = 0; initRealtime(); }
-      }
-    } catch(e) {
-      console.warn('[HEALTH]', e.message);
-    }
-  }, 30000);
-}
-
-/* D. Reconnect when tab becomes visible again (handles phone sleep / tab switching) */
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState !== 'visible') return;
-  const sb = getSupa();
-  if(!sb) return;
-  sb.from('settings').select('id').limit(1).then(({ error }) => {
-    if(error) return;
-    if(!_subChannel) { _rtFailCount = 0; initRealtime(); }
-    if(document.getElementById('viewAdmin')?.classList.contains('active')) {
-      dbLoadAll().then(fresh => { subs = fresh; renderAdmin(); }).catch(() => {});
-    }
-  }).catch(() => {});
-});
 
 function handleRealtimeSubmission(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
@@ -453,6 +404,10 @@ function handleRealtimeSetting(payload) {
 /* ── Submissions (cloud + local mirror) ── */
 async function dbLoadAll(){
   const cached=loadSubCache();
+  /* Stale-while-revalidate: surface cached data immediately so UI is never blank */
+  const cached = loadSubCache();
+  if(cached.length && !subs.length){ subs = cached; }
+
   showSync('syncing','Connecting to cloud…');
   try{
     const sb=getSupa();
@@ -786,9 +741,8 @@ async function initCloudSync(){
   if(statusEl) statusEl.textContent = 'Syncing settings…';
   showSync('syncing','Connecting to cloud…');
   try{
-    /* Start Realtime listeners + 30s health check */
+    /* Start Realtime listeners early */
     initRealtime();
-    startHealthCheck();
     Promise.allSettled([
       checkDatabaseHealth(),
       checkAuthHealth(),
@@ -4512,12 +4466,16 @@ setTimeout(async () => {
     else showSync('syncing', 'Cloud is taking longer than usual');
   } finally {
     try {
-      /* If a ?form= link was shared externally, open it now with up-to-date cloud settings */
-      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey]){
-        openForm(_pendingFormKey);
+      /* If a ?form= link was shared externally, open it now with up-to-date cloud settings.
+         Only fire if the URL actually contained ?form= AND the user hasn't navigated away. */
+      const _activeView = document.querySelector('.view.active');
+      const _alreadyOnForm = _activeView && _activeView.id === 'viewForm';
+      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey] && _alreadyOnForm){
+        openForm(_pendingFormKey); /* re-open to pick up fresh cloud settings */
+      } else if(!_pendingFormKey) {
+        /* Normal visit — make sure landing is shown */
+        renderLandingCards();
       }
-      /* Ensure UI is rendered with latest data */
-      renderLandingCards();
     } catch (err) {
       console.error('[BOOT] Render error:', err.message);
     }
