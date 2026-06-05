@@ -264,7 +264,6 @@ function showSync(state,msg){
     document.body.appendChild(bar);
   }
   bar.classList.add('visible');
-  bar.dataset.syncState=state;
   const dot = document.getElementById('syncDot');
   dot.className='sync-dot '+state;
   document.getElementById('syncMsg').textContent=msg;
@@ -284,54 +283,34 @@ let currentAdminCat = 'all';
 let currentEditorCat = 'all';
 
 
-let _rtFailCount=0,_rtReconnectTimer=null,_healthTimer=null,_subNotifyChannel=null;
+function initRealtime() {
+  const sb = getSupa();
+  if (!sb || _subChannel) return;
 
-function _scheduleRtReconnect(){
-  if(_rtReconnectTimer)clearTimeout(_rtReconnectTimer);
-  const delay=Math.min(5000*Math.pow(2,_rtFailCount),60000);
-  console.warn('[RT] Reconnect scheduled in '+delay+'ms');
-  _rtReconnectTimer=setTimeout(()=>{_subChannel=null;_subNotifyChannel=null;initRealtime();},delay);
-}
-
-function _startHealthCheck(){
-  if(_healthTimer)clearInterval(_healthTimer);
-  _healthTimer=setInterval(async()=>{
-    const sb=getSupa();if(!sb)return;
-    try{
-      const{error}=await sb.from('settings').select('id').limit(1);
-      if(error)return;
-      /* Cloud reachable — clear cached banner and refresh */
-      const bar=document.getElementById('syncBar');
-      if(bar&&(bar.dataset.syncState==='syncing'||bar.dataset.syncState==='err')){
-        dbLoadAll().then(fresh=>{subs=fresh;showSync('live','❖ Reconnected');if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();}).catch(()=>{});
-      }
-      if(!_subChannel){_rtFailCount=0;initRealtime();}
-    }catch(e){console.warn('[HEALTH]',e.message);}
-  },30000);
-}
-
-function initRealtime(){
-  const sb=getSupa();
-  if(!sb||_subChannel)return;
-  console.log('[RT] Initializing Realtime...');
-  _subChannel=sb.channel('db-changes')
-    .on('postgres_changes',{event:'*',schema:'public',table:'settings'},payload=>{
+  console.log('[DB] Initializing Realtime listeners…');
+  
+  /* Subscribe to lightweight pg_notify channel — no large photo payloads broadcast */
+  _subChannel = sb.channel('db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
+      console.log('[DB] Realtime Setting:', payload.eventType);
       handleRealtimeSetting(payload);
     })
-    .subscribe(status=>{
-      if(status==='SUBSCRIBED'){_rtFailCount=0;showSync('live','❖ Connected Live');}
-      else if(status==='CLOSED'||status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
-        console.warn('[RT] Dropped:',status);_rtFailCount++;_subChannel=null;_scheduleRtReconnect();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        showSync('live', '✦ Connected Live');
+        console.log('[DB] Realtime Subscribed');
+      } else {
+        console.warn('[DB] Realtime Status:', status);
       }
     });
-  _subNotifyChannel=sb.channel('submission-notify')
-    .on('broadcast',{event:'submission_changes'},({payload})=>{handleRealtimeNotify(payload);})
-    .subscribe(status=>{
-      if(status==='CLOSED'||status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
-        _rtFailCount++;_subNotifyChannel=null;_scheduleRtReconnect();
-      }
-    });
-  _startHealthCheck();
+
+  /* Listen on the lightweight submission_changes notify channel (trigger sends only id/status/category/created_at) */
+  sb.channel('submission-notify')
+    .on('broadcast', { event: 'submission_changes' }, ({ payload }) => {
+      console.log('[DB] Submission notify:', payload);
+      handleRealtimeNotify(payload);
+    })
+    .subscribe();
 }
 
 function handleRealtimeSubmission(payload) {
@@ -474,8 +453,36 @@ async function dbLoadAll(){
     return mapped;
   }catch(e){
     cloudHealth.database=isNetworkTrulyOffline()?'offline':'degraded';
-    console.warn('[DB] Cloud load exhausted retries:',e.message);
-    if(cached.length){subs=cached;showSync('syncing','Showing cached submissions while cloud recovers');return cached;}
+
+    /* ── DIAGNOSTIC: capture exact root cause ── */
+    const _diagHttpStatus = e?.status || e?.code || e?.statusCode || (e?.context?.status) || 'unknown';
+    const _diagMsg        = e?.message || String(e) || 'no message';
+    const _diagHint       = e?.hint || e?.details || '';
+    const _diagUrl        = e?.url || (typeof e?.context?.url === 'string' ? e.context.url : '') ||
+                            `${SUPA_URL}/rest/v1/submissions?select=*&order=created_at.asc`;
+    const _diagRtState    = _subChannel
+                            ? (_subChannel.state || _subChannel.topic || 'channel-exists-unknown-state')
+                            : 'no-channel (never subscribed or already dropped)';
+    const _diagNetwork    = isNetworkTrulyOffline() ? 'OFFLINE' : 'online';
+    const _diagTime       = new Date().toISOString();
+    const _diagReport = [
+      '╔══ CLOUD FAILURE DIAGNOSTIC ══════════════════════════════════',
+      '║ Time        : ' + _diagTime,
+      '║ Network     : ' + _diagNetwork,
+      '║ HTTP Status : ' + _diagHttpStatus,
+      '║ Error Msg   : ' + _diagMsg,
+      '║ Hint/Detail : ' + (_diagHint || '—'),
+      '║ Failing URL : ' + _diagUrl,
+      '║ RT Channel  : ' + _diagRtState,
+      '║ Error Object: ' + JSON.stringify(e, Object.getOwnPropertyNames(e)),
+      '╚══════════════════════════════════════════════════════════════'
+    ].join('
+');
+    console.error(_diagReport);
+
+    /* Show condensed reason in the sync bar */
+    const _diagShort = `Cached [${_diagNetwork} | HTTP ${_diagHttpStatus} | ${_diagMsg.slice(0,60)}]`;
+    if(cached.length){subs=cached;showSync('syncing',_diagShort);return cached;}
     if(isNetworkTrulyOffline())showSync('err','No network connection - no cached submissions found');
     else showSync('syncing','Cloud is taking longer than usual - showing empty dashboard');
     return subs || [];
@@ -4484,7 +4491,7 @@ setTimeout(async () => {
   } finally {
     try {
       /* If a ?form= link was shared externally, open it now with up-to-date cloud settings */
-      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey] && document.querySelector('.view.active')?.id==='viewForm'){
+      if(_pendingFormKey && typeof _pendingFormKey === 'string' && CATEGORIES[_pendingFormKey]){
         openForm(_pendingFormKey);
       }
       /* Ensure UI is rendered with latest data */
