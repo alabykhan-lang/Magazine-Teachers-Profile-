@@ -453,36 +453,8 @@ async function dbLoadAll(){
     return mapped;
   }catch(e){
     cloudHealth.database=isNetworkTrulyOffline()?'offline':'degraded';
-
-    /* ── DIAGNOSTIC: capture exact root cause ── */
-    const _diagHttpStatus = e?.status || e?.code || e?.statusCode || (e?.context?.status) || 'unknown';
-    const _diagMsg        = e?.message || String(e) || 'no message';
-    const _diagHint       = e?.hint || e?.details || '';
-    const _diagUrl        = e?.url || (typeof e?.context?.url === 'string' ? e.context.url : '') ||
-                            `${SUPA_URL}/rest/v1/submissions?select=*&order=created_at.asc`;
-    const _diagRtState    = _subChannel
-                            ? (_subChannel.state || _subChannel.topic || 'channel-exists-unknown-state')
-                            : 'no-channel (never subscribed or already dropped)';
-    const _diagNetwork    = isNetworkTrulyOffline() ? 'OFFLINE' : 'online';
-    const _diagTime       = new Date().toISOString();
-    const _diagReport = [
-      '╔══ CLOUD FAILURE DIAGNOSTIC ══════════════════════════════════',
-      '║ Time        : ' + _diagTime,
-      '║ Network     : ' + _diagNetwork,
-      '║ HTTP Status : ' + _diagHttpStatus,
-      '║ Error Msg   : ' + _diagMsg,
-      '║ Hint/Detail : ' + (_diagHint || '—'),
-      '║ Failing URL : ' + _diagUrl,
-      '║ RT Channel  : ' + _diagRtState,
-      '║ Error Object: ' + JSON.stringify(e, Object.getOwnPropertyNames(e)),
-      '╚══════════════════════════════════════════════════════════════'
-    ].join('
-');
-    console.error(_diagReport);
-
-    /* Show condensed reason in the sync bar */
-    const _diagShort = `Cached [${_diagNetwork} | HTTP ${_diagHttpStatus} | ${_diagMsg.slice(0,60)}]`;
-    if(cached.length){subs=cached;showSync('syncing',_diagShort);return cached;}
+    console.warn('[DB] Cloud load exhausted retries:',e.message);
+    if(cached.length){subs=cached;const _ds='HTTP:'+(e?.status||e?.code||'?')+' | '+(e?.message||String(e)).slice(0,80)+' | RT:'+(_subChannel?(_subChannel.state||'?'):'no-channel')+' | net:'+(isNetworkTrulyOffline()?'OFFLINE':'online');console.error('[CACHE FALLBACK]',_ds,e);showSync('syncing','Cached ['+_ds+']');return cached;}
     if(isNetworkTrulyOffline())showSync('err','No network connection - no cached submissions found');
     else showSync('syncing','Cloud is taking longer than usual - showing empty dashboard');
     return subs || [];
