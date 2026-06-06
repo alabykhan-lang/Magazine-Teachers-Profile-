@@ -142,6 +142,38 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 let _supa=null;
 function loadSubCache(){try{const s=JSON.parse(localStorage.getItem('me_subs')||'[]');return Array.isArray(s)?s:[];}catch(e){return[];}}
 function persistSubCache(list){try{localStorage.setItem('me_subs',JSON.stringify(Array.isArray(list)?list:[]));}catch(e){console.warn('[DB] Local cache save failed:',e.message);}}
+function normalizeSubmissionRow(r){
+  if(!r)return null;
+  return{
+    id:r.id,category:r.category,ts:r.ts||new Date(r.created_at||Date.now()).toLocaleString(),
+    createdAt:r.created_at?new Date(r.created_at).getTime():r.created_at_ms||r.createdAt||Date.now(),
+    status:r.status||'pending',reviewerNote:r.reviewer_note||r.reviewerNote||'',reviewedAt:r.reviewed_at||r.reviewedAt||null,
+    data:typeof r.data==='string'?JSON.parse(r.data):r.data||{},
+    photoData:r.photo_url||r.photo_data||r.photoData||null,photoName:r.photo_name||r.photoName||null,
+    photos:r.photos?(typeof r.photos==='string'?JSON.parse(r.photos):r.photos):null
+  };
+}
+function mergeSubmissionLists(localList,cloudList){
+  const merged=new Map();
+  (Array.isArray(localList)?localList:[]).forEach(s=>{if(s&&s.id)merged.set(String(s.id),s);});
+  (Array.isArray(cloudList)?cloudList:[]).forEach(cloudSub=>{
+    if(!cloudSub||!cloudSub.id)return;
+    const key=String(cloudSub.id);
+    const localSub=merged.get(key);
+    if(!localSub){merged.set(key,cloudSub);return;}
+    const localLocked=localSub.status==='finalized'||localSub.locked===true;
+    const cloudTime=cloudSub.reviewedAt?new Date(cloudSub.reviewedAt).getTime():(cloudSub.createdAt||0);
+    const localTime=localSub.reviewedAt?new Date(localSub.reviewedAt).getTime():(localSub.createdAt||0);
+    merged.set(key,(localLocked&&localTime>=cloudTime)?{...cloudSub,...localSub}:{...localSub,...cloudSub});
+  });
+  return Array.from(merged.values()).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+}
+function absorbSubmissions(cloudList){
+  const merged=mergeSubmissionLists(loadSubCache(),cloudList);
+  subs=merged;
+  persistSubCache(merged);
+  return merged;
+}
 let subs=loadSubCache();
 let lsSettings=loadLsSettingsFromStorage();
 let bulkPhotos=[];
@@ -317,21 +349,12 @@ function handleRealtimeSubmission(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
   
   if (eventType === 'INSERT' || eventType === 'UPDATE') {
-    const sub = {
-      id: newRow.id, category: newRow.category, ts: newRow.ts || new Date(newRow.created_at).toLocaleString(),
-      createdAt: newRow.created_at ? new Date(newRow.created_at).getTime() : newRow.created_at_ms || Date.now(),
-      status: newRow.status || 'draft', reviewerNote: newRow.reviewer_note || '', reviewedAt: newRow.reviewed_at || null,
-      data: typeof newRow.data === 'string' ? JSON.parse(newRow.data) : newRow.data || {},
-      photoData: newRow.photo_url || newRow.photo_data || null, photoName: newRow.photo_name || null,
-      photos: newRow.photos ? (typeof newRow.photos === 'string' ? JSON.parse(newRow.photos) : newRow.photos) : null
-    };
-    
-    const idx = subs.findIndex(s => String(s.id) === String(sub.id));
-    if (idx >= 0) { subs[idx] = sub; } else { subs.push(sub); }
-    showSync('live', '✦ New data received');
+    const sub = normalizeSubmissionRow(newRow);
+    if(sub)absorbSubmissions([sub]);
+    showSync('live', 'New data received');
   } else if (eventType === 'DELETE') {
-    subs = subs.filter(s => String(s.id) !== String(oldRow.id));
-    showSync('live', '✦ Data removed');
+    console.warn('[DB] Ignoring realtime delete to protect recovered local submissions:', oldRow?.id);
+    showSync('syncing', 'Cloud delete noticed - cached submissions preserved');
   }
 
   if (document.getElementById('viewAdmin')?.classList.contains('active')) renderAdmin();
@@ -347,24 +370,15 @@ async function handleRealtimeNotify(payload) {
   console.log('[DB] Notify event:', event, id);
 
   if (event === 'DELETE') {
-    subs = subs.filter(s => String(s.id) !== String(id));
-    showSync('live', '✦ Submission removed');
+    console.warn('[DB] Ignoring notify delete to protect recovered local submissions:', id);
+    showSync('syncing', 'Cloud delete noticed - cached submissions preserved');
   } else {
     /* Re-fetch only this single row — small, no photo payload issues */
     try {
       const { data, error } = await sb.from('submissions').select('*').eq('id', id).single();
       if (error || !data) return;
-      const r = data;
-      const sub = {
-        id: r.id, category: r.category, ts: r.ts || new Date(r.created_at).toLocaleString(),
-        createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
-        status: r.status || 'pending', reviewerNote: r.reviewer_note || '', reviewedAt: r.reviewed_at || null,
-        data: typeof r.data === 'string' ? JSON.parse(r.data) : r.data || {},
-        photoData: r.photo_url || r.photo_data || null, photoName: r.photo_name || null,
-        photos: r.photos ? (typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos) : null
-      };
-      const idx = subs.findIndex(s => String(s.id) === String(sub.id));
-      if (idx >= 0) { subs[idx] = sub; } else { subs.push(sub); }
+      const sub = normalizeSubmissionRow(data);
+      if(sub)absorbSubmissions([sub]);
       showSync('live', '✦ New submission received');
     } catch(e) { console.warn('[DB] Notify re-fetch failed:', e.message); }
   }
@@ -439,18 +453,16 @@ async function dbLoadAll(){
     const cloudRows = res.data || [];
 
     /* Normalise: Supabase row → internal format */
-    const mapped=cloudRows.map(r=>({
-      id:r.id,category:r.category,ts:r.ts||new Date(r.created_at).toLocaleString(),
-      createdAt:r.created_at?new Date(r.created_at).getTime():r.created_at_ms||Date.now(),
-      status:r.status||'pending',reviewerNote:r.reviewer_note||'',reviewedAt:r.reviewed_at||null,
-      data:typeof r.data==='string'?JSON.parse(r.data):r.data||{},
-      photoData:r.photo_url||r.photo_data||null,photoName:r.photo_name||null,
-      photos:r.photos?(typeof r.photos==='string'?JSON.parse(r.photos):r.photos):null
-    }));
+    const mapped=cloudRows.map(normalizeSubmissionRow).filter(Boolean);
 
-    persistSubCache(mapped);
-    showSync('ok','✓ Cloud synced — '+mapped.length+' submissions');
-    return mapped;
+    if(!mapped.length&&cached.length){
+      subs=cached;
+      showSync('syncing','Cloud returned no rows - keeping recovered cache');
+      return cached;
+    }
+    const merged=absorbSubmissions(mapped);
+    showSync('ok','Cloud synced - '+merged.length+' submissions locked in cache');
+    return merged;
   }catch(e){
     cloudHealth.database=isNetworkTrulyOffline()?'offline':'degraded';
     console.warn('[DB] Cloud load exhausted retries:',e.message);
@@ -1638,10 +1650,11 @@ function checkPIN(){const adminOk=pinBuf===cfg.adminPin||pinBuf==='1234';const e
 
 /* ADMIN */
 function adminRefresh(){
-  const list=document.getElementById('adminSubList');
+  let list=document.getElementById('adminSubList');
+  if(subs.length)list=null;
   if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">☁️</div><h3>Refreshing…</h3><p>Fetching latest submissions from cloud.</p></div>';
   dbLoadAll().then(cloudList=>{
-    subs=cloudList;
+    subs=mergeSubmissionLists(loadSubCache(),cloudList);persistSubCache(subs);
     const banner=document.getElementById('cloudRetryBanner');
     if(banner)banner.remove();
     renderAdmin();
@@ -1782,11 +1795,14 @@ function deleteSubmission(id){if(!confirm('Permanently delete this submission?')
 /* ADMIN ENTER — pulls fresh cloud data */
 function enterAdmin(){
   show('viewAdmin');
+  subs=loadAll();
+  if(subs.length)renderAdmin();
   /* Show a loading placeholder immediately so the list doesn't appear empty */
-  const list=document.getElementById('adminSubList');
+  let list=document.getElementById('adminSubList');
+  if(subs.length)list=null;
   if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">☁️</div><h3>Loading submissions…</h3><p>Fetching latest from cloud.</p></div>';
   dbLoadAll().then(cloudList=>{
-    subs=cloudList;
+    subs=mergeSubmissionLists(loadSubCache(),cloudList);persistSubCache(subs);
     renderAdmin();
   }).catch(()=>{
     /* Cloud failed — fall back to local cache and surface a retry banner */
@@ -1806,15 +1822,18 @@ function enterAdmin(){
 /* EDITOR ENTER — pulls fresh cloud data, defaults to pending */
 function enterEditor(){
   show('viewEditor');
+  subs=loadAll();
   currentEditorCat='pending';
   document.querySelectorAll('#viewEditor .editor-tab').forEach(t=>t.classList.remove('active'));
   const pendingTab=document.getElementById('etab-pending');if(pendingTab)pendingTab.classList.add('active');
   document.getElementById('editorModeList').style.display='block';
   document.getElementById('editorModeNote').style.display='none';
-  const list=document.getElementById('editorSubList');
+  if(subs.length)renderEditor();
+  let list=document.getElementById('editorSubList');
+  if(subs.length)list=null;
   if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">⏳</div><h3>Loading submissions…</h3><p>Fetching latest from cloud.</p></div>';
   dbLoadAll().then(cloudList=>{
-    subs=cloudList;
+    subs=mergeSubmissionLists(loadSubCache(),cloudList);persistSubCache(subs);
     renderEditor();
   }).catch(()=>{subs=loadAll();renderEditor();});
 }
@@ -1823,7 +1842,7 @@ function editorRefresh(){
   const list=document.getElementById('editorSubList');
   if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">↻</div><h3>Refreshing…</h3><p>Fetching latest submissions from cloud.</p></div>';
   dbLoadAll().then(cloudList=>{
-    subs=cloudList;
+    subs=mergeSubmissionLists(loadSubCache(),cloudList);persistSubCache(subs);
     renderEditor();
     /* Flash the tab counts to signal fresh data */
     const btn=document.getElementById('etab-pending');
@@ -1843,7 +1862,7 @@ function setEditorCategory(cat){
     document.getElementById('editorModeNote').style.display='none';
     /* Always re-pull cloud on tab switch so new submissions appear immediately */
     dbLoadAll().then(cloudList=>{
-      subs=cloudList;
+      subs=mergeSubmissionLists(loadSubCache(),cloudList);persistSubCache(subs);
       localStorage.setItem('me_subs',JSON.stringify(subs));
       renderEditor();
     }).catch(()=>{subs=loadAll();renderEditor();});
