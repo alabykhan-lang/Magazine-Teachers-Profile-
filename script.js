@@ -139,8 +139,8 @@ const EDITORIAL_META={'editorial-note':{label:'Editorial Note',tag:'Editorial No
 ═══════════════════════════════════════════════════════════ */
 const SUPA_URL='https://srkgolzstppnyntrkemk.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNya2dvbHpzdHBwbnludHJrZW1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjg4MTAsImV4cCI6MjA5MjgwNDgxMH0.M1uVsgraBxXGDrLSqBgz9e3QFRmSjaZBgz7xoGlOo3c';
-const DB_SUBMISSION_COLUMNS='id,category,ts,created_at,created_at_ms,status,reviewer_note,reviewed_at,data,photo_url,photo_data,photo_name,photos';
-const DB_SUBMISSION_PAGE_SIZE=1000;
+const DB_SUBMISSION_COLUMNS='id,category,ts,created_at,status,reviewer_note,reviewed_at,data,photo_url,photo_name,photos';
+const DB_SUBMISSION_PAGE_SIZE=25;
 const ENABLE_REALTIME=false;
 const CLOUD_AUTO_REFRESH_MS=180000;
 let _supa=null;
@@ -189,12 +189,36 @@ function mergeSubmissionLists(localList,cloudList){
   });
   return Array.from(merged.values()).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
 }
-const cloudLoadState={count:null,loadedAt:null,source:'cache',error:null};
-function absorbSubmissions(cloudList){
-  const merged=mergeSubmissionLists(loadSubCache(),cloudList);
-  subs=merged;
-  persistSubCache(merged);
-  return merged;
+const cloudLoadState={count:null,loadedAt:null,source:'cache',error:null,counts:null};
+function computeSubmissionCounts(list){
+  const all=Array.isArray(list)?list:[];
+  const byStatus={pending:0,approved:0,rejected:0,finalized:0,draft:0};
+  const byCategory={};
+  all.forEach(s=>{
+    const status=s?.status||'pending';
+    byStatus[status]=(byStatus[status]||0)+1;
+    const cat=s?.category||'uncategorized';
+    byCategory[cat]=(byCategory[cat]||0)+1;
+  });
+  return{total:all.length,byStatus,byCategory};
+}
+function formatAdminCountSummary(counts,source){
+  counts=counts||computeSubmissionCounts([]);
+  const status=counts.byStatus||{};
+  const catText=Object.entries(counts.byCategory||{})
+    .sort(([a],[b])=>a.localeCompare(b))
+    .map(([k,v])=>`${CATEGORIES[k]?.tag||EDITORIAL_META[k]?.tag||k}: ${v}`)
+    .join(' | ')||'No categories';
+  const label=source==='cloud'?'Cloud source of truth':'Cached fallback only';
+  return `${label} - Total ${counts.total||0} | Pending ${status.pending||0} | Approved ${status.approved||0} | Rejected ${status.rejected||0} | ${catText}`;
+}
+function absorbSubmissions(cloudList,options){
+  options=options||{};
+  const cloud=Array.isArray(cloudList)?cloudList:[];
+  const next=options.replaceCache?cloud:mergeSubmissionLists(loadSubCache(),cloud);
+  subs=next;
+  persistSubCache(next);
+  return next;
 }
 let subs=loadSubCache();
 let lsSettings=loadLsSettingsFromStorage();
@@ -206,7 +230,7 @@ const PRINT_IMAGE_RECOMMENDED_PX=1200;
 const PRINT_MAX_IMAGE_MB=25;
 const BULK_CLOUD_CONCURRENCY=6;
 const CLOUD_RETRY_DELAYS=[500,1000,2000];
-const CLOUD_TIMEOUT_MS=9000;
+const CLOUD_TIMEOUT_MS=20000;
 const cloudHealth={database:'unknown',auth:'unknown',realtime:'unknown',edge:'unknown'};
 
 function loadLsSettingsFromStorage(){
@@ -375,8 +399,8 @@ function handleRealtimeSubmission(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
   
   if (eventType === 'INSERT' || eventType === 'UPDATE') {
-    const sub = normalizeSubmissionRow(newRow);
-    if(sub)absorbSubmissions([sub]);
+      const sub = normalizeSubmissionRow(newRow);
+      if(sub)absorbSubmissions([sub]);
     showSync('live', 'New data received');
   } else if (eventType === 'DELETE') {
     console.warn('[DB] Ignoring realtime delete to protect recovered local submissions:', oldRow?.id);
@@ -505,19 +529,22 @@ async function dbLoadAll(options){
 
     /* Normalise: Supabase row → internal format */
     const mapped=cloudRows.map(normalizeSubmissionRow).filter(Boolean);
+    cloudLoadState.count=typeof res.count==='number'?res.count:mapped.length;
+    cloudLoadState.counts=computeSubmissionCounts(mapped);
 
     if(!mapped.length&&cached.length&&!options.bypassCache){
       subs=cached;
       if(!options.silent)showSync('syncing','Cloud returned no rows - keeping recovered cache');
       return cached;
     }
-    const merged=absorbSubmissions(mapped);
-    if(!options.silent)showSync('ok','Cloud synced - '+mapped.length+' cloud rows, '+merged.length+' visible');
-    return merged;
+    const cloudOnly=absorbSubmissions(mapped,{replaceCache:true});
+    if(!options.silent)showSync('ok','Cloud synced - '+mapped.length+' cloud rows visible');
+    return cloudOnly;
   }catch(e){
     cloudHealth.database=isNetworkTrulyOffline()?'offline':'degraded';
-    cloudLoadState.source='cache';
+    cloudLoadState.source='fallback';
     cloudLoadState.error=e.message||String(e);
+    cloudLoadState.counts=null;
     console.warn('[DB] Cloud load exhausted retries:',e.message);
     if(options.bypassCache||options.allowCacheFallback===false)throw e;
     if(cached.length){subs=cached;if(!options.silent)showSync('syncing','Showing cached submissions while cloud recovers');return cached;}
@@ -1727,7 +1754,6 @@ function checkPIN(){const adminOk=pinBuf===cfg.adminPin||pinBuf==='1234';const e
 /* ADMIN */
 function adminRefresh(){
   let list=document.getElementById('adminSubList');
-  if(subs.length)list=null;
   if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">☁️</div><h3>Refreshing…</h3><p>Fetching latest submissions from cloud.</p></div>';
   const statusFilter=document.getElementById('filterStatus');
   if(statusFilter)statusFilter.value='all';
@@ -1738,7 +1764,21 @@ function adminRefresh(){
     renderAdmin();
     const btn=document.getElementById('tab-all');
     if(btn){btn.style.background='var(--school-mint2)';setTimeout(()=>btn.style.background='',800);}
-  }).catch(()=>{subs=loadAll();renderAdmin();});
+  }).catch(e=>{subs=loadSubCache();renderAdmin();showAdminCloudError(e);});
+}
+function showAdminCloudError(err){
+  const msg=err?.message||String(err||'Unknown cloud error');
+  showSync('err','Cloud fetch failed - showing cached fallback only');
+  const main=document.querySelector('#viewAdmin .admin-main');
+  if(!main)return;
+  let banner=document.getElementById('cloudRetryBanner');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='cloudRetryBanner';
+    main.prepend(banner);
+  }
+  banner.style.cssText='background:#7f1d1d;color:#fff;padding:10px 20px;text-align:center;font-size:13px;font-family:Lato,sans-serif;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;';
+  banner.innerHTML=`<span>Cloud fetch failed. Showing cached fallback only (${loadSubCache().length} cached). Error: ${esc(msg)}</span><button onclick="adminRefresh()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;font-family:Lato,sans-serif;">Refresh from Cloud</button>`;
 }
 function hideAllAdminModes(){['adminModeSubs','adminModeEditorial','adminModeLayout','adminModeShareLinks','adminModeSettings'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 function setCategory(cat){currentAdminCat=cat;document.querySelectorAll('#viewAdmin .admin-tab').forEach(t=>t.classList.remove('active'));const btn=document.getElementById('tab-'+cat);if(btn)btn.classList.add('active');hideAllAdminModes();if(cat==='editorial'){document.getElementById('adminModeEditorial').style.display='block';renderEditorialMode();}else{document.getElementById('adminModeSubs').style.display='block';renderAdmin();}}
@@ -1776,31 +1816,33 @@ function renderAdminTabs(){
 }
 
 function renderAdmin(){
-  subs=loadAll();
+  const adminData=(Array.isArray(subs)&&subs.length)?subs:loadAll();
+  subs=adminData;
+  const counts=computeSubmissionCounts(adminData);
   renderAdminTabs();
   const statusFilter=document.getElementById('filterStatus');
   if(statusFilter&&!statusFilter.value)statusFilter.value='all';
-  document.getElementById('count-all').textContent=subs.length;
-  CATEGORY_KEYS.forEach(k=>{const el=document.getElementById('count-'+k);if(el)el.textContent=subs.filter(s=>s.category===k).length;});
-  const edCount=document.getElementById('count-editorial');if(edCount)edCount.textContent=subs.filter(s=>s.category==='editorial-note'||s.category==='appreciation').length;
-  document.getElementById('statTotal').textContent=subs.length;
-  document.getElementById('statPending').textContent=subs.filter(s=>s.status==='pending').length;
-  document.getElementById('statApproved').textContent=subs.filter(s=>s.status==='approved').length;
-  document.getElementById('statFinalized').textContent=subs.filter(s=>s.status==='finalized').length;
+  document.getElementById('count-all').textContent=counts.total;
+  CATEGORY_KEYS.forEach(k=>{const el=document.getElementById('count-'+k);if(el)el.textContent=counts.byCategory[k]||0;});
+  const edCount=document.getElementById('count-editorial');if(edCount)edCount.textContent=(counts.byCategory['editorial-note']||0)+(counts.byCategory['appreciation']||0);
+  document.getElementById('statTotal').textContent=counts.total;
+  document.getElementById('statPending').textContent=counts.byStatus.pending||0;
+  document.getElementById('statApproved').textContent=counts.byStatus.approved||0;
+  document.getElementById('statFinalized').textContent=counts.byStatus.finalized||0;
   const sf=statusFilter?statusFilter.value:'all';
   /* Sequence order: sort by createdAt ascending (oldest first = submission order) */
-  let filtered=subs.slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  let filtered=adminData.slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
   /* WORKFLOW: Production Admin defaults to all statuses; editor state still controls actions. */
   if(currentAdminCat!=='all')filtered=filtered.filter(s=>s.category===currentAdminCat);
   if(sf!=='all')filtered=filtered.filter(s=>s.status===sf);
   const list=document.getElementById('adminSubList');
   /* Workflow notice for admin */
-  const pendingCount=subs.filter(s=>s.status==='pending').length;
-  const approvedCount=subs.filter(s=>s.status==='approved').length;
-  const lockedCount=subs.filter(s=>s.status==='approved'||s.status==='finalized').length;
+  const pendingCount=counts.byStatus.pending||0;
+  const approvedCount=counts.byStatus.approved||0;
+  const lockedCount=(counts.byStatus.approved||0)+(counts.byStatus.finalized||0);
   const cloudSummary=cloudLoadState.loadedAt
     ?`Cloud: ${cloudLoadState.count??'unknown'} row${cloudLoadState.count===1?'':'s'} refreshed ${new Date(cloudLoadState.loadedAt).toLocaleTimeString()}`
-    :(cloudLoadState.error?`Cloud delayed - cache visible (${subs.length})`:`Cloud count pending - cache visible (${subs.length})`);
+    :(cloudLoadState.error?`Cloud failed - cached fallback visible (${counts.total})`:`Cloud count pending (${counts.total} visible)`);
   let workflowBanner=`<div style="background:linear-gradient(135deg,#f0fdf6,#e6faf0);border:1px solid var(--school-mint2);border-radius:var(--radius);padding:14px 18px;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <span style="font-size:20px;">📋</span>
     <div style="flex:1;font-size:13px;color:var(--school-navy);">
@@ -1810,7 +1852,10 @@ function renderAdmin(){
   </div>`;
   if(!filtered.length){list.innerHTML=workflowBanner+`<div class="empty-state"><div class="empty-state-icon">📭</div><h3>No submissions to show</h3><p>${subs.length?'Try changing the filter.':'Share the submission links with contributors.'}</p></div>`;return;}
   const cloudCountBanner=`<div style="font-size:12px;color:var(--ink3);margin:-.75rem 0 1rem 0;">All Statuses is the default view · ${lockedCount} approved/finalized locked visible · ${cloudSummary}</div>`;
-  list.innerHTML=workflowBanner+cloudCountBanner+filtered.map(s=>renderSubCard(s,'admin')).join('');
+  const countSource=cloudLoadState.source==='cloud'?'cloud':'fallback';
+  const visibleCounts=cloudLoadState.source==='cloud'&&cloudLoadState.counts?cloudLoadState.counts:counts;
+  const detailedCountBanner=`<div style="font-size:12px;color:var(--ink3);margin:-.75rem 0 1rem 0;">${esc(formatAdminCountSummary(visibleCounts,countSource))}${cloudLoadState.error?'<br>Error: '+esc(cloudLoadState.error):''}</div>`;
+  list.innerHTML=workflowBanner+cloudCountBanner+detailedCountBanner+filtered.map(s=>renderSubCard(s,'admin')).join('');
 }
 
 function renderSubCard(s,ctx){
@@ -1883,18 +1928,16 @@ function enterAdmin(){
   show('viewAdmin');
   const statusFilter=document.getElementById('filterStatus');
   if(statusFilter)statusFilter.value='all';
-  subs=loadAll();
-  if(subs.length)renderAdmin();
+  subs=[];
   /* Show a loading placeholder immediately so the list doesn't appear empty */
   let list=document.getElementById('adminSubList');
-  if(subs.length)list=null;
   if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">☁️</div><h3>Loading submissions…</h3><p>Fetching latest from cloud.</p></div>';
-  dbLoadAll().then(cloudList=>{
-    subs=mergeSubmissionLists(loadSubCache(),cloudList);persistSubCache(subs);
+  dbLoadAll({bypassCache:true,allowCacheFallback:false}).then(cloudList=>{
+    subs=cloudList;persistSubCache(subs);
     renderAdmin();
-  }).catch(()=>{
+  }).catch(e=>{
     /* Cloud failed — fall back to local cache and surface a retry banner */
-    subs=loadAll();
+    subs=loadSubCache();
     renderAdmin();
     const main=document.querySelector('#viewAdmin .admin-main');
     if(main&&!document.getElementById('cloudRetryBanner')){
@@ -1904,6 +1947,7 @@ function enterAdmin(){
       banner.innerHTML='<span>Cloud sync is delayed - showing cached submissions.</span><button onclick="adminRefresh()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;font-family:Lato,sans-serif;">Retry Sync</button>';
       main.prepend(banner);
     }
+    showAdminCloudError(e);
   });
 }
 
