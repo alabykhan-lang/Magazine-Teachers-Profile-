@@ -139,9 +139,30 @@ const EDITORIAL_META={'editorial-note':{label:'Editorial Note',tag:'Editorial No
 ═══════════════════════════════════════════════════════════ */
 const SUPA_URL='https://srkgolzstppnyntrkemk.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNya2dvbHpzdHBwbnludHJrZW1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjg4MTAsImV4cCI6MjA5MjgwNDgxMH0.M1uVsgraBxXGDrLSqBgz9e3QFRmSjaZBgz7xoGlOo3c';
+const DB_SUBMISSION_COLUMNS='id,category,ts,created_at,created_at_ms,status,reviewer_note,reviewed_at,data,photo_url,photo_data,photo_name,photos';
+const DB_SUBMISSION_PAGE_SIZE=1000;
+const ENABLE_REALTIME=false;
+const CLOUD_AUTO_REFRESH_MS=180000;
 let _supa=null;
 function loadSubCache(){try{const s=JSON.parse(localStorage.getItem('me_subs')||'[]');return Array.isArray(s)?s:[];}catch(e){return[];}}
 function persistSubCache(list){try{localStorage.setItem('me_subs',JSON.stringify(Array.isArray(list)?list:[]));}catch(e){console.warn('[DB] Local cache save failed:',e.message);}}
+function isStorageUrl(url){
+  if(!url||typeof url!=='string')return false;
+  try{
+    const u=new URL(url);
+    return /^https?:$/.test(u.protocol)&&u.origin===new URL(SUPA_URL).origin&&u.pathname.includes('/storage/v1/object/');
+  }catch(e){return false;}
+}
+function storageUrlOnly(url){return isStorageUrl(url)?url:null;}
+function normalizePhotoList(photos){
+  let list=[];
+  try{list=typeof photos==='string'?JSON.parse(photos||'[]'):(Array.isArray(photos)?photos:[]);}
+  catch(e){list=[];}
+  return list.map(p=>{
+    const url=storageUrlOnly(p?.url||p?.data);
+    return url?{...p,url,data:null}:null;
+  }).filter(Boolean);
+}
 function normalizeSubmissionRow(r){
   if(!r)return null;
   return{
@@ -149,8 +170,8 @@ function normalizeSubmissionRow(r){
     createdAt:r.created_at?new Date(r.created_at).getTime():r.created_at_ms||r.createdAt||Date.now(),
     status:r.status||'pending',reviewerNote:r.reviewer_note||r.reviewerNote||'',reviewedAt:r.reviewed_at||r.reviewedAt||null,
     data:typeof r.data==='string'?JSON.parse(r.data):r.data||{},
-    photoData:r.photo_url||r.photo_data||r.photoData||null,photoName:r.photo_name||r.photoName||null,
-    photos:r.photos?(typeof r.photos==='string'?JSON.parse(r.photos):r.photos):null
+    photoData:storageUrlOnly(r.photo_url||r.photo_data||r.photoData),photoName:r.photo_name||r.photoName||null,
+    photos:r.photos?normalizePhotoList(r.photos):null
   };
 }
 function mergeSubmissionLists(localList,cloudList){
@@ -161,13 +182,14 @@ function mergeSubmissionLists(localList,cloudList){
     const key=String(cloudSub.id);
     const localSub=merged.get(key);
     if(!localSub){merged.set(key,cloudSub);return;}
-    const localLocked=localSub.status==='finalized'||localSub.locked===true;
+    const localLocked=localSub.status==='approved'||localSub.status==='finalized'||localSub.locked===true;
     const cloudTime=cloudSub.reviewedAt?new Date(cloudSub.reviewedAt).getTime():(cloudSub.createdAt||0);
     const localTime=localSub.reviewedAt?new Date(localSub.reviewedAt).getTime():(localSub.createdAt||0);
     merged.set(key,(localLocked&&localTime>=cloudTime)?{...cloudSub,...localSub}:{...localSub,...cloudSub});
   });
   return Array.from(merged.values()).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
 }
+const cloudLoadState={count:null,loadedAt:null,source:'cache',error:null};
 function absorbSubmissions(cloudList){
   const merged=mergeSubmissionLists(loadSubCache(),cloudList);
   subs=merged;
@@ -316,6 +338,10 @@ let currentEditorCat = 'all';
 
 
 function initRealtime() {
+  if(!ENABLE_REALTIME){
+    cloudHealth.realtime='optional';
+    return;
+  }
   const sb = getSupa();
   if (!sb || _subChannel) return;
 
@@ -375,7 +401,7 @@ async function handleRealtimeNotify(payload) {
   } else {
     /* Re-fetch only this single row — small, no photo payload issues */
     try {
-      const { data, error } = await sb.from('submissions').select('*').eq('id', id).single();
+      const { data, error } = await sb.from('submissions').select(DB_SUBMISSION_COLUMNS).eq('id', id).single();
       if (error || !data) return;
       const sub = normalizeSubmissionRow(data);
       if(sub)absorbSubmissions([sub]);
@@ -416,24 +442,45 @@ function handleRealtimeSetting(payload) {
 /* (withRetry defined above — duplicate removed) */
 
 /* ── Submissions (cloud + local mirror) ── */
-async function dbLoadAll(){
+async function dbFetchAllSubmissionRows(){
+  const sb=getSupa();
+  if(!sb)throw new Error('Supabase client not available - check internet');
+  const rows=[];
+  let from=0,total=null;
+  while(true){
+    const to=from+DB_SUBMISSION_PAGE_SIZE-1;
+    const res=await fetchWithRetry(
+      () => sb.from('submissions').select(DB_SUBMISSION_COLUMNS,{count:'exact'}).order('created_at',{ascending:true}).range(from,to),
+      from?'Loading more submissions':'Loading submissions'
+    );
+    if(res.error)throw res.error;
+    const page=res.data||[];
+    if(total===null&&typeof res.count==='number')total=res.count;
+    rows.push(...page);
+    if(page.length<DB_SUBMISSION_PAGE_SIZE)break;
+    if(total!==null&&rows.length>=total)break;
+    from+=DB_SUBMISSION_PAGE_SIZE;
+  }
+  return{rows,count:total??rows.length};
+}
+
+async function dbLoadAll(options){
+  options=options||{};
   const cached=loadSubCache();
-  showSync('syncing','Connecting to cloud…');
+  if(!options.silent)showSync('syncing',options.bypassCache?'Refreshing from cloud...':'Connecting to cloud...');
   try{
     const sb=getSupa();
     if(!sb) throw new Error('Supabase client not available — check internet');
 
-    const res = await fetchWithRetry(
-      () => sb.from('submissions').select('*').order('created_at', { ascending: true }),
-      'Loading submissions'
-    );
+    const result=await dbFetchAllSubmissionRows();
+    const res={data:result.rows,error:null,count:result.count};
 
     if(res.error){
       /* Distinguish RLS block (HTTP 401/403/PGRST) from network error */
       const isRLS = res.error.code==='42501'||res.error.message?.includes('permission')||res.error.message?.includes('policy');
       if(isRLS){
         cloudHealth.database='blocked';
-        showSync('err','⚠ Supabase RLS is blocking access — run fix SQL in Supabase (see console)');
+      if(!options.silent)showSync('err','⚠ Supabase RLS is blocking access — run fix SQL in Supabase (see console)');
         console.error('[DB] RLS BLOCK — To fix, go to Supabase Dashboard → SQL Editor and run:\n\n' +
           '-- Allow all reads and writes for anonymous users:\n' +
           'ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;\n' +
@@ -444,31 +491,40 @@ async function dbLoadAll(){
           'CREATE POLICY "public_access" ON public.settings FOR ALL TO anon USING (true) WITH CHECK (true);\n');
       } else {
         cloudHealth.database='degraded';
-        showSync('syncing','Cloud is slow - keeping cached submissions visible');
+        if(!options.silent)showSync('syncing','Cloud is slow - keeping cached submissions visible');
       }
       throw res.error;
     }
     cloudHealth.database='ok';
 
     const cloudRows = res.data || [];
+    cloudLoadState.count=typeof res.count==='number'?res.count:cloudRows.length;
+    cloudLoadState.loadedAt=Date.now();
+    cloudLoadState.source='cloud';
+    cloudLoadState.error=null;
 
     /* Normalise: Supabase row → internal format */
     const mapped=cloudRows.map(normalizeSubmissionRow).filter(Boolean);
 
-    if(!mapped.length&&cached.length){
+    if(!mapped.length&&cached.length&&!options.bypassCache){
       subs=cached;
-      showSync('syncing','Cloud returned no rows - keeping recovered cache');
+      if(!options.silent)showSync('syncing','Cloud returned no rows - keeping recovered cache');
       return cached;
     }
     const merged=absorbSubmissions(mapped);
-    showSync('ok','Cloud synced - '+merged.length+' submissions locked in cache');
+    if(!options.silent)showSync('ok','Cloud synced - '+mapped.length+' cloud rows, '+merged.length+' visible');
     return merged;
   }catch(e){
     cloudHealth.database=isNetworkTrulyOffline()?'offline':'degraded';
+    cloudLoadState.source='cache';
+    cloudLoadState.error=e.message||String(e);
     console.warn('[DB] Cloud load exhausted retries:',e.message);
-    if(cached.length){subs=cached;showSync('syncing','Showing cached submissions while cloud recovers');return cached;}
-    if(isNetworkTrulyOffline())showSync('err','No network connection - no cached submissions found');
-    else showSync('syncing','Cloud is taking longer than usual - showing empty dashboard');
+    if(options.bypassCache||options.allowCacheFallback===false)throw e;
+    if(cached.length){subs=cached;if(!options.silent)showSync('syncing','Showing cached submissions while cloud recovers');return cached;}
+    if(!options.silent){
+      if(isNetworkTrulyOffline())showSync('err','No network connection - no cached submissions found');
+      else showSync('syncing','Cloud is taking longer than usual - showing empty dashboard');
+    }
     return subs || [];
   }
 }
@@ -486,9 +542,8 @@ async function dbSaveSubmission(sub){
     const row=submissionToDbRow(sub);
     
     await fetchWithRetry(async()=>{
-      const{error,data}=await sb.from('submissions').upsert(row,{onConflict:'id'}).select();
+      const{error}=await sb.from('submissions').upsert(row,{onConflict:'id'});
       if(error)throw error;
-      return data;
     }, 'Saving submission');
     
     showSync('ok','✓ Cloud synced');
@@ -498,14 +553,18 @@ async function dbSaveSubmission(sub){
   }
 }
 function submissionToDbRow(sub){
+  const photos=Array.isArray(sub.photos)?sub.photos.map(p=>{
+    const url=storageUrlOnly(p?.url||p?.data);
+    return url?{...p,url,data:null}:null;
+  }).filter(Boolean):null;
   return{
     id:sub.id,category:sub.category,ts:sub.ts,
     created_at:new Date(sub.createdAt||Date.now()).toISOString(),
     status:sub.status,reviewer_note:sub.reviewerNote||'',
     reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
     data:JSON.stringify(sub.data),
-    photo_url:sub.photoData||null,photo_name:sub.photoName||null,
-    photos:sub.photos?JSON.stringify(sub.photos):null
+    photo_url:storageUrlOnly(sub.photoData),photo_name:sub.photoName||null,
+    photos:photos?JSON.stringify(photos):null
   };
 }
 async function dbSaveSubmissionsBulk(list){
@@ -550,11 +609,6 @@ async function dbDeleteSubmission(id){
   }
 }
 async function dbUpdateStatus(id,status,reviewerNote,reviewedAt){
-  if(status === 'rejected') {
-    console.log('[DB] Submission rejected. Permanently wiping from system.');
-    return dbDeleteSubmission(id);
-  }
-
   /* Optimistic memory update */
   const s=subs.find(x=>String(x.id)===String(id));
   if(s){s.status=status;s.reviewerNote=reviewerNote||'';s.reviewedAt=reviewedAt||null;persistSubCache(subs);}
@@ -617,14 +671,7 @@ async function dbSaveAllToCloud(list){
   showSync('syncing','Saving all to cloud…');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const rows = list.map(sub=>({
-      id:sub.id,category:sub.category,ts:sub.ts,
-      created_at:new Date(sub.createdAt||Date.now()).toISOString(),
-      status:sub.status,reviewer_note:sub.reviewerNote||'',
-      reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
-      data:JSON.stringify(sub.data),photo_url:sub.photoData||null,photo_name:sub.photoName||null,
-      photos:sub.photos?JSON.stringify(sub.photos):null
-    }));
+    const rows = list.map(submissionToDbRow);
     await withRetry(async()=>{
       const {error}=await sb.from('submissions').upsert(rows,{onConflict:'id'});
       if(error)throw error;
@@ -723,6 +770,7 @@ async function checkAuthHealth(){
 }
 async function checkRealtimeHealth(){
   try{
+    if(!ENABLE_REALTIME){cloudHealth.realtime='optional';return cloudHealth.realtime;}
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
     cloudHealth.realtime=_subChannel?'ok':'available';
   }catch(e){
@@ -784,7 +832,7 @@ async function initCloudSync(){
     subs=await dbLoadAll();
     
     showSync('ok', subs.length ? '✓ Cloud Synced' : '✓ Connected (Empty)');
-    if(subs.length) showSync('live','✦ Live & Synced');
+    if(subs.length) showSync('ok','Cloud data ready');
     
     /* Refresh any open view */
     if(document.getElementById('viewAdmin')?.classList.contains('active'))renderAdmin();
@@ -799,6 +847,23 @@ async function initCloudSync(){
     /* ALWAYS remove overlay after sync attempt (success or fail) */
     if(typeof removeBootOverlay === 'function') removeBootOverlay();
   }
+}
+
+let _cloudAutoRefreshTimer=null;
+function startOptionalCloudAutoRefresh(){
+  if(_cloudAutoRefreshTimer)return;
+  _cloudAutoRefreshTimer=setInterval(()=>{
+    const adminActive=document.getElementById('viewAdmin')?.classList.contains('active');
+    const editorActive=document.getElementById('viewEditor')?.classList.contains('active');
+    const workspaceActive=document.getElementById('viewWorkspace')?.classList.contains('active');
+    if(!adminActive&&!editorActive&&!workspaceActive)return;
+    dbLoadAll({silent:true,allowCacheFallback:false}).then(list=>{
+      subs=list;
+      if(adminActive)renderAdmin();
+      if(editorActive)renderEditor();
+      if(workspaceActive&&typeof wsGeneratePreview==='function')wsGeneratePreview();
+    }).catch(e=>console.warn('[DB] Optional cloud refresh skipped:',e.message));
+  },CLOUD_AUTO_REFRESH_MS);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1015,11 +1080,7 @@ async function submitBulkGallery(){
   const prepared=await mapWithConcurrency(bulkPhotos,BULK_CLOUD_CONCURRENCY,async(p,i)=>{
     try{
       const subId=genId();
-      /* Upload to Storage for full quality */
-      let photoData=p.dataURL;
-      if(p.file){
-        try{photoData=await uploadToStorage(p.file,subId);}catch(e){console.warn('[Storage] Bulk photo upload failed:',e.message);errors++;}
-      }
+      const photoData=await uploadToStorage(p.file,subId);
       return{
         id:subId,
         category:'gallery',ts,createdAt:Date.now()+i,
@@ -1044,13 +1105,14 @@ async function submitBulkGallery(){
   if(ready.length)await dbSaveSubmissionsBulk(ready);
   bulkPhotos=[];renderBulkGrid();
   if(errors){
-    alert(`${ready.length} photos submitted, ${errors} had upload issues. Storage fallbacks were saved with the submissions.`);
+    alert(`${ready.length} photos submitted, ${errors} photo upload(s) failed and were not saved.`);
   } else {
     alert(`${ready.length} photos submitted successfully! They are now awaiting Editor review.`);
   }
   showSync('ok',ready.length+' photos uploaded');
   document.getElementById('formContainer').style.display='none';
   document.getElementById('successWrap').style.display='block';
+  clearSubmissionUrlRouting();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 const DEFAULT_SECTION_ORDER=[
@@ -1132,6 +1194,13 @@ function goLanding(){
     return;
   }
   show('viewLanding');currentFormCategory=null;resetFormState();renderLandingCards();if(window.history&&window.history.replaceState){window.history.replaceState({},document.title,window.location.pathname);}
+}
+function clearSubmissionUrlRouting(){
+  standaloneFormKey=null;
+  updateStandaloneFormChrome();
+  if(window.history&&window.history.replaceState){
+    window.history.replaceState({},document.title,window.location.pathname);
+  }
 }
 
 /* LANDING CARDS */
@@ -1457,12 +1526,9 @@ async function submitForm(){
 
   /* Upload photo to Supabase Storage for full quality preservation */
   const subId=genId();
-  let finalPhotoData=photoDataURL||null;
+  let finalPhotoData=null;
   if(photoFile&&!cat.photoMulti){
-    try{
-      const storageUrl=await uploadToStorage(photoFile,subId);
-      finalPhotoData=storageUrl;/* full-quality URL replaces base64 */
-    }catch(e){console.warn('[Storage] Upload failed, using base64:',e.message);}
+    finalPhotoData=await uploadToStorage(photoFile,subId);
   }
   let finalPhotos=null;
   if(cat.photoMulti&&photoFilesMulti.length){
@@ -1471,9 +1537,7 @@ async function submitForm(){
       try{
         const url=await uploadToStorage(photoFilesMulti[i],subId+'_'+i);
         finalPhotos.push({url:url,name:photoFilesMulti[i]?.name||`photo_${i+1}.jpg`,meta:photoMetasMulti[i]||null});
-      }catch(e){
-        finalPhotos.push({data:photoDataURLsMulti[i],name:photoFilesMulti[i]?.name||`photo_${i+1}.jpg`,meta:photoMetasMulti[i]||null});
-      }
+      }catch(e){throw new Error('Photo '+(i+1)+' upload failed: '+(e.message||e));}
     }
   }
   const sub={id:subId,category:currentFormCategory,
@@ -1514,6 +1578,7 @@ async function submitForm(){
       document.getElementById('successUploading').style.display='none';
       document.getElementById('successDone').style.display='block';
     },600);
+    clearSubmissionUrlRouting();
     releaseSubmit();
   }catch(e){
     clearInterval(tick);
@@ -1549,10 +1614,9 @@ function collectBulkSubmissionPayloads(){
 
 async function buildSubmissionPayload(data,entry,batchIndex){
   const cat=CATEGORIES[currentFormCategory],subId=genId();
-  let finalPhotoData=entry.photoDataURL||null;
+  let finalPhotoData=null;
   if(entry.photoFile&&!cat.photoMulti){
-    try{finalPhotoData=await uploadToStorage(entry.photoFile,subId);}
-    catch(e){console.warn('[Storage] Upload failed, using base64:',e.message);}
+    finalPhotoData=await uploadToStorage(entry.photoFile,subId);
   }
   let finalPhotos=null;
   if(cat.photoMulti&&entry.photoFilesMulti.length){
@@ -1560,9 +1624,7 @@ async function buildSubmissionPayload(data,entry,batchIndex){
       try{
         const url=await uploadToStorage(file,subId+'_'+i);
         return{url:url,name:file?.name||`photo_${i+1}.jpg`,meta:entry.photoMetasMulti[i]||null};
-      }catch(e){
-        return{data:entry.photoDataURLsMulti[i],name:file?.name||`photo_${i+1}.jpg`,meta:entry.photoMetasMulti[i]||null};
-      }
+      }catch(e){throw new Error('Photo '+(i+1)+' upload failed: '+(e.message||e));}
     });
   }
   return{id:subId,category:currentFormCategory,
@@ -1600,6 +1662,7 @@ async function saveSubmissionBatch(submissions,releaseSubmit){
       document.getElementById('successDone').style.display='block';
     },600);
     resetFormState();
+    clearSubmissionUrlRouting();
     releaseSubmit();
   }catch(e){
     clearInterval(tick);
@@ -1629,14 +1692,27 @@ async function submitForm(){
     if(onBulk){releaseSubmit();submitBulkGallery();return;}
     if(cat.photoRequired&&!photoDataURL){const e=document.getElementById('photoErrMsg');if(e){e.textContent='A photo is required.';e.style.display='block';}valid=false;}
     if(!valid){const fe=document.querySelector('.has-error')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});releaseSubmit();return;}
-    const sub=await buildSubmissionPayload(data,bulkEntry(0),0);
-    return saveSubmissionBatch([sub],releaseSubmit);
+    try{
+      const sub=await buildSubmissionPayload(data,bulkEntry(0),0);
+      return saveSubmissionBatch([sub],releaseSubmit);
+    }catch(e){
+      alert('Photo upload failed. Please check your connection and try again. '+(e.message||''));
+      releaseSubmit();
+      return;
+    }
   }
 
   snapshotBulkFormValues();
   const collected=collectBulkSubmissionPayloads();
   if(!collected.valid){const fe=document.querySelector('.has-error')||document.querySelector('.photo-err-msg[style*="block"]')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});releaseSubmit();return;}
-  const submissions=await mapWithConcurrency(collected.items,BULK_CLOUD_CONCURRENCY,(item,i)=>buildSubmissionPayload(item.data,item.entry,i));
+  let submissions;
+  try{
+    submissions=await mapWithConcurrency(collected.items,BULK_CLOUD_CONCURRENCY,(item,i)=>buildSubmissionPayload(item.data,item.entry,i));
+  }catch(e){
+    alert('Photo upload failed. Please check your connection and try again. '+(e.message||''));
+    releaseSubmit();
+    return;
+  }
   return saveSubmissionBatch(submissions,releaseSubmit);
 }
 
@@ -1653,8 +1729,10 @@ function adminRefresh(){
   let list=document.getElementById('adminSubList');
   if(subs.length)list=null;
   if(list)list.innerHTML='<div class="empty-state"><div class="empty-state-icon" style="font-size:32px;">☁️</div><h3>Refreshing…</h3><p>Fetching latest submissions from cloud.</p></div>';
-  dbLoadAll().then(cloudList=>{
-    subs=mergeSubmissionLists(loadSubCache(),cloudList);persistSubCache(subs);
+  const statusFilter=document.getElementById('filterStatus');
+  if(statusFilter)statusFilter.value='all';
+  dbLoadAll({bypassCache:true,allowCacheFallback:false}).then(cloudList=>{
+    subs=cloudList;persistSubCache(subs);
     const banner=document.getElementById('cloudRetryBanner');
     if(banner)banner.remove();
     renderAdmin();
@@ -1700,6 +1778,8 @@ function renderAdminTabs(){
 function renderAdmin(){
   subs=loadAll();
   renderAdminTabs();
+  const statusFilter=document.getElementById('filterStatus');
+  if(statusFilter&&!statusFilter.value)statusFilter.value='all';
   document.getElementById('count-all').textContent=subs.length;
   CATEGORY_KEYS.forEach(k=>{const el=document.getElementById('count-'+k);if(el)el.textContent=subs.filter(s=>s.category===k).length;});
   const edCount=document.getElementById('count-editorial');if(edCount)edCount.textContent=subs.filter(s=>s.category==='editorial-note'||s.category==='appreciation').length;
@@ -1707,26 +1787,30 @@ function renderAdmin(){
   document.getElementById('statPending').textContent=subs.filter(s=>s.status==='pending').length;
   document.getElementById('statApproved').textContent=subs.filter(s=>s.status==='approved').length;
   document.getElementById('statFinalized').textContent=subs.filter(s=>s.status==='finalized').length;
-  const sf=document.getElementById('filterStatus').value;
+  const sf=statusFilter?statusFilter.value:'all';
   /* Sequence order: sort by createdAt ascending (oldest first = submission order) */
   let filtered=subs.slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
-  /* WORKFLOW: Production Admin only sees approved/finalized — pending stays with Editor */
-  filtered=filtered.filter(s=>s.status==='approved'||s.status==='finalized'||s.status==='rejected');
+  /* WORKFLOW: Production Admin defaults to all statuses; editor state still controls actions. */
   if(currentAdminCat!=='all')filtered=filtered.filter(s=>s.category===currentAdminCat);
   if(sf!=='all')filtered=filtered.filter(s=>s.status===sf);
   const list=document.getElementById('adminSubList');
   /* Workflow notice for admin */
   const pendingCount=subs.filter(s=>s.status==='pending').length;
   const approvedCount=subs.filter(s=>s.status==='approved').length;
-  const workflowBanner=`<div style="background:linear-gradient(135deg,#f0fdf6,#e6faf0);border:1px solid var(--school-mint2);border-radius:var(--radius);padding:14px 18px;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  const lockedCount=subs.filter(s=>s.status==='approved'||s.status==='finalized').length;
+  const cloudSummary=cloudLoadState.loadedAt
+    ?`Cloud: ${cloudLoadState.count??'unknown'} row${cloudLoadState.count===1?'':'s'} refreshed ${new Date(cloudLoadState.loadedAt).toLocaleTimeString()}`
+    :(cloudLoadState.error?`Cloud delayed - cache visible (${subs.length})`:`Cloud count pending - cache visible (${subs.length})`);
+  let workflowBanner=`<div style="background:linear-gradient(135deg,#f0fdf6,#e6faf0);border:1px solid var(--school-mint2);border-radius:var(--radius);padding:14px 18px;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <span style="font-size:20px;">📋</span>
     <div style="flex:1;font-size:13px;color:var(--school-navy);">
       <strong>Workflow:</strong> Submissions → <span style="color:var(--amber);font-weight:700;">Editor reviews &amp; proofreads</span> → <span style="color:var(--green);font-weight:700;">Approved here for layout</span> → Finalize
-      <br><span style="font-size:12px;color:var(--ink3);">Showing only Editor-approved content · ${pendingCount} still pending with Editor · ${approvedCount} ready to finalize</span>
+      <br><span style="font-size:12px;color:var(--ink3);">Showing all statuses by default · ${pendingCount} pending · ${approvedCount} ready to finalize</span>
     </div>
   </div>`;
   if(!filtered.length){list.innerHTML=workflowBanner+`<div class="empty-state"><div class="empty-state-icon">📭</div><h3>No submissions to show</h3><p>${subs.length?'Try changing the filter.':'Share the submission links with contributors.'}</p></div>`;return;}
-  list.innerHTML=workflowBanner+filtered.map(s=>renderSubCard(s,'admin')).join('');
+  const cloudCountBanner=`<div style="font-size:12px;color:var(--ink3);margin:-.75rem 0 1rem 0;">All Statuses is the default view · ${lockedCount} approved/finalized locked visible · ${cloudSummary}</div>`;
+  list.innerHTML=workflowBanner+cloudCountBanner+filtered.map(s=>renderSubCard(s,'admin')).join('');
 }
 
 function renderSubCard(s,ctx){
@@ -1754,7 +1838,9 @@ function renderSubCard(s,ctx){
     if(s.status==='rejected'){
       acts+=`<span style="font-size:11px;color:var(--red);font-weight:700;padding:4px 10px;background:var(--red2);border-radius:999px;">✗ Rejected by Editor</span>`;
     }
-    acts+=`<button class="sub-action-btn sub-action-delete" onclick="deleteSubmission('${s.id}')">Delete</button>`;
+    if(s.status!=='approved'&&s.status!=='finalized'){
+      acts+=`<button class="sub-action-btn sub-action-delete" onclick="deleteSubmission('${s.id}')">Delete</button>`;
+    }
   } else {
     /* Fix 5: Editor — sees all text fields, can Approve/Reject/Proofread */
     if(s.status==='pending'){
@@ -1762,7 +1848,7 @@ function renderSubCard(s,ctx){
       acts+=`<button class="sub-action-btn sub-action-delete" onclick="editorReview('${s.id}','rejected')">✗ Reject</button>`;
     } else if(s.status==='approved'){
       acts+=`<span class="status-badge status-approved">✓ Approved</span>`;
-      acts+=`<button class="sub-action-btn" onclick="editorReview('${s.id}','rejected')">Change to Rejected</button>`;
+      acts+=`<span style="font-size:11px;color:var(--green);font-weight:700;padding:4px 10px;background:var(--green2);border-radius:999px;">Locked</span>`;
     } else if(s.status==='rejected'){
       acts+=`<span class="status-badge status-rejected">✗ Rejected</span>`;
       acts+=`<button class="sub-action-btn" onclick="editorReview('${s.id}','approved')">Re-approve</button>`;
@@ -1790,11 +1876,13 @@ function renderSubCard(s,ctx){
 /* ACTIONS */
 function sendForReview(id){if(!confirm('Send to Editor-in-Chief for review?'))return;subs=loadAll();const s=subs.find(x=>x.id===id);if(!s)return;s.status='pending';saveAll(subs);dbUpdateStatus(id,'pending','',null);renderAdmin();}
 function finalizeSubmission(id){if(!confirm('Finalize this submission? It will appear in the magazine layout.'))return;subs=loadAll();const s=subs.find(x=>String(x.id)===String(id));if(!s)return;s.status='finalized';saveAll(subs);dbUpdateStatus(id,'finalized',s.reviewerNote||'',s.reviewedAt);renderAdmin();}
-function deleteSubmission(id){if(!confirm('Permanently delete this submission?'))return;dbDeleteSubmission(id);subs=loadAll().filter(s=>String(s.id)!==String(id));renderAdmin();}
+function deleteSubmission(id){const existing=loadAll().find(s=>String(s.id)===String(id));if(existing&&(existing.status==='approved'||existing.status==='finalized')){alert('Approved and finalized submissions are locked and cannot be deleted here.');return;}if(!confirm('Permanently delete this submission?'))return;dbDeleteSubmission(id);subs=loadAll().filter(s=>String(s.id)!==String(id));renderAdmin();}
 
 /* ADMIN ENTER — pulls fresh cloud data */
 function enterAdmin(){
   show('viewAdmin');
+  const statusFilter=document.getElementById('filterStatus');
+  if(statusFilter)statusFilter.value='all';
   subs=loadAll();
   if(subs.length)renderAdmin();
   /* Show a loading placeholder immediately so the list doesn't appear empty */
@@ -4472,6 +4560,7 @@ setTimeout(async () => {
     } else {
       console.log('[BOOT] Supabase CDN loaded. Starting cloud sync...');
       await initCloudSync();
+      startOptionalCloudAutoRefresh();
       console.log('[BOOT] Cloud sync finished.');
     }
   } catch (e) {
