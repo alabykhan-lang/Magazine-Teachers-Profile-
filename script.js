@@ -225,12 +225,14 @@ let lsSettings=loadLsSettingsFromStorage();
 let bulkPhotos=[];
 let sectionOrder;
 let formConfig;
-const PRINT_IMAGE_MIN_PX=600;
+const PRINT_IMAGE_MIN_PX=300;
 const PRINT_IMAGE_RECOMMENDED_PX=1200;
 const PRINT_MAX_IMAGE_MB=25;
 const BULK_CLOUD_CONCURRENCY=6;
 const CLOUD_RETRY_DELAYS=[500,1000,2000];
 const CLOUD_TIMEOUT_MS=20000;
+const STORAGE_BUCKET='photos';
+const STORAGE_UPLOAD_TIMEOUT_MS=60000;
 const cloudHealth={database:'unknown',auth:'unknown',realtime:'unknown',edge:'unknown'};
 
 function loadLsSettingsFromStorage(){
@@ -260,15 +262,36 @@ function waitForSupabase(maxMs){
 }
 /* ── Supabase Storage: full-quality photo uploads ── */
 async function uploadToStorage(file, subId){
-  const sb=getSupa();if(!sb)throw new Error('No Supabase client');
-  const ext=(file.name||'photo.jpg').split('.').pop().toLowerCase();
-  const path=`submissions/${subId}.${ext}`;
-  await fetchWithRetry(async()=>{
-    const{error}=await sb.storage.from('photos').upload(path,file,{cacheControl:'31536000',upsert:true});
-    if(error)throw error;
-  },'Uploading photo');
-  const{data}=sb.storage.from('photos').getPublicUrl(path);
-  return data.publicUrl;
+  if(!file)throw new Error('No photo selected.');
+  if(isNetworkTrulyOffline())throw new Error('You appear to be offline. Reconnect and try the photo upload again.');
+  const loaded=await waitForSupabase(8000);
+  const sb=loaded?getSupa():null;
+  if(!sb)throw new Error('Cloud storage is still loading. Please try again in a moment.');
+  const rawExt=(file.name||'photo.jpg').split('.').pop().toLowerCase();
+  const typeExt=(file.type||'').split('/').pop().replace('jpeg','jpg').toLowerCase();
+  const ext=['jpg','jpeg','png','webp'].includes(rawExt)?rawExt:(['jpg','png','webp'].includes(typeExt)?typeExt:'jpg');
+  const safeId=String(subId||genId()).replace(/[^a-zA-Z0-9_-]/g,'_');
+  const day=new Date().toISOString().slice(0,10);
+  const path=`submissions/${day}/${safeId}-${Date.now()}.${ext}`;
+  try{
+    await fetchWithRetry(async()=>{
+      const{data,error}=await sb.storage.from(STORAGE_BUCKET).upload(path,file,{
+        cacheControl:'31536000',
+        contentType:file.type||`image/${ext==='jpg'?'jpeg':ext}`,
+        upsert:false
+      });
+      if(error)throw error;
+      if(!data?.path)throw new Error('Upload finished without a storage path.');
+    },'Uploading photo',3,STORAGE_UPLOAD_TIMEOUT_MS);
+    const{data}=sb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+    const publicUrl=data?.publicUrl;
+    if(!storageUrlOnly(publicUrl))throw new Error('Could not create a valid public URL for the uploaded photo.');
+    return publicUrl;
+  }catch(e){
+    const msg=e?.message||String(e||'Unknown error');
+    if(/failed to fetch|network|timeout|load failed/i.test(msg))throw new Error('Photo upload could not reach cloud storage. Check your connection, then try again. Your selected photo is still on the form.');
+    throw new Error('Photo upload failed: '+msg);
+  }
 }
 async function mapWithConcurrency(items,limit,worker){
   const list=Array.from(items||[]),out=new Array(list.length);
@@ -1008,11 +1031,11 @@ function buildGalleryTabs(){
       <div class="f-card-title">Photo &amp; Caption</div>
       <div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)">
         <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/>
-        <div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>Upload gallery photo <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">High quality · Min 1200×1200px</span></div>
+        <div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>Upload gallery photo <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">Accepted from ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px · ${PRINT_IMAGE_RECOMMENDED_PX}x${PRINT_IMAGE_RECOMMENDED_PX}px recommended</span></div>
         <div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><div class="photo-dims" id="photoDims"></div><button class="photo-change" onclick="resetPhoto(event)">Change photo</button></div>
       </div>
       <div class="photo-err-msg" id="photoErrMsg"></div>
-      <div class="photo-reqs"><p><strong>For print quality:</strong> minimum 1200×1200 pixels, JPG or PNG, original file preserved for print.</p></div>
+      <div class="photo-reqs"><p><strong>For print quality:</strong> ${PRINT_IMAGE_RECOMMENDED_PX}x${PRINT_IMAGE_RECOMMENDED_PX}px or higher recommended. Smaller valid JPG/PNG/WebP images are accepted and preserved.</p></div>
     </div>
     <!-- Bulk upload tab -->
     <div class="gallery-tab-pane" id="gpane-bulk">
@@ -1057,7 +1080,7 @@ function processBulkPhoto(file){
   const img=new Image(),url=URL.createObjectURL(file);
   const fileName=file.name;
   img.onload=function(){
-    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(errEl){errEl.textContent=`Skipped "${file.name}": minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px for print.`;errEl.style.display='block';}URL.revokeObjectURL(url);return;}
+    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(errEl){errEl.textContent=`Skipped "${file.name}": image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;errEl.style.display='block';}URL.revokeObjectURL(url);return;}
     const r=new FileReader();
     r.onload=ev=>{
       bulkPhotos.push({dataURL:ev.target.result,file:file,fileName:fileName,caption:'',meta:{w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)}});
@@ -1103,6 +1126,7 @@ async function submitBulkGallery(){
   const submitterRole=(document.getElementById('ff-submitterRole')?.value||'').trim()||'';
   const ts=new Date().toLocaleString();
   let errors=0;
+  const failedPhotos=[];
   showSync('syncing','Uploading '+bulkPhotos.length+' photos…');
   const prepared=await mapWithConcurrency(bulkPhotos,BULK_CLOUD_CONCURRENCY,async(p,i)=>{
     try{
@@ -1125,14 +1149,17 @@ async function submitBulkGallery(){
     }catch(e){
       console.warn('[Gallery] Failed to prepare photo '+(i+1)+':',e.message);
       errors++;
+      failedPhotos.push(p);
       return null;
     }
   });
   const ready=prepared.filter(Boolean);
   if(ready.length)await dbSaveSubmissionsBulk(ready);
-  bulkPhotos=[];renderBulkGrid();
+  bulkPhotos=failedPhotos;renderBulkGrid();
   if(errors){
     alert(`${ready.length} photos submitted, ${errors} photo upload(s) failed and were not saved.`);
+    showSync(ready.length?'ok':'syncing',ready.length?ready.length+' photos uploaded; failed photos remain on the form':'No photos uploaded. Please check your connection and try again.');
+    return;
   } else {
     alert(`${ready.length} photos submitted successfully! They are now awaiting Editor review.`);
   }
@@ -1319,14 +1346,14 @@ function buildForm(k){
     h+=buildGalleryTabs();
   } else if(cat.photoRequired&&cat.photoMulti){
     const max=cat.photoMax||5;
-    h+=`<div class="f-card"><div class="f-card-title">Event Photos (up to ${max})</div><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInputMulti').click()"><input type="file" id="photoInputMulti" accept=".jpg,.jpeg,.png,.webp" multiple onchange="handlePhotoMulti(event,${max})"/><div id="photoPlaceholderMulti"><span class="photo-drop-icon">📸</span><h3>Upload event photos <span class="req">*</span></h3><p>Tap to choose 1–${max} photos</p><span class="photo-pill">Action shots · Group photos · Min 1200×1200px</span></div></div><div id="multiPhotoGrid" class="multi-photo-grid"></div><div id="multiPhotoCount" class="multi-photo-count" style="display:none;">0 of ${max}</div><div class="photo-err-msg" id="photoErrMsg"></div><div class="photo-reqs"><p><strong>For print quality:</strong> min 1200×1200px, JPG/PNG/WebP, original file preserved for print.</p></div></div>`;
+    h+=`<div class="f-card"><div class="f-card-title">Event Photos (up to ${max})</div><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInputMulti').click()"><input type="file" id="photoInputMulti" accept=".jpg,.jpeg,.png,.webp" multiple onchange="handlePhotoMulti(event,${max})"/><div id="photoPlaceholderMulti"><span class="photo-drop-icon">📸</span><h3>Upload event photos <span class="req">*</span></h3><p>Tap to choose 1–${max} photos</p><span class="photo-pill">Accepted from ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px · ${PRINT_IMAGE_RECOMMENDED_PX}x${PRINT_IMAGE_RECOMMENDED_PX}px recommended</span></div></div><div id="multiPhotoGrid" class="multi-photo-grid"></div><div id="multiPhotoCount" class="multi-photo-count" style="display:none;">0 of ${max}</div><div class="photo-err-msg" id="photoErrMsg"></div><div class="photo-reqs"><p><strong>For print quality:</strong> ${PRINT_IMAGE_RECOMMENDED_PX}x${PRINT_IMAGE_RECOMMENDED_PX}px or higher recommended. Smaller valid JPG/PNG/WebP images are accepted and preserved.</p></div></div>`;
   } else if(cat.photoRequired){
     const isClass=currentFormCategory.includes('_class_')||currentFormCategory==='ss3_class_message';
     const isAdvert=currentFormCategory==='advertisements';
     const photoTitle=isAdvert?'Business flyer':isClass?'Full class picture':'Profile photo';
     const photoPrompt=isAdvert?'Upload business flyer':isClass?'Upload full class picture':'Upload your profile photo';
-    const photoPill=isAdvert?'Business flyer only · Min 1200x1200px':isClass?'Full group photo · Min 1200x1200px':'Passport-style · Clear face · Min 1200x1200px';
-    h+=`<div class="f-card"><div class="f-card-title">${photoTitle}</div><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)"><input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/><div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>${photoPrompt} <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">${photoPill}</span></div><div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><div class="photo-dims" id="photoDims"></div><button class="photo-change" onclick="resetPhoto(event)">Change photo</button></div></div><div class="photo-err-msg" id="photoErrMsg"></div><div class="photo-reqs"><p><strong>For print quality:</strong> minimum 1200x1200 pixels, original JPG/PNG/WebP kept for press output.</p></div></div>`;
+    const photoPill=isAdvert?`Business flyer only · Accepted from ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px`:isClass?`Full group photo · Accepted from ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px`:`Passport-style · Clear face · Accepted from ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px`;
+    h+=`<div class="f-card"><div class="f-card-title">${photoTitle}</div><div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropPhoto(event)"><input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event)"/><div id="photoPlaceholder"><span class="photo-drop-icon">📷</span><h3>${photoPrompt} <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">${photoPill}</span></div><div class="photo-preview-wrap" id="photoPreviewWrap"><img id="photoPreview" src="" alt="Preview"/><div class="photo-filename" id="photoFilename"></div><div class="photo-dims" id="photoDims"></div><button class="photo-change" onclick="resetPhoto(event)">Change photo</button></div></div><div class="photo-err-msg" id="photoErrMsg"></div><div class="photo-reqs"><p><strong>For print quality:</strong> ${PRINT_IMAGE_RECOMMENDED_PX}x${PRINT_IMAGE_RECOMMENDED_PX}px or higher recommended. Smaller valid JPG/PNG/WebP images are accepted and preserved.</p></div></div>`;
   }
   /* Submit button — not shown for gallery (bulk has own button) */
   h+=`<button class="submit-btn" type="button" onclick="submitForm()" id="mainSubmitBtn">Submit</button>`;
@@ -1447,10 +1474,10 @@ function processPhoto(file){
   if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){err.textContent=`File too large. Max ${PRINT_MAX_IMAGE_MB} MB.`;err.style.display='block';return;}
   const img=new Image(),url=URL.createObjectURL(file);
   img.onload=function(){
-    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){err.textContent=`Image too small for print. Minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';URL.revokeObjectURL(url);return;}
+    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){err.textContent=`Image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';URL.revokeObjectURL(url);return;}
     photoFile=file;photoMeta={w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)};
     const r=new FileReader();
-    r.onload=ev=>{photoDataURL=ev.target.result;document.getElementById('photoPreview').src=photoDataURL;document.getElementById('photoFilename').textContent=file.name;document.getElementById('photoDims').textContent=`${img.width}x${img.height}px - ${(file.size/1024).toFixed(0)} KB - ${photoMeta.printQuality}`;document.getElementById('photoPlaceholder').style.display='none';document.getElementById('photoPreviewWrap').style.display='flex';document.getElementById('photoDrop').classList.add('uploaded');};
+    r.onload=ev=>{photoDataURL=ev.target.result;document.getElementById('photoPreview').src=photoDataURL;document.getElementById('photoFilename').textContent=file.name;document.getElementById('photoDims').textContent=`${img.width}x${img.height}px - ${(file.size/1024).toFixed(0)} KB - ${photoMeta.printQuality}${Math.min(img.width,img.height)<PRINT_IMAGE_RECOMMENDED_PX?' - '+PRINT_IMAGE_RECOMMENDED_PX+'x'+PRINT_IMAGE_RECOMMENDED_PX+'px or higher recommended for print':''}`;document.getElementById('photoPlaceholder').style.display='none';document.getElementById('photoPreviewWrap').style.display='flex';document.getElementById('photoDrop').classList.add('uploaded');};
     r.readAsDataURL(file);URL.revokeObjectURL(url);
   };
   img.onerror=()=>{err.textContent='Could not read this image. Try another JPG, PNG, or WebP.';err.style.display='block';URL.revokeObjectURL(url);};
@@ -1464,7 +1491,7 @@ function processPhotoForMulti(file,max){
   if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){err.textContent=`Skipped "${file.name}": too large (max ${PRINT_MAX_IMAGE_MB} MB).`;err.style.display='block';return;}
   const img=new Image();const url=URL.createObjectURL(file);
   img.onload=function(){
-    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){err.textContent=`Skipped "${file.name}": minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px for print.`;err.style.display='block';URL.revokeObjectURL(url);return;}
+    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){err.textContent=`Skipped "${file.name}": image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';URL.revokeObjectURL(url);return;}
     const meta={w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)};
     const r=new FileReader();
     r.onload=ev=>{photoFilesMulti.push(file);photoDataURLsMulti.push(ev.target.result);photoMetasMulti.push(meta);renderMultiPhotoGrid(max);};
@@ -1492,13 +1519,13 @@ function processPhoto(file,idx){
   if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(err){err.textContent=`File too large. Max ${PRINT_MAX_IMAGE_MB} MB.`;err.style.display='block';}return;}
   const img=new Image(),url=URL.createObjectURL(file);
   img.onload=function(){
-    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Image too small for print. Minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
+    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
     entry.photoFile=file;entry.photoMeta={w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)};
     const r=new FileReader();
     r.onload=ev=>{
       entry.photoDataURL=ev.target.result;if(idx===0)syncPrimaryPhotoGlobals();
       const prev=document.getElementById(photoDomId('photoPreview',idx)),fn=document.getElementById(photoDomId('photoFilename',idx)),dims=document.getElementById(photoDomId('photoDims',idx)),ph=document.getElementById(photoDomId('photoPlaceholder',idx)),wrap=document.getElementById(photoDomId('photoPreviewWrap',idx)),drop=document.getElementById(photoDomId('photoDrop',idx));
-      if(prev)prev.src=entry.photoDataURL;if(fn)fn.textContent=file.name;if(dims)dims.textContent=`${img.width}x${img.height}px - ${(file.size/1024).toFixed(0)} KB - ${entry.photoMeta.printQuality}`;if(ph)ph.style.display='none';if(wrap)wrap.style.display='flex';if(drop)drop.classList.add('uploaded');
+      if(prev)prev.src=entry.photoDataURL;if(fn)fn.textContent=file.name;if(dims)dims.textContent=`${img.width}x${img.height}px - ${(file.size/1024).toFixed(0)} KB - ${entry.photoMeta.printQuality}${Math.min(img.width,img.height)<PRINT_IMAGE_RECOMMENDED_PX?' - '+PRINT_IMAGE_RECOMMENDED_PX+'x'+PRINT_IMAGE_RECOMMENDED_PX+'px or higher recommended for print':''}`;if(ph)ph.style.display='none';if(wrap)wrap.style.display='flex';if(drop)drop.classList.add('uploaded');
     };
     r.readAsDataURL(file);URL.revokeObjectURL(url);
   };
@@ -1519,7 +1546,7 @@ function processPhotoForMulti(file,max,idx){
   if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(err){err.textContent=`Skipped "${file.name}": too large (max ${PRINT_MAX_IMAGE_MB} MB).`;err.style.display='block';}return;}
   const img=new Image();const url=URL.createObjectURL(file);
   img.onload=function(){
-    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Skipped "${file.name}": minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px for print.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
+    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Skipped "${file.name}": image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
     const meta={w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)};
     const r=new FileReader();
     r.onload=ev=>{entry.photoFilesMulti.push(file);entry.photoDataURLsMulti.push(ev.target.result);entry.photoMetasMulti.push(meta);if(idx===0)syncPrimaryPhotoGlobals();renderMultiPhotoGrid(max,idx);};
@@ -1723,7 +1750,10 @@ async function submitForm(){
       const sub=await buildSubmissionPayload(data,bulkEntry(0),0);
       return saveSubmissionBatch([sub],releaseSubmit);
     }catch(e){
-      alert('Photo upload failed. Please check your connection and try again. '+(e.message||''));
+      const msg=e.message||'Please check your connection and try again.';
+      const err=document.getElementById('photoErrMsg')||document.getElementById('bulkErrMsg');
+      if(err){err.textContent=msg;err.style.display='block';err.scrollIntoView({behavior:'smooth',block:'center'});}
+      alert(msg);
       releaseSubmit();
       return;
     }
@@ -1736,7 +1766,10 @@ async function submitForm(){
   try{
     submissions=await mapWithConcurrency(collected.items,BULK_CLOUD_CONCURRENCY,(item,i)=>buildSubmissionPayload(item.data,item.entry,i));
   }catch(e){
-    alert('Photo upload failed. Please check your connection and try again. '+(e.message||''));
+    const msg=e.message||'Please check your connection and try again.';
+    const err=document.querySelector('.photo-err-msg')||document.getElementById('photoErrMsg');
+    if(err){err.textContent=msg;err.style.display='block';err.scrollIntoView({behavior:'smooth',block:'center'});}
+    alert(msg);
     releaseSubmit();
     return;
   }
@@ -2390,6 +2423,18 @@ function wsBuildPassportPhoto(src,bg,key){
   });
 }
 
+function getProductionItemsPerPage(sec,settings){
+  const s=settings||lsSettings||{};
+  const key=sec?.key;
+  if(key==='teachers')return Math.max(1,Math.min(30,parseInt(s.teachersPerPage)||9));
+  if(['primary5','jss3','ss3'].includes(key))return Math.max(1,Math.min(30,parseInt(s.studentsPerPage)||2));
+  if(key==='speeches')return Math.max(1,Math.min(2,parseInt(s.speechesPerPage)||1));
+  if(key==='gallery')return Math.max(1,Math.min(30,parseInt(s.galleryPerPage)||4));
+  if(key==='creative')return Math.max(1,Math.min(6,parseInt(s.creativePerPage)||2));
+  if(['events','academic','interviews','motivational'].includes(key))return 2;
+  return 1;
+}
+
 function generateMagPreview(){
   subs=loadAll();magPages=[];currentPageIdx=0;
   const s=lsSettings;
@@ -2401,12 +2446,7 @@ function generateMagPreview(){
     if(sec.key==='editorial-note'){const sub=approved.find(sub=>sub.category==='editorial-note');if(sub)magPages.push({type:'editorial-note',sub,sec});return;}
     if(sec.key==='appreciation'){const sub=approved.find(sub=>sub.category==='appreciation');if(sub)magPages.push({type:'appreciation',sub,sec});return;}
     if(!catSubs.length)return;
-    let perPage=1;
-    if(sec.key==='teachers')perPage=parseInt(s.teachersPerPage)||9;
-    else if(['primary5','jss3','ss3'].includes(sec.key))perPage=parseInt(s.studentsPerPage)||2;
-    else if(sec.key==='speeches')perPage=parseInt(s.speechesPerPage)||1;
-    else if(sec.key==='gallery')perPage=parseInt(s.galleryPerPage)||4;
-    else if(sec.key==='creative')perPage=parseInt(s.creativePerPage)||2;
+    let perPage=getProductionItemsPerPage(sec,s);
     for(let i=0;i<catSubs.length;i+=perPage){magPages.push({type:'section-content',sec,items:catSubs.slice(i,i+perPage),isFirst:i===0,pageInSection:Math.floor(i/perPage)+1});}
   });
   renderCurrentPage();renderTOC();updatePageNavUI();
@@ -2446,6 +2486,8 @@ function renderCurrentPage(){
       const skipFirst = opts.skipFirst || false; // skip name field (shown in header)
       let entries = Object.entries(sub.data || {});
       if(skipFirst && entries.length > 0) entries.shift();
+      const skipIds = new Set(opts.skipIds || []);
+      if(skipIds.size) entries = entries.filter(([k])=>!skipIds.has(k));
       if(Array.isArray(opts.fieldIds)) entries = entries.filter(([k])=>opts.fieldIds.includes(k));
       if(opts.maxFields) entries = entries.slice(0, opts.maxFields);
       return entries.map(([k, fc]) => {
@@ -2485,48 +2527,69 @@ function renderCurrentPage(){
              sub.data.speechType?.value || sub.data.eventType?.value ||
              sub.data.subjectArea?.value || sub.data.photoCategory?.value || '';
     }
+    function firstDataField(sub,keys){
+      for(const key of keys){if(sub.data[key]?.value)return {key,value:sub.data[key].value,label:sub.data[key].label};}
+      return {key:null,value:''};
+    }
+    function resolveContentTitle(sub){
+      return firstDataField(sub,['articleTitle','contribTitle','speechTitle','messageTitle','title']).value;
+    }
+    function resolveAuthorLine(sub){
+      const name=firstDataField(sub,['authorName','speakerName','contribName','reporterName','interviewerName','intervieweeName','submitterName','submittedBy']).value;
+      const role=firstDataField(sub,['authorRole','speakerTitle','contribRole','submitterRole','intervieweeTitle','speakerOrg']).value;
+      return [name,role].filter(Boolean).join(' - ');
+    }
+    function usedContentFieldIds(sub){
+      const keys=['articleTitle','contribTitle','speechTitle','messageTitle','title','authorName','speakerName','contribName','reporterName','interviewerName','intervieweeName','submitterName','submittedBy','authorRole','speakerTitle','contribRole','submitterRole','intervieweeTitle','speakerOrg','classMessage','speechBody','articleBody','contribBody','qaBody','eventReport','message','introParagraph','advertCaption','pullQuote'];
+      return keys.filter(k=>sub.data[k]?.value);
+    }
     function resolveMainText(sub){
       const keys=['classMessage','speechBody','articleBody','contribBody','qaBody','eventReport','message','introParagraph','advertCaption'];
       for(const key of keys){if(sub.data[key]?.value)return page.textEdits?.[String(sub.id)+'|'+key] ?? sub.data[key].value;}
       return '';
     }
     function renderArticleCard(sub,mode,idx){
-      const name=resolveName(sub),subtitle=resolveSubtitle(sub),mainText=resolveMainText(sub),pullQuote=sub.data.pullQuote?.value||'';
+      const title=resolveContentTitle(sub)||resolveName(sub),author=resolveAuthorLine(sub),subtitle=author||resolveSubtitle(sub),mainText=resolveMainText(sub),pullQuote=sub.data.pullQuote?.value||'';
       const ph=sub.photoData?resolvePhotoBlock(sub,mode==='feature'?'88px':'64px',mode==='feature'?'96px':'72px','7px',`2px solid ${c2}44`):'';
       const body=esc(mainText);
+      const extraFields=renderAllFields(sub,{skipIds:usedContentFieldIds(sub),textColor,bFont});
       const cols=mode==='newspaper'?3:mode==='columns'?2:mode==='photo-break'?2:1;
       const imgFloat=ph?`<div style="float:${idx%2?'right':'left'};width:${mode==='feature'?'104px':'76px'};margin:${idx%2?'0 0 8px 12px':'0 12px 8px 0'};">${ph}</div>`:'';
       if(mode==='briefs'){
         return `<article class="mag-item mag-item-article mag-brief-card" style="padding:10px 12px;border:1px solid ${c2}44;border-radius:7px;background:#fff;break-inside:avoid;page-break-inside:avoid;overflow:visible;height:auto;max-height:none;">
           <div style="font-size:8px;letter-spacing:1.8px;text-transform:uppercase;color:${c2};font-weight:800;margin-bottom:3px;">${esc(subtitle)}</div>
-          <h3 style="font-family:${hFont};font-size:13px;line-height:1.2;color:${c1};margin-bottom:6px;">${esc(name)}</h3>
+          <h3 style="font-family:${hFont};font-size:13px;line-height:1.2;color:${c1};margin-bottom:6px;">${esc(title)}</h3>
           <div style="font-family:${bFont};font-size:${bSize};line-height:1.6;color:${textColor};text-align:justify;">${body.replace(/\n/g,'<br>')}</div>
+          ${extraFields?`<div style="margin-top:8px;">${extraFields}</div>`:''}
         </article>`;
       }
       if(mode==='ribbon'){
         return `<article class="mag-item mag-item-article mag-ribbon-story" style="padding:0;border:1px solid #e8e8e0;border-radius:7px;background:#fff;break-inside:avoid;page-break-inside:avoid;overflow:visible;height:auto;max-height:none;">
           <div style="padding:8px 12px;background:${c1};color:#fff;">
             <div style="font-size:7px;letter-spacing:1.8px;text-transform:uppercase;color:${c2};font-weight:800;">${esc(subtitle)}</div>
-            <h3 style="font-family:${hFont};font-size:14px;line-height:1.2;color:#fff;">${esc(name)}</h3>
+            <h3 style="font-family:${hFont};font-size:14px;line-height:1.2;color:#fff;">${esc(title)}</h3>
           </div>
           <div style="padding:10px 12px;font-family:${bFont};font-size:${bSize};line-height:1.7;color:${textColor};text-align:justify;column-count:2;column-gap:14px;">${body.replace(/\n/g,'<br>')}</div>
+          ${extraFields?`<div style="padding:0 12px 10px;">${extraFields}</div>`:''}
         </article>`;
       }
       if(mode==='photo-break'&&ph){
         return `<article class="mag-item mag-item-article mag-photo-break" style="padding:12px;border:1px solid ${c2}44;border-radius:7px;background:#fffefb;break-inside:avoid;page-break-inside:avoid;overflow:visible;height:auto;max-height:none;">
-          <h3 style="font-family:${hFont};font-size:15px;line-height:1.2;color:${c1};margin-bottom:3px;">${esc(name)}</h3>
+          <h3 style="font-family:${hFont};font-size:15px;line-height:1.2;color:${c1};margin-bottom:3px;">${esc(title)}</h3>
           <div style="font-size:8px;letter-spacing:1.8px;text-transform:uppercase;color:${c2};font-weight:800;margin-bottom:7px;">${esc(subtitle)}</div>
           <div style="display:grid;grid-template-columns:1fr 86px;gap:10px;align-items:start;">
             <div style="font-family:${bFont};font-size:${bSize};line-height:1.65;color:${textColor};text-align:justify;column-count:${cols};column-gap:14px;">${body.replace(/\n/g,'<br>')}</div>
             <div>${ph}</div>
           </div>
+          ${extraFields?`<div style="margin-top:8px;">${extraFields}</div>`:''}
         </article>`;
       }
       return `<article class="mag-item mag-item-article" style="padding:${mode==='feature'?'14px':'10px 12px'};border:${mode==='feature'?`1px solid ${c2}44`:'1px solid #e8e8e0'};border-radius:${mode==='feature'?'8px':'4px'};background:${mode==='feature'?'#fff':'#fffefb'};break-inside:avoid;page-break-inside:avoid;overflow:visible;height:auto;max-height:none;">
         <div style="font-size:8px;letter-spacing:1.8px;text-transform:uppercase;color:${c2};font-weight:800;margin-bottom:3px;">${esc(subtitle)}</div>
-        <h3 style="font-family:${hFont};font-size:${mode==='feature'?'16px':'13px'};line-height:1.2;color:${c1};margin-bottom:6px;">${esc(name)}</h3>
+        <h3 style="font-family:${hFont};font-size:${mode==='feature'?'16px':'13px'};line-height:1.2;color:${c1};margin-bottom:6px;">${esc(title)}</h3>
         ${pullQuote?`<div style="font-family:${hFont};font-size:11px;color:${c1};border-left:3px solid ${c2};padding:5px 8px;margin:5px 0 8px;background:${c2}18;">${esc(pullQuote)}</div>`:''}
         <div style="font-family:${bFont};font-size:${bSize};line-height:1.65;color:${textColor};column-count:${cols};column-gap:14px;text-align:justify;">${imgFloat}${body.replace(/\n/g,'<br>')}</div>
+        ${extraFields?`<div style="margin-top:8px;">${extraFields}</div>`:''}
       </article>`;
     }
     function renderImageFrame(src,key,style,alt){
@@ -2572,7 +2635,7 @@ function renderCurrentPage(){
     }
 
     /* ── TEACHER GRID ─────────────────────────────────────────────────────── */
-    function profileStyleDefaults(page){
+    function profileStyleDefaults(page,itemCount){
       const ctl = page.sec?.profileControls || page.profileControls || {};
       const photo = {small:['46px','54px'],medium:['62px','74px'],large:['78px','92px']}[ctl.photoSize] || ['62px','74px'];
       const shape = ctl.photoShape==='circle'?'50%':ctl.photoShape==='square'?'0':'6px';
@@ -2580,7 +2643,8 @@ function renderCurrentPage(){
       const gap = {compact:'6px',normal:'10px',roomy:'14px'}[ctl.cardSpacing] || '10px';
       const pad = {compact:'7px',normal:'10px',roomy:'13px'}[ctl.cardSpacing] || '10px';
       const maxFields = ctl.fieldsMode==='key'?3:0;
-      return {ctl,photoW:photo[0],photoH:photo[1],shape,nameSize,gap,pad,maxFields};
+      const dense=(parseInt(itemCount)||0)>=18;
+      return {ctl,photoW:dense?'42px':photo[0],photoH:dense?'50px':photo[1],shape,nameSize:dense?'8.5px':nameSize,gap:dense?'5px':gap,pad:dense?'5px':pad,maxFields};
     }
     function profileCardStyle(style,kind){
       const design=style.ctl.cardDesign||'classic';
@@ -2599,8 +2663,8 @@ function renderCurrentPage(){
       return renderAllFields(sub, {skipFirst:true, maxChars, maxFields:style.maxFields, fieldIds, textColor, bFont});
     }
     if(layout==='teacher-grid'){
-      const style = profileStyleDefaults(page);
-      const cols = items.length > 9 ? 4 : 3;
+      const style = profileStyleDefaults(page,items.length);
+      const cols = items.length >= 24 ? 6 : items.length >= 18 ? 5 : items.length > 9 ? 4 : 3;
       contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${style.gap};">
         ${items.map(sub => {
           const name = resolveName(sub);
@@ -2618,8 +2682,8 @@ function renderCurrentPage(){
 
     /* ── STUDENT GRID (primary5 / jss3 / ss3) ─────────────────────────────── */
     else if(layout==='grid'){
-      const style = profileStyleDefaults(page);
-      const cols = items.length === 1 ? 1 : items.length <= 4 ? 2 : items.length <= 9 ? 3 : 4;
+      const style = profileStyleDefaults(page,items.length);
+      const cols = items.length === 1 ? 1 : items.length <= 4 ? 2 : items.length <= 9 ? 3 : items.length >= 24 ? 6 : items.length >= 18 ? 5 : 4;
       const namePlacement = page.sec?.namePlacement || page.namePlacement || 'side';
       const compactCards = namePlacement==='under'||namePlacement==='photo-under';
       contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${style.gap};${compactCards?'justify-items:center;':''}">
@@ -2658,7 +2722,7 @@ function renderCurrentPage(){
             </div>`;
           }
           if(sub.photos && sub.photos.length){
-            return sub.photos.slice(0,2).map((p,pi) => `<div class="mag-item mag-item-gallery">
+            return sub.photos.map((p,pi) => `<div class="mag-item mag-item-gallery">
               ${renderImageFrame(wsPhotoSrc(p),'sub:'+sub.id+':photo:'+pi,{frame:`width:100%;aspect-ratio:4/3;border-radius:6px;border:1px solid ${c2}33;`,fit:'contain'},resolveName(sub))}
               ${pi===0?`<div class="mag-item-fields" style="padding:4px 2px;font-size:8px;">${allFields}</div>`:''}
             </div>`).join('');
@@ -2741,11 +2805,12 @@ function renderCurrentPage(){
     else if(layout==='events'){
       contentHtml = items.map(sub => {
         const name = resolveName(sub);
-        const allFields = renderAllFields(sub, {skipFirst:true, maxChars:400, textColor, bFont});
+        const allFields = renderAllFields(sub, {skipFirst:true, maxChars:400, skipIds:['eventReport'], textColor, bFont});
         const imgs = sub.photos && sub.photos.length ? sub.photos : sub.photoData ? [{data:sub.photoData}] : [];
         return `<div class="mag-item mag-item-event" style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eee;">
           <h3 class="mag-item-name" style="font-family:${hFont};font-size:13px;color:${c1};margin-bottom:6px;">${esc(name)}</h3>
-          ${imgs.length ? `<div class="mag-item-photos" style="display:flex;gap:5px;margin-bottom:7px;">${imgs.slice(0,3).map((p,pi)=>renderImageFrame(wsPhotoSrc(p),'sub:'+sub.id+':photo:'+pi,{frame:'flex:1;aspect-ratio:16/9;border-radius:5px;max-height:75px;',fit:'contain'},name)).join('')}</div>` : ''}
+          ${imgs.length ? `<div class="mag-item-photos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-bottom:7px;">${imgs.map((p,pi)=>renderImageFrame(wsPhotoSrc(p),'sub:'+sub.id+':photo:'+pi,{frame:'width:100%;aspect-ratio:4/3;border-radius:5px;',fit:'contain'},name)).join('')}</div>` : ''}
+          ${resolveMainText(sub)?`<div class="mag-item-body" style="font-family:${bFont};font-size:${bSize};line-height:1.75;color:${textColor};white-space:pre-line;text-align:justify;margin-bottom:8px;">${esc(resolveMainText(sub))}</div>`:''}
           <div class="mag-item-fields">${allFields}</div>
         </div>`;
       }).join('');
@@ -2754,17 +2819,18 @@ function renderCurrentPage(){
     /* ── SINGLE / SPEECHES / INTERVIEWS / MOTIVATIONAL / ACADEMIC / DEFAULT ─ */
     else {
       contentHtml = items.map(sub => {
-        const name = resolveName(sub);
-        const subtitle = resolveSubtitle(sub);
+        const title = resolveContentTitle(sub) || resolveName(sub);
+        const author = resolveAuthorLine(sub);
+        const subtitle = author || resolveSubtitle(sub);
         const mainText = resolveMainText(sub);
         const pullQuote = sub.data.pullQuote?.value || '';
-        const allFields = renderAllFields(sub, {skipFirst:true, maxChars:99999, textColor, bFont});
+        const allFields = renderAllFields(sub, {skipFirst:false, maxChars:99999, skipIds:usedContentFieldIds(sub), textColor, bFont});
         const ph = sub.photoData ? resolvePhotoBlock(sub,'52px','58px','6px',`2px solid ${c2}44`) : '';
         return `<div class="mag-item mag-item-single" style="margin-bottom:16px;">
-          ${name ? `<div class="mag-item-header" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #e8e8e0;">
+          ${title ? `<div class="mag-item-header" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #e8e8e0;">
             <div class="mag-item-photo-wrap">${ph}</div>
             <div class="mag-item-header-text">
-              <div class="mag-item-name" style="font-size:13px;font-weight:700;color:${c1};font-family:${hFont};">${esc(name)}</div>
+              <div class="mag-item-name" style="font-size:15px;font-weight:700;color:${c1};font-family:${hFont};line-height:1.25;">${esc(title)}</div>
               ${subtitle ? `<div class="mag-item-subtitle" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:${c2};font-weight:700;">${esc(subtitle)}</div>` : ''}
             </div>
           </div>` : ''}
@@ -2789,7 +2855,7 @@ function nextPage(){if(currentPageIdx<magPages.length-1){currentPageIdx++;render
 function updatePageNavUI(){const total=magPages.length||1;document.getElementById('pageNavInfo').textContent=`${currentPageIdx+1} / ${total}`;document.getElementById('btnPrevPage').disabled=currentPageIdx===0;document.getElementById('btnNextPage').disabled=currentPageIdx>=magPages.length-1;}
 
 /* TOC */
-function buildTOCItems(){const items=[];let pageNum=1;subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');const s=lsSettings;sectionOrder.filter(sec=>sec.visible).forEach(sec=>{if(sec.key==='cover'){pageNum++;return;}if(sec.key==='toc'){pageNum++;return;}const catSubs=approved.filter(sub=>sub.category===sec.key);if(sec.key==='editorial-note'||sec.key==='appreciation'){if(catSubs.length||approved.find(sub=>sub.category===sec.key)){items.push({num:items.length+1,name:getLabel('section_'+sec.key,sec.label),page:pageNum});pageNum++;}return;}if(!catSubs.length)return;items.push({num:items.length+1,name:getLabel('section_'+sec.key,sec.label),page:pageNum});let pp=1;if(sec.key==='teachers')pp=parseInt(s.teachersPerPage)||9;else if(['primary5','jss3','ss3'].includes(sec.key))pp=parseInt(s.studentsPerPage)||2;else if(sec.key==='speeches')pp=parseInt(s.speechesPerPage)||1;else if(sec.key==='gallery')pp=parseInt(s.galleryPerPage)||4;else if(sec.key==='creative')pp=parseInt(s.creativePerPage)||2;pageNum+=Math.ceil(catSubs.length/pp);});return items;}
+function buildTOCItems(){const items=[];let pageNum=1;subs=loadAll();const approved=subs.filter(s=>s.status==='approved'||s.status==='finalized');const s=lsSettings;sectionOrder.filter(sec=>sec.visible).forEach(sec=>{if(sec.key==='cover'){pageNum++;return;}if(sec.key==='toc'){pageNum++;return;}const catSubs=approved.filter(sub=>sub.category===sec.key);if(sec.key==='editorial-note'||sec.key==='appreciation'){if(catSubs.length||approved.find(sub=>sub.category===sec.key)){items.push({num:items.length+1,name:getLabel('section_'+sec.key,sec.label),page:pageNum});pageNum++;}return;}if(!catSubs.length)return;items.push({num:items.length+1,name:getLabel('section_'+sec.key,sec.label),page:pageNum});let pp=getProductionItemsPerPage(sec,s);pageNum+=Math.ceil(catSubs.length/pp);});return items;}
 function renderTOC(){const c=document.getElementById('tocPreview');if(!c)return;const items=buildTOCItems();if(!items.length){c.innerHTML='<p style="color:var(--ink3);font-size:13px;">No approved content yet. Generate a preview first.</p>';return;}const s=lsSettings;const c1=s.color1||'#1a2744',c2=s.color2||'#7dd4a8';c.innerHTML=`<div style="max-width:500px;">${items.map(item=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed #e0e0d8;"><span style="font-size:12px;font-weight:700;color:${c2};width:24px;">${item.num}</span><span style="font-size:14px;color:var(--ink);flex:1;">${esc(item.name)}</span><span style="flex:1;border-bottom:1px dotted #ccc;height:14px;margin:0 6px;"></span><span style="font-size:12px;color:var(--ink3);font-weight:700;">p. ${item.page}</span></div>`).join('')}</div>`;}
 
 /* PRINT */
@@ -3181,8 +3247,8 @@ function applyLayoutFromObject(obj,logEl){
     }
   };
   /* Pagination */
-  if(obj.teachersPerPage!=null)setIfChanged('teachersPerPage','ls-teachersPerPage',[6,9,12,15],obj.teachersPerPage);
-  if(obj.studentsPerPage!=null)setIfChanged('studentsPerPage','ls-studentsPerPage',[1,2,3,4],obj.studentsPerPage);
+  if(obj.teachersPerPage!=null)setIfChanged('teachersPerPage','ls-teachersPerPage',[6,9,12,15,18,20,24,30],obj.teachersPerPage);
+  if(obj.studentsPerPage!=null)setIfChanged('studentsPerPage','ls-studentsPerPage',[1,2,3,4,6,9,12,15,18,20,24,30],obj.studentsPerPage);
   if(obj.galleryPerPage!=null)setIfChanged('galleryPerPage','ls-galleryPerPage',[2,4,6,9],obj.galleryPerPage);
   if(obj.speechesPerPage!=null)setIfChanged('speechesPerPage','ls-speechesPerPage',[1,2],obj.speechesPerPage);
   if(obj.creativePerPage!=null)setIfChanged('creativePerPage','ls-creativePerPage',[1,2,3],obj.creativePerPage);
@@ -3277,7 +3343,7 @@ function applyLayoutSuggestions(){
     ||extractNum(/(?:teachers?|staff)\s*(?:per|a|each)\s*page[:\s]+(\d+)/i)
     ||extractNum(/(\d+)x(\d+)\s*grid/i);
   if(teacherMatch){
-    const valid=[6,9,12,15];
+    const valid=[6,9,12,15,18,20,24,30];
     const snapped=valid.reduce((a,b)=>Math.abs(b-teacherMatch)<Math.abs(a-teacherMatch)?b:a);
     if(String(snapped)!==String(s.teachersPerPage)){
       s.teachersPerPage=String(snapped);
@@ -3290,7 +3356,7 @@ function applyLayoutSuggestions(){
   const studentMatch=extractNum(/(\d+)[- ]?(?:students?|graduates?|pupils?)\s*(?:per|a|each)?\s*page/i)
     ||extractNum(/(?:students?|graduates?)\s*(?:per|a|each)\s*page[:\s]+(\d+)/i);
   if(studentMatch){
-    const valid=[1,2,3,4];
+    const valid=[1,2,3,4,6,9,12,15,18,20,24,30];
     const snapped=valid.reduce((a,b)=>Math.abs(b-studentMatch)<Math.abs(a-studentMatch)?b:a);
     if(String(snapped)!==String(s.studentsPerPage)){
       s.studentsPerPage=String(snapped);
@@ -3476,12 +3542,7 @@ function wsGeneratePreview(){
     if(sec.key==='editorial-note'){const sub=finalized.find(sub=>sub.category==='editorial-note');if(sub)wsPages.push({type:'editorial-note',sub,sec,label:'Editorial Note'});return;}
     if(sec.key==='appreciation'){const sub=finalized.find(sub=>sub.category==='appreciation');if(sub)wsPages.push({type:'appreciation',sub,sec,label:'Appreciation'});return;}
     if(!catSubs.length)return;
-    let perPage=1;
-    if(sec.key==='teachers')perPage=parseInt(s.teachersPerPage)||9;
-    else if(['primary5','jss3','ss3'].includes(sec.key))perPage=parseInt(s.studentsPerPage)||2;
-    else if(sec.key==='speeches')perPage=parseInt(s.speechesPerPage)||1;
-    else if(sec.key==='gallery')perPage=parseInt(s.galleryPerPage)||4;
-    else if(sec.key==='creative')perPage=parseInt(s.creativePerPage)||2;
+    let perPage=getProductionItemsPerPage(sec,s);
     for(let i=0;i<catSubs.length;i+=perPage){
       wsPages.push({type:'section-content',sec,items:catSubs.slice(i,i+perPage),isFirst:i===0,pageInSection:Math.floor(i/perPage)+1,label:getLabel('section_'+sec.key,sec.label)+(i>0?' (p'+(Math.floor(i/perPage)+1)+')':'')});
     }
@@ -3646,7 +3707,7 @@ function wsUpdateProductionControls(){
   wsRenderImageControls(page,meta);
 }
 function wsItemLabel(sub){return sub?.data?.name?.value||sub?.data?.className?.value||sub?.data?.businessName?.value||sub?.data?.messageTitle?.value||sub?.data?.speakerName?.value||sub?.data?.contribName?.value||sub?.data?.reporterName?.value||sub?.data?.authorName?.value||sub?.data?.intervieweeName?.value||sub?.data?.submitterName?.value||sub?.data?.eventName?.value||sub?.data?.title?.value||'Untitled';}
-function wsPageGridCols(page,itemCount){const layout=page?.sec?.layout||page?.type;if(layout==='teacher-grid')return itemCount>9?4:3;if(layout==='grid')return itemCount===1?1:itemCount<=4?2:itemCount<=9?3:4;return 1;}
+function wsPageGridCols(page,itemCount){const layout=page?.sec?.layout||page?.type;if(layout==='teacher-grid')return itemCount>=24?6:itemCount>=18?5:itemCount>9?4:3;if(layout==='grid')return itemCount===1?1:itemCount<=4?2:itemCount<=9?3:itemCount>=24?6:itemCount>=18?5:4;return 1;}
 function wsRenderPageEditPanel(page,meta){
   const btn=document.getElementById('wsHidePageBtn'),list=document.getElementById('wsPageEditList');
   if(btn)btn.querySelector('span:last-child').firstChild.textContent=meta.hidden?'Show Page':'Hide Page';
@@ -3820,7 +3881,7 @@ function wsUpdateProfileControls(page,meta){
   const ctl=wsGetProfileControls(page,meta);
   const set=(id,val)=>{const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=String(val);};
   const perPage=page.sec?.key==='teachers'?(parseInt(lsSettings.teachersPerPage)||9):(parseInt(lsSettings.studentsPerPage)||2);
-  const cards=document.getElementById('wsProfileCardsPerPage'),allowed=page.sec?.key==='teachers'?[6,9,12,15]:[1,2,3,4,5,6,7,8,9,10,12,15];
+  const cards=document.getElementById('wsProfileCardsPerPage'),allowed=page.sec?.key==='teachers'?[6,9,12,15,18,20,24,30]:[1,2,3,4,5,6,7,8,9,10,12,15,18,20,24,30];
   if(cards)[...cards.options].forEach(o=>o.disabled=!allowed.includes(parseInt(o.value)));
   set('wsProfileCardsPerPage',perPage);set('wsProfilePhotoSize',ctl.photoSize);set('wsProfilePhotoShape',ctl.photoShape);set('wsProfileNameSize',ctl.nameSize);set('wsProfileCardSpacing',ctl.cardSpacing);set('wsProfileCardDesign',ctl.cardDesign||'classic');set('wsProfileFieldsMode',ctl.fieldsMode);set('wsProfilePreset',ctl.preset||'custom');
   const bgWrap=document.getElementById('wsStudentPhotoBgWrap'),bg=document.getElementById('wsStudentPhotoBg');
@@ -3873,8 +3934,8 @@ function wsSetProfileCardsPerPage(val){
   const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!wsIsProfilePage(page))return;
   if(meta.locked){alert('This page is locked for print. Unlock it before changing cards per page.');wsUpdateProductionControls();return;}
   const n=parseInt(val)||0;
-  if(page.sec?.key==='teachers'){if(![6,9,12,15].includes(n))return;lsSettings.teachersPerPage=n;}
-  else{if(![1,2,3,4,5,6,7,8,9,10,12,15].includes(n))return;lsSettings.studentsPerPage=n;}
+  if(page.sec?.key==='teachers'){if(![6,9,12,15,18,20,24,30].includes(n))return;lsSettings.teachersPerPage=n;}
+  else{if(![1,2,3,4,5,6,7,8,9,10,12,15,18,20,24,30].includes(n))return;lsSettings.studentsPerPage=n;}
   saveLsSettingsToStorage(lsSettings);wsGeneratePreview();
 }
 function wsApplyProfilePreset(preset){
@@ -4597,9 +4658,11 @@ function wsExportWord(){
       <p style="font-size:10pt;color:#888;margin:4px 0 16px;">${e(catDef.subtitle||'')} &mdash; ${catSubs.length} submission${catSubs.length>1?'s':''}</p>`;
 
     catSubs.forEach((sub, idx) => {
-      const name = sub.data.name?.value || sub.data.speakerName?.value || sub.data.contribName?.value ||
-                   sub.data.authorName?.value || sub.data.intervieweeName?.value || sub.data.submitterName?.value ||
-                   sub.data.eventName?.value || 'Submission '+(idx+1);
+      const name = sub.data.articleTitle?.value || sub.data.contribTitle?.value || sub.data.speechTitle?.value ||
+                   sub.data.messageTitle?.value || sub.data.title?.value || sub.data.name?.value ||
+                   sub.data.speakerName?.value || sub.data.contribName?.value || sub.data.authorName?.value ||
+                   sub.data.intervieweeName?.value || sub.data.submitterName?.value || sub.data.eventName?.value ||
+                   'Submission '+(idx+1);
 
       bodyHtml += `<div style="margin-bottom:24px;padding:16px;border:1px solid #e0e0e0;border-radius:4px;background:#fafafa;">
         <h3 style="color:${c1};font-size:14pt;margin:0 0 8px;border-left:4px solid ${c2};padding-left:10px;">${e(name)}</h3>`;
