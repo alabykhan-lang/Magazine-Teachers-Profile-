@@ -81,7 +81,7 @@ let CATEGORIES={
     {id:'contribBody',label:'Your submission',type:'textarea',required:true,long:true,hint:'The full poem, story, or joke.'},
     {id:'contribNote',label:'Note to editor',type:'textarea',required:false,hint:'Optional — any context or dedication.'}
   ]},
-  events:{label:'School Life & Events',tag:'Events',title:'Event / Activity Report',subtitle:'Sports days, excursions, competitions, achievements.',icon:'📸',photoRequired:true,photoMulti:true,photoMax:30,fields:[
+  events:{label:'School Life & Events',tag:'Events',title:'Event / Activity Report',subtitle:'Sports days, excursions, competitions, achievements.',icon:'📸',photoRequired:true,photoMulti:true,photoMax:15,fields:[
     {id:'eventType',label:'Event type',type:'select',required:true,options:['Sports Day','Excursion','Competition','Achievement','Academic Event','Other']},
     {id:'eventName',label:'Event name',type:'text',required:true,placeholder:'e.g. Inter-House Sports 2025'},
     {id:'eventDate',label:'Event date',type:'date',required:false},
@@ -228,11 +228,13 @@ let formConfig;
 const PRINT_IMAGE_MIN_PX=300;
 const PRINT_IMAGE_RECOMMENDED_PX=1200;
 const PRINT_MAX_IMAGE_MB=25;
-const BULK_CLOUD_CONCURRENCY=6;
-const CLOUD_RETRY_DELAYS=[500,1000,2000];
+const BULK_CLOUD_CONCURRENCY=1;
+const CLOUD_RETRY_DELAYS=[800,1500,3000];
 const CLOUD_TIMEOUT_MS=20000;
 const STORAGE_BUCKET='photos';
 const STORAGE_UPLOAD_TIMEOUT_MS=60000;
+const BULK_PHOTO_MAX=15;
+const BULK_UPLOAD_BETWEEN_FILES_MS=700;
 const cloudHealth={database:'unknown',auth:'unknown',realtime:'unknown',edge:'unknown'};
 
 function loadLsSettingsFromStorage(){
@@ -280,18 +282,47 @@ async function uploadToStorage(file, subId){
         contentType:file.type||`image/${ext==='jpg'?'jpeg':ext}`,
         upsert:false
       });
-      if(error)throw error;
+      if(error){
+        console.error('[Storage] Supabase upload error:',{path,fileName:file.name,fileSize:file.size,error});
+        throw error;
+      }
       if(!data?.path)throw new Error('Upload finished without a storage path.');
-    },'Uploading photo',3,STORAGE_UPLOAD_TIMEOUT_MS);
+    },'Uploading photo',CLOUD_RETRY_DELAYS.length+1,STORAGE_UPLOAD_TIMEOUT_MS);
     const{data}=sb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
     const publicUrl=data?.publicUrl;
     if(!storageUrlOnly(publicUrl))throw new Error('Could not create a valid public URL for the uploaded photo.');
     return publicUrl;
   }catch(e){
     const msg=e?.message||String(e||'Unknown error');
+    console.error('[Storage] Upload failed:',{fileName:file?.name,fileSize:file?.size,path,error:e});
     if(/failed to fetch|network|timeout|load failed/i.test(msg))throw new Error('Photo upload could not reach cloud storage. Check your connection, then try again. Your selected photo is still on the form.');
     throw new Error('Photo upload failed: '+msg);
   }
+}
+function uploadErrorDetail(err){
+  const msg=String(err?.message||err||'');
+  if(!msg)return '';
+  return msg.length>180?msg.slice(0,177)+'...':msg;
+}
+async function uploadPhotosSequential(files,options){
+  const list=Array.from(files||[]);
+  const opts=options||{};
+  const total=list.length;
+  const photos=[];
+  for(let i=0;i<total;i++){
+    const file=list[i];
+    const photoNo=i+1;
+    if(opts.onProgress)opts.onProgress(photoNo,total,file);
+    try{
+      const url=await uploadToStorage(file,(opts.idPrefix||genId())+'_'+i);
+      photos.push({url:url,name:file?.name||`photo_${photoNo}.jpg`,meta:opts.metas?.[i]||null});
+    }catch(e){
+      console.error('[Storage] Photo '+photoNo+' failed:',{fileName:file?.name,fileSize:file?.size,error:e});
+      throw new Error('Photo '+photoNo+' failed to upload. Please retry or use a smaller image. '+uploadErrorDetail(e));
+    }
+    if(photoNo<total)await wait(opts.betweenMs||BULK_UPLOAD_BETWEEN_FILES_MS);
+  }
+  return photos;
 }
 async function mapWithConcurrency(items,limit,worker){
   const list=Array.from(items||[]),out=new Array(list.length);
@@ -579,11 +610,15 @@ async function dbLoadAll(options){
   }
 }
 
-async function dbSaveSubmission(sub){
-  /* Optimistic memory update */
-  const idx=subs.findIndex(s=>String(s.id)===String(sub.id));
-  if(idx>=0)subs[idx]=sub;else subs.push(sub);
-  persistSubCache(subs);
+async function dbSaveSubmission(sub,options){
+  options=options||{};
+  const applyLocal=()=>{
+    const idx=subs.findIndex(s=>String(s.id)===String(sub.id));
+    if(idx>=0)subs[idx]=sub;else subs.push(sub);
+    persistSubCache(subs);
+  };
+  if(!options.strict)applyLocal();
+  /* Default saves keep the existing local fallback. Strict submit saves only touch local cache after cloud confirms the row. */
   
   /* Cloud sync */
   showSync('syncing','Syncing to cloud…');
@@ -595,10 +630,12 @@ async function dbSaveSubmission(sub){
       const{error}=await sb.from('submissions').upsert(row,{onConflict:'id'});
       if(error)throw error;
     }, 'Saving submission');
+    if(options.strict)applyLocal();
     
     showSync('ok','✓ Cloud synced');
   }catch(e){
     console.warn('[DB] Cloud save failed:',e.message);
+    if(options.strict)throw e;
     showSync('syncing','Saved locally - cloud sync pending');
   }
 }
@@ -617,13 +654,17 @@ function submissionToDbRow(sub){
     photos:photos?JSON.stringify(photos):null
   };
 }
-async function dbSaveSubmissionsBulk(list){
+async function dbSaveSubmissionsBulk(list,options){
   if(!list||!list.length)return;
+  options=options||{};
+  const applyLocal=()=>{
   list.forEach(sub=>{
     const idx=subs.findIndex(s=>String(s.id)===String(sub.id));
     if(idx>=0)subs[idx]=sub;else subs.push(sub);
   });
   persistSubCache(subs);
+  };
+  if(!options.strict)applyLocal();
   showSync('syncing','Syncing '+list.length+' submissions to cloud...');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
@@ -632,9 +673,11 @@ async function dbSaveSubmissionsBulk(list){
       const{error}=await sb.from('submissions').upsert(rows,{onConflict:'id'});
       if(error)throw error;
     },'Bulk saving submissions');
+    if(options.strict)applyLocal();
     showSync('ok','Cloud synced');
   }catch(e){
     console.warn('[DB] Bulk cloud save failed:',e.message);
+    if(options.strict)throw e;
     showSync('syncing','Saved locally - cloud sync pending');
   }
 }
@@ -1044,12 +1087,12 @@ function buildGalleryTabs(){
         <input type="file" id="bulkPhotoInput" accept=".jpg,.jpeg,.png,.webp" multiple style="display:none;" onchange="handleBulkPhotos(event)"/>
         <span style="font-size:40px;display:block;margin-bottom:10px;">📦</span>
         <h3>Select Multiple Photos</h3>
-        <p>Click to choose up to 30 photos at once — add captions for each</p>
+        <p>Click to choose up to ${BULK_PHOTO_MAX} photos at once - add captions for each</p>
       </div>
       <div id="bulkGrid" class="bulk-grid"></div>
       <div id="bulkCount" style="margin-top:10px;font-size:13px;color:var(--ink3);"></div>
       <div id="bulkErrMsg" class="photo-err-msg"></div>
-      <button class="submit-btn" style="margin-top:1.25rem;" onclick="submitBulkGallery()">📦 Submit All Bulk Photos</button>
+      <button class="submit-btn" id="bulkSubmitBtn" style="margin-top:1.25rem;" onclick="submitBulkGallery()">Submit All Bulk Photos</button>
     </div>
   </div>`;
 }
@@ -1064,11 +1107,11 @@ function switchGalleryTab(tab){
 function handleBulkPhotos(event){
   const files=Array.from(event.target.files||[]);
   const errEl=document.getElementById('bulkErrMsg');errEl.style.display='none';
-  const max=30;
+  const max=BULK_PHOTO_MAX;
   const rem=max-bulkPhotos.length;
   if(rem<=0){errEl.textContent=`Maximum ${max} photos reached.`;errEl.style.display='block';return;}
   const toAdd=files.slice(0,rem);
-  if(files.length>rem){errEl.textContent=`Adding first ${rem} — limit is ${max} total.`;errEl.style.display='block';}
+  if(files.length>rem){errEl.textContent=`Adding first ${rem} - limit is ${max} total.`;errEl.style.display='block';}
   toAdd.forEach(f=>processBulkPhoto(f));
   event.target.value='';
 }
@@ -1081,12 +1124,8 @@ function processBulkPhoto(file){
   const fileName=file.name;
   img.onload=function(){
     if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(errEl){errEl.textContent=`Skipped "${file.name}": image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;errEl.style.display='block';}URL.revokeObjectURL(url);return;}
-    const r=new FileReader();
-    r.onload=ev=>{
-      bulkPhotos.push({dataURL:ev.target.result,file:file,fileName:fileName,caption:'',meta:{w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)}});
-      renderBulkGrid();
-    };
-    r.readAsDataURL(file);URL.revokeObjectURL(url);
+    bulkPhotos.push({previewUrl:url,file:file,fileName:fileName,caption:'',meta:{w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)}});
+    renderBulkGrid();
   };
   img.onerror=()=>{if(errEl){errEl.textContent=`Skipped "${file.name}": could not read image.`;errEl.style.display='block';}URL.revokeObjectURL(url);};
   img.src=url;
@@ -1107,7 +1146,7 @@ function renderBulkGrid(){
   if(!grid)return;
   grid.innerHTML=bulkPhotos.map((p,i)=>`
     <div class="bulk-thumb">
-      <img src="${p.dataURL}" alt="Photo ${i+1}"/>
+      <img src="${p.previewUrl||p.dataURL||''}" alt="Photo ${i+1}"/>
       <button class="bulk-thumb-rm" onclick="removeBulkPhoto(${i})">×</button>
       <div class="bulk-thumb-cap">
         <input type="text" placeholder="Caption for photo ${i+1}" value="${esc(p.caption)}" oninput="updateBulkCaption(${i},this.value)"/>
@@ -1115,10 +1154,16 @@ function renderBulkGrid(){
     </div>`).join('');
   if(ctr)ctr.textContent=bulkPhotos.length?`${bulkPhotos.length} photo${bulkPhotos.length>1?'s':''} ready to submit`:'';
 }
-function removeBulkPhoto(i){bulkPhotos.splice(i,1);renderBulkGrid();}
+function clearBulkPhotos(){
+  bulkPhotos.forEach(p=>{if(p?.previewUrl)URL.revokeObjectURL(p.previewUrl);});
+  bulkPhotos=[];
+}
+function revokePreviewUrl(url){if(typeof url==='string'&&url.indexOf('blob:')===0)URL.revokeObjectURL(url);}
+function removeBulkPhoto(i){const p=bulkPhotos[i];if(p?.previewUrl)URL.revokeObjectURL(p.previewUrl);bulkPhotos.splice(i,1);renderBulkGrid();}
 function updateBulkCaption(i,val){if(bulkPhotos[i])bulkPhotos[i].caption=val;}
 
 async function submitBulkGallery(){
+  return submitBulkGallerySafe();
   if(!bulkPhotos.length){alert('Please add at least one photo.');return;}
   /* Validate required fields */
   const submitterName=(document.getElementById('ff-submitterName')?.value||'').trim();
@@ -1164,6 +1209,79 @@ async function submitBulkGallery(){
     alert(`${ready.length} photos submitted successfully! They are now awaiting Editor review.`);
   }
   showSync('ok',ready.length+' photos uploaded');
+  document.getElementById('formContainer').style.display='none';
+  document.getElementById('successWrap').style.display='block';
+  clearSubmissionUrlRouting();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function submitBulkGallerySafe(){
+  if(window.__meBulkGallerySubmitting)return;
+  if(!bulkPhotos.length){alert('Please add at least one photo.');return;}
+  const submitterName=(document.getElementById('ff-submitterName')?.value||'').trim();
+  if(!submitterName){alert('Please enter your name before submitting.');document.getElementById('ff-submitterName')?.focus();return;}
+  const submitterRole=(document.getElementById('ff-submitterRole')?.value||'').trim()||'';
+  const btn=document.getElementById('bulkSubmitBtn');
+  const errEl=document.getElementById('bulkErrMsg');
+  const originalText=btn?btn.textContent:'Submit All Bulk Photos';
+  const total=bulkPhotos.length;
+  const ready=[];
+  const ts=new Date().toLocaleString();
+  const release=()=>{window.__meBulkGallerySubmitting=false;if(btn){btn.disabled=false;btn.classList.remove('is-submitting');btn.textContent=originalText;}};
+
+  window.__meBulkGallerySubmitting=true;
+  if(btn){btn.disabled=true;btn.classList.add('is-submitting');}
+
+  try{
+    for(let i=0;i<bulkPhotos.length;i++){
+      const p=bulkPhotos[i];
+      const photoNo=i+1;
+      const progressMsg='Uploading photo '+photoNo+' of '+total+'...';
+      if(btn)btn.textContent=progressMsg;
+      if(errEl){errEl.style.display='block';errEl.textContent=progressMsg;}
+      showSync('syncing',progressMsg);
+
+      const subId=genId();
+      const photoData=await uploadToStorage(p.file,subId);
+      const photoName=p.fileName||('photo_'+photoNo+'.jpg');
+      ready.push({
+        id:subId,
+        category:'gallery',ts,createdAt:Date.now()+i,
+        status:'pending',
+        reviewerNote:'',reviewedAt:null,
+        data:{
+          submitterName:{label:'Submitted by',value:submitterName},
+          submitterRole:{label:'Role',value:submitterRole},
+          photoCaption:{label:'Photo caption',value:p.caption||'Gallery photo'},
+          photoCategory:{label:'Category',value:'Other'},
+          photoDate:{label:'Date',value:''}
+        },
+        photoData:photoData,photoName:photoName,photoMeta:p.meta||null,
+        photos:[{url:photoData,name:photoName,caption:p.caption||'Gallery photo',meta:p.meta||null}]
+      });
+      if(photoNo<total)await wait(BULK_UPLOAD_BETWEEN_FILES_MS);
+    }
+
+    if(errEl){errEl.style.display='block';errEl.textContent='Saving '+ready.length+' uploaded photo'+(ready.length>1?'s':'')+' to cloud...';}
+    showSync('syncing','Saving '+ready.length+' uploaded photo'+(ready.length>1?'s':'')+' to cloud...');
+    await dbSaveSubmissionsBulk(ready,{strict:true});
+  }catch(e){
+    const failedNo=Math.min(ready.length+1,total);
+    const msg='Photo '+failedNo+' failed to upload. Please retry or use a smaller image.';
+    console.error('[Gallery] Bulk upload stopped at photo '+failedNo+':',e);
+    if(errEl){errEl.textContent=msg+' '+uploadErrorDetail(e);errEl.style.display='block';errEl.scrollIntoView({behavior:'smooth',block:'center'});}
+    showSync('err',msg);
+    alert(msg);
+    release();
+    return;
+  }
+
+  alert(`${ready.length} photos submitted successfully! They are now awaiting Editor review.`);
+  showSync('ok',ready.length+' photos uploaded');
+  if(errEl){errEl.textContent=ready.length+' photos uploaded successfully.';errEl.style.display='block';}
+  clearBulkPhotos();
+  renderBulkGrid();
+  release();
   document.getElementById('formContainer').style.display='none';
   document.getElementById('successWrap').style.display='block';
   clearSubmissionUrlRouting();
@@ -1333,10 +1451,14 @@ function openForm(k){
 }
 function makeBulkFormEntry(){return{values:{},photoFile:null,photoDataURL:null,photoMeta:null,photoFilesMulti:[],photoDataURLsMulti:[],photoMetasMulti:[]};}
 function ensureBulkFormEntries(){if(!Array.isArray(bulkFormEntries)||!bulkFormEntries.length)bulkFormEntries=[makeBulkFormEntry()];return bulkFormEntries;}
-function resetFormState(){photoFile=null;photoDataURL=null;photoMeta=null;photoFilesMulti=[];photoDataURLsMulti=[];photoMetasMulti=[];bulkFormEntries=[makeBulkFormEntry()];}
+function resetFormState(){
+  photoDataURLsMulti.forEach(revokePreviewUrl);
+  if(Array.isArray(bulkFormEntries))bulkFormEntries.forEach(entry=>(entry.photoDataURLsMulti||[]).forEach(revokePreviewUrl));
+  photoFile=null;photoDataURL=null;photoMeta=null;photoFilesMulti=[];photoDataURLsMulti=[];photoMetasMulti=[];bulkFormEntries=[makeBulkFormEntry()];
+}
 function buildForm(k){
   const cat=CATEGORIES[k];const c=document.getElementById('formContainer');
-  bulkPhotos=[];/* reset bulk state */
+  clearBulkPhotos();/* reset bulk state */
   let h=`<div class="f-card"><div class="f-card-title">Your Details</div>`;
   getEffectiveFields(k).forEach(f=>{h+=buildFieldHtml(f);});h+=`</div>`;
   /* OCR panel — inject for applicable categories */
@@ -1376,7 +1498,7 @@ function formFieldWrapId(fieldId,idx){return idx?`fw-${idx}-${fieldId}`:`fw-${fi
 function photoDomId(base,idx){return idx?`${base}-${idx}`:base;}
 function buildForm(k){
   const c=document.getElementById('formContainer');
-  bulkPhotos=[];
+  clearBulkPhotos();
   if(k==='gallery'){
     let h=`<div class="f-card"><div class="f-card-title">Your Details</div>`;
     getEffectiveFields(k).forEach(f=>{h+=buildFieldHtml(f,0);});h+=`</div>`;
@@ -1548,15 +1670,13 @@ function processPhotoForMulti(file,max,idx){
   img.onload=function(){
     if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Skipped "${file.name}": image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
     const meta={w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)};
-    const r=new FileReader();
-    r.onload=ev=>{entry.photoFilesMulti.push(file);entry.photoDataURLsMulti.push(ev.target.result);entry.photoMetasMulti.push(meta);if(idx===0)syncPrimaryPhotoGlobals();renderMultiPhotoGrid(max,idx);};
-    r.readAsDataURL(file);URL.revokeObjectURL(url);
+    entry.photoFilesMulti.push(file);entry.photoDataURLsMulti.push(url);entry.photoMetasMulti.push(meta);if(idx===0)syncPrimaryPhotoGlobals();renderMultiPhotoGrid(max,idx);
   };
   img.onerror=()=>{if(err){err.textContent=`Skipped "${file.name}".`;err.style.display='block';}URL.revokeObjectURL(url);};
   img.src=url;
 }
 function renderMultiPhotoGrid(max,idx){idx=idx||0;const entry=bulkEntry(idx),grid=document.getElementById(photoDomId('multiPhotoGrid',idx)),ph=document.getElementById(photoDomId('photoPlaceholderMulti',idx)),ctr=document.getElementById(photoDomId('multiPhotoCount',idx));if(!grid)return;if(!entry.photoDataURLsMulti.length){grid.innerHTML='';if(ph)ph.style.display='block';if(ctr)ctr.style.display='none';return;}if(ph)ph.style.display='none';grid.innerHTML=entry.photoDataURLsMulti.map((url,i)=>`<div class="multi-photo-thumb"><img src="${url}" alt="Photo ${i+1}"/><button class="multi-photo-remove" type="button" onclick="removeMultiPhoto(${i},${max},${idx})">x</button></div>`).join('');if(ctr){ctr.style.display='inline-block';ctr.textContent=`${entry.photoDataURLsMulti.length} of ${max} photos selected`;ctr.classList.toggle('full',entry.photoDataURLsMulti.length>=max);}}
-function removeMultiPhoto(i,max,idx){idx=idx||0;const entry=bulkEntry(idx);entry.photoFilesMulti.splice(i,1);entry.photoDataURLsMulti.splice(i,1);entry.photoMetasMulti.splice(i,1);if(idx===0)syncPrimaryPhotoGlobals();renderMultiPhotoGrid(max,idx);}
+function removeMultiPhoto(i,max,idx){idx=idx||0;const entry=bulkEntry(idx);revokePreviewUrl(entry.photoDataURLsMulti[i]);entry.photoFilesMulti.splice(i,1);entry.photoDataURLsMulti.splice(i,1);entry.photoMetasMulti.splice(i,1);if(idx===0)syncPrimaryPhotoGlobals();renderMultiPhotoGrid(max,idx);}
 
 /* SUBMIT */
 async function submitForm(){
@@ -1666,7 +1786,7 @@ function collectBulkSubmissionPayloads(){
   return{valid,items};
 }
 
-async function buildSubmissionPayload(data,entry,batchIndex){
+async function buildSubmissionPayload(data,entry,batchIndex,onUploadProgress){
   const cat=CATEGORIES[currentFormCategory],subId=genId();
   let finalPhotoData=null;
   if(entry.photoFile&&!cat.photoMulti){
@@ -1674,12 +1794,14 @@ async function buildSubmissionPayload(data,entry,batchIndex){
   }
   let finalPhotos=null;
   if(cat.photoMulti&&entry.photoFilesMulti.length){
-    finalPhotos=await mapWithConcurrency(entry.photoFilesMulti,Math.min(BULK_CLOUD_CONCURRENCY,4),async(file,i)=>{
-      try{
-        const url=await uploadToStorage(file,subId+'_'+i);
-        return{url:url,name:file?.name||`photo_${i+1}.jpg`,meta:entry.photoMetasMulti[i]||null};
-      }catch(e){throw new Error('Photo '+(i+1)+' upload failed: '+(e.message||e));}
+    finalPhotos=await uploadPhotosSequential(entry.photoFilesMulti,{
+      idPrefix:subId,
+      metas:entry.photoMetasMulti,
+      onProgress:(photoNo,total,file)=>{
+        if(onUploadProgress)onUploadProgress(photoNo,total,file,batchIndex);
+      }
     });
+    if(finalPhotos.length)finalPhotoData=finalPhotos[0].url;
   }
   return{id:subId,category:currentFormCategory,
     ts:new Date().toLocaleString(),createdAt:Date.now()+batchIndex,
@@ -1707,7 +1829,7 @@ async function saveSubmissionBatch(submissions,releaseSubmit){
 
   try{
     if(txt)txt.textContent='Saving '+submissions.length+' submission'+(submissions.length>1?'s':'')+' to cloud...';
-    await dbSaveSubmissionsBulk(submissions);
+    await dbSaveSubmissionsBulk(submissions,{strict:true});
     clearInterval(tick);
     if(bar)bar.style.width='100%';
     if(txt)txt.textContent=submissions.length+' submission'+(submissions.length>1?'s':'')+' saved successfully!';
@@ -1720,12 +1842,14 @@ async function saveSubmissionBatch(submissions,releaseSubmit){
     releaseSubmit();
   }catch(e){
     clearInterval(tick);
-    if(bar){bar.style.width='100%';bar.style.background='var(--school-mint3)';}
-    if(txt)txt.textContent='Saved locally. Cloud sync will retry.';
-    setTimeout(()=>{
-      document.getElementById('successUploading').style.display='none';
-      document.getElementById('successDone').style.display='block';
-    },1200);
+    if(bar){bar.style.width='100%';bar.style.background='var(--red)';}
+    if(txt)txt.textContent='Cloud save failed. Please retry.';
+    document.getElementById('formContainer').style.display='block';
+    document.getElementById('successWrap').style.display='none';
+    const err=document.querySelector('.photo-err-msg')||document.getElementById('bulkErrMsg');
+    const msg='Cloud save failed after upload. Please retry. '+uploadErrorDetail(e);
+    if(err){err.textContent=msg;err.style.display='block';err.scrollIntoView({behavior:'smooth',block:'center'});}
+    alert(msg);
     releaseSubmit();
   }
 }
@@ -1764,7 +1888,15 @@ async function submitForm(){
   if(!collected.valid){const fe=document.querySelector('.has-error')||document.querySelector('.photo-err-msg[style*="block"]')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});releaseSubmit();return;}
   let submissions;
   try{
-    submissions=await mapWithConcurrency(collected.items,BULK_CLOUD_CONCURRENCY,(item,i)=>buildSubmissionPayload(item.data,item.entry,i));
+    submissions=[];
+    for(let i=0;i<collected.items.length;i++){
+      const item=collected.items[i];
+      submissions.push(await buildSubmissionPayload(item.data,item.entry,i,(photoNo,total)=>{
+        if(submitBtn)submitBtn.textContent='Uploading photo '+photoNo+' of '+total+'...';
+        showSync('syncing','Uploading photo '+photoNo+' of '+total+'...');
+      }));
+      if(i<collected.items.length-1)await wait(BULK_UPLOAD_BETWEEN_FILES_MS);
+    }
   }catch(e){
     const msg=e.message||'Please check your connection and try again.';
     const err=document.querySelector('.photo-err-msg')||document.getElementById('photoErrMsg');
