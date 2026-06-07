@@ -612,9 +612,10 @@ async function dbLoadAll(options){
 
 async function dbSaveSubmission(sub,options){
   options=options||{};
+  const prepared={...sub,category:requireSubmissionCategory(sub?.category)};
   const applyLocal=()=>{
-    const idx=subs.findIndex(s=>String(s.id)===String(sub.id));
-    if(idx>=0)subs[idx]=sub;else subs.push(sub);
+    const idx=subs.findIndex(s=>String(s.id)===String(prepared.id));
+    if(idx>=0)subs[idx]=prepared;else subs.push(prepared);
     persistSubCache(subs);
   };
   if(!options.strict)applyLocal();
@@ -624,7 +625,7 @@ async function dbSaveSubmission(sub,options){
   showSync('syncing','Syncing to cloud…');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const row=submissionToDbRow(sub);
+    const row=submissionToDbRow(prepared);
     
     await fetchWithRetry(async()=>{
       const{error}=await sb.from('submissions').upsert(row,{onConflict:'id'});
@@ -640,12 +641,13 @@ async function dbSaveSubmission(sub,options){
   }
 }
 function submissionToDbRow(sub){
+  const category=requireSubmissionCategory(sub?.category);
   const photos=Array.isArray(sub.photos)?sub.photos.map(p=>{
     const url=storageUrlOnly(p?.url||p?.data);
     return url?{...p,url,data:null}:null;
   }).filter(Boolean):null;
   return{
-    id:sub.id,category:sub.category,ts:sub.ts,
+    id:sub.id,category:category,ts:sub.ts,
     created_at:new Date(sub.createdAt||Date.now()).toISOString(),
     status:sub.status,reviewer_note:sub.reviewerNote||'',
     reviewed_at:sub.reviewedAt?new Date(sub.reviewedAt).toISOString():null,
@@ -657,8 +659,9 @@ function submissionToDbRow(sub){
 async function dbSaveSubmissionsBulk(list,options){
   if(!list||!list.length)return;
   options=options||{};
+  const prepared=list.map(sub=>({...sub,category:requireSubmissionCategory(sub?.category)}));
   const applyLocal=()=>{
-  list.forEach(sub=>{
+  prepared.forEach(sub=>{
     const idx=subs.findIndex(s=>String(s.id)===String(sub.id));
     if(idx>=0)subs[idx]=sub;else subs.push(sub);
   });
@@ -668,7 +671,7 @@ async function dbSaveSubmissionsBulk(list,options){
   showSync('syncing','Syncing '+list.length+' submissions to cloud...');
   try{
     const sb=getSupa();if(!sb)throw new Error('Supabase client not available');
-    const rows=list.map(submissionToDbRow);
+    const rows=prepared.map(submissionToDbRow);
     await withRetry(async()=>{
       const{error}=await sb.from('submissions').upsert(rows,{onConflict:'id'});
       if(error)throw error;
@@ -1352,6 +1355,23 @@ let aiPendingSuggestion=null;
 /* VIEW */
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);}
 function isStandaloneForm(){return !!(standaloneFormKey&&CATEGORIES[standaloneFormKey]);}
+function resolveSubmissionCategory(fallback){
+  const candidates=[fallback,currentFormCategory,document.getElementById('formContainer')?.dataset?.category,standaloneFormKey];
+  try{
+    const fp=new URLSearchParams(window.location.search).get('form');
+    if(fp)candidates.push(fp);
+  }catch(e){}
+  for(const key of candidates){
+    const clean=String(key||'').trim();
+    if(clean&&CATEGORIES[clean])return clean;
+  }
+  return '';
+}
+function requireSubmissionCategory(fallback){
+  const category=resolveSubmissionCategory(fallback);
+  if(!category)throw new Error('Missing submission category. Please reopen the form and try again.');
+  return category;
+}
 function updateStandaloneFormChrome(){
   const locked=isStandaloneForm();
   const back=document.getElementById('formBackBtn');
@@ -1431,7 +1451,7 @@ function openForm(k){
   const wrap=document.getElementById('successWrap');
   if(wrap) wrap.style.display='none';
   const cont=document.getElementById('formContainer');
-  if(cont){ cont.style.display='block'; cont.innerHTML=''; }
+  if(cont){ cont.style.display='block'; cont.innerHTML=''; cont.dataset.category=k; }
 
   /* Build form — show inline error on failure instead of silent blank */
   try {
@@ -1766,8 +1786,9 @@ async function submitForm(){
   }
 }
 
-function collectBulkSubmissionPayloads(){
-  const cat=CATEGORIES[currentFormCategory],fields=getEffectiveFields(currentFormCategory),items=[];let valid=true;
+function collectBulkSubmissionPayloads(categoryKey){
+  categoryKey=requireSubmissionCategory(categoryKey);
+  const cat=CATEGORIES[categoryKey],fields=getEffectiveFields(categoryKey),items=[];let valid=true;
   ensureBulkFormEntries().forEach((entry,idx)=>{
     const data={};
     fields.forEach(f=>{
@@ -1780,14 +1801,15 @@ function collectBulkSubmissionPayloads(){
     const err=document.getElementById(photoDomId('photoErrMsg',idx));
     if(err){err.style.display='none';err.textContent='';}
     if(cat.photoRequired&&cat.photoMulti&&!entry.photoDataURLsMulti.length){if(err){err.textContent='At least one event photo is required.';err.style.display='block';}valid=false;}
-    else if(cat.photoRequired&&!cat.photoMulti&&!entry.photoDataURL){if(err){const isClass=currentFormCategory.includes('_class_')||currentFormCategory==='ss3_class_message';const isAdvert=currentFormCategory==='advertisements';err.textContent=(isAdvert?'A business flyer':isClass?'A full class picture':'A profile photo')+' is required.';err.style.display='block';}valid=false;}
-    items.push({entry,data});
+    else if(cat.photoRequired&&!cat.photoMulti&&!entry.photoDataURL){if(err){const isClass=categoryKey.includes('_class_')||categoryKey==='ss3_class_message';const isAdvert=categoryKey==='advertisements';err.textContent=(isAdvert?'A business flyer':isClass?'A full class picture':'A profile photo')+' is required.';err.style.display='block';}valid=false;}
+    items.push({entry,data,category:categoryKey});
   });
   return{valid,items};
 }
 
-async function buildSubmissionPayload(data,entry,batchIndex,onUploadProgress){
-  const cat=CATEGORIES[currentFormCategory],subId=genId();
+async function buildSubmissionPayload(data,entry,batchIndex,onUploadProgress,categoryKey){
+  categoryKey=requireSubmissionCategory(categoryKey);
+  const cat=CATEGORIES[categoryKey],subId=genId();
   let finalPhotoData=null;
   if(entry.photoFile&&!cat.photoMulti){
     finalPhotoData=await uploadToStorage(entry.photoFile,subId);
@@ -1803,7 +1825,7 @@ async function buildSubmissionPayload(data,entry,batchIndex,onUploadProgress){
     });
     if(finalPhotos.length)finalPhotoData=finalPhotos[0].url;
   }
-  return{id:subId,category:currentFormCategory,
+  return{id:subId,category:categoryKey,
     ts:new Date().toLocaleString(),createdAt:Date.now()+batchIndex,
     status:'pending',
     reviewerNote:'',reviewedAt:null,data,
@@ -1856,22 +1878,33 @@ async function saveSubmissionBatch(submissions,releaseSubmit){
 
 async function submitForm(){
   if(window.__meSubmitting)return;
-  const cat=CATEGORIES[currentFormCategory];
   const submitBtn=document.getElementById('mainSubmitBtn');
   const originalSubmitText=submitBtn?submitBtn.textContent:'Submit';
   window.__meSubmitting=true;
   if(submitBtn){submitBtn.disabled=true;submitBtn.classList.add('is-submitting');submitBtn.textContent='Submitting...';}
   const releaseSubmit=()=>{window.__meSubmitting=false;if(submitBtn){submitBtn.disabled=false;submitBtn.classList.remove('is-submitting');submitBtn.textContent=originalSubmitText;}};
+  let categoryKey,cat;
+  try{
+    categoryKey=requireSubmissionCategory();
+    currentFormCategory=categoryKey;
+    cat=CATEGORIES[categoryKey];
+  }catch(e){
+    const err=document.querySelector('.photo-err-msg')||document.getElementById('bulkErrMsg');
+    if(err){err.textContent=e.message;err.style.display='block';err.scrollIntoView({behavior:'smooth',block:'center'});}
+    alert(e.message);
+    releaseSubmit();
+    return;
+  }
 
-  if(currentFormCategory==='gallery'){
+  if(categoryKey==='gallery'){
     let valid=true;const data={};
-    getEffectiveFields(currentFormCategory).forEach(f=>{const el=document.getElementById('ff-'+f.id);const w=document.getElementById('fw-'+f.id);if(!el)return;const val=f.type==='checkbox'?el.checked?'Yes':'No':(el.value||'').trim();data[f.id]={label:f.label,value:val,type:f.type};if(f.required&&f.type!=='checkbox'&&!val){if(w)w.classList.add('has-error');valid=false;}else if(w)w.classList.remove('has-error');});
+    getEffectiveFields(categoryKey).forEach(f=>{const el=document.getElementById('ff-'+f.id);const w=document.getElementById('fw-'+f.id);if(!el)return;const val=f.type==='checkbox'?el.checked?'Yes':'No':(el.value||'').trim();data[f.id]={label:f.label,value:val,type:f.type};if(f.required&&f.type!=='checkbox'&&!val){if(w)w.classList.add('has-error');valid=false;}else if(w)w.classList.remove('has-error');});
     const onBulk=document.getElementById('gpane-bulk')?.classList.contains('active');
     if(onBulk){releaseSubmit();submitBulkGallery();return;}
     if(cat.photoRequired&&!photoDataURL){const e=document.getElementById('photoErrMsg');if(e){e.textContent='A photo is required.';e.style.display='block';}valid=false;}
     if(!valid){const fe=document.querySelector('.has-error')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});releaseSubmit();return;}
     try{
-      const sub=await buildSubmissionPayload(data,bulkEntry(0),0);
+      const sub=await buildSubmissionPayload(data,bulkEntry(0),0,null,categoryKey);
       return saveSubmissionBatch([sub],releaseSubmit);
     }catch(e){
       const msg=e.message||'Please check your connection and try again.';
@@ -1884,7 +1917,7 @@ async function submitForm(){
   }
 
   snapshotBulkFormValues();
-  const collected=collectBulkSubmissionPayloads();
+  const collected=collectBulkSubmissionPayloads(categoryKey);
   if(!collected.valid){const fe=document.querySelector('.has-error')||document.querySelector('.photo-err-msg[style*="block"]')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});releaseSubmit();return;}
   let submissions;
   try{
@@ -1894,7 +1927,7 @@ async function submitForm(){
       submissions.push(await buildSubmissionPayload(item.data,item.entry,i,(photoNo,total)=>{
         if(submitBtn)submitBtn.textContent='Uploading photo '+photoNo+' of '+total+'...';
         showSync('syncing','Uploading photo '+photoNo+' of '+total+'...');
-      }));
+      },item.category||categoryKey));
       if(i<collected.items.length-1)await wait(BULK_UPLOAD_BETWEEN_FILES_MS);
     }
   }catch(e){
