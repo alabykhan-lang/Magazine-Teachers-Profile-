@@ -227,12 +227,13 @@ let sectionOrder;
 let formConfig;
 const PRINT_IMAGE_MIN_PX=300;
 const PRINT_IMAGE_RECOMMENDED_PX=1200;
-const PRINT_MAX_IMAGE_MB=25;
+const PRINT_MAX_IMAGE_MB=15;
 const BULK_CLOUD_CONCURRENCY=1;
 const CLOUD_RETRY_DELAYS=[800,1500,3000];
 const CLOUD_TIMEOUT_MS=20000;
 const STORAGE_BUCKET='photos';
-const STORAGE_UPLOAD_TIMEOUT_MS=60000;
+const STORAGE_UPLOAD_RETRY_DELAYS=[1000,2000,4000,8000];
+const STORAGE_UPLOAD_TIMEOUT_MS=180000;
 const BULK_PHOTO_MAX=15;
 const BULK_UPLOAD_BETWEEN_FILES_MS=700;
 const cloudHealth={database:'unknown',auth:'unknown',realtime:'unknown',edge:'unknown'};
@@ -265,44 +266,80 @@ function waitForSupabase(maxMs){
 /* ── Supabase Storage: full-quality photo uploads ── */
 async function uploadToStorage(file, subId){
   if(!file)throw new Error('No photo selected.');
+  if(!(file instanceof Blob))throw new Error('Invalid image file.');
+  if(!file.size||file.size<=0)throw new Error('Invalid image file.');
+  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024)throw new Error('Image is too large. Please use a smaller photo.');
+  const fileType=file.type||'';
+  const fileName=file.name||'photo.jpg';
+  if(fileType&&!/^image\/(jpeg|jpg|png|webp)$/i.test(fileType))throw new Error('Invalid image file.');
   if(isNetworkTrulyOffline())throw new Error('You appear to be offline. Reconnect and try the photo upload again.');
   const loaded=await waitForSupabase(8000);
   const sb=loaded?getSupa():null;
   if(!sb)throw new Error('Cloud storage is still loading. Please try again in a moment.');
-  const rawExt=(file.name||'photo.jpg').split('.').pop().toLowerCase();
-  const typeExt=(file.type||'').split('/').pop().replace('jpeg','jpg').toLowerCase();
+  const rawExt=fileName.split('.').pop().toLowerCase();
+  const typeExt=fileType.split('/').pop().replace('jpeg','jpg').toLowerCase();
   const ext=['jpg','jpeg','png','webp'].includes(rawExt)?rawExt:(['jpg','png','webp'].includes(typeExt)?typeExt:'jpg');
   const safeId=String(subId||genId()).replace(/[^a-zA-Z0-9_-]/g,'_');
   const day=new Date().toISOString().slice(0,10);
   const path=`submissions/${day}/${safeId}-${Date.now()}.${ext}`;
   try{
-    await fetchWithRetry(async()=>{
+    await storageUploadWithRetry(async()=>{
       const{data,error}=await sb.storage.from(STORAGE_BUCKET).upload(path,file,{
         cacheControl:'31536000',
-        contentType:file.type||`image/${ext==='jpg'?'jpeg':ext}`,
+        contentType:fileType||`image/${ext==='jpg'?'jpeg':ext}`,
         upsert:false
       });
       if(error){
-        console.error('[Storage] Supabase upload error:',{path,fileName:file.name,fileSize:file.size,error});
+        console.error("Storage upload failed",{fileName,fileSize:file.size,fileType,path,error});
         throw error;
       }
       if(!data?.path)throw new Error('Upload finished without a storage path.');
-    },'Uploading photo',CLOUD_RETRY_DELAYS.length+1,STORAGE_UPLOAD_TIMEOUT_MS);
+    },{fileName,fileSize:file.size,fileType,path});
     const{data}=sb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
     const publicUrl=data?.publicUrl;
     if(!storageUrlOnly(publicUrl))throw new Error('Could not create a valid public URL for the uploaded photo.');
     return publicUrl;
   }catch(e){
-    const msg=e?.message||String(e||'Unknown error');
-    console.error('[Storage] Upload failed:',{fileName:file?.name,fileSize:file?.size,path,error:e});
-    if(/failed to fetch|network|timeout|load failed/i.test(msg))throw new Error('Photo upload could not reach cloud storage. Check your connection, then try again. Your selected photo is still on the form.');
-    throw new Error('Photo upload failed: '+msg);
+    console.error("Storage upload failed",{fileName,fileSize:file.size,fileType,path,error:e});
+    throw normalizeStorageUploadError(e);
   }
+}
+async function storageUploadWithRetry(operation,context){
+  let lastErr;
+  const attempts=STORAGE_UPLOAD_RETRY_DELAYS.length+1;
+  for(let i=0;i<attempts;i++){
+    try{
+      return await withTimeout(Promise.resolve().then(operation),'Uploading photo',STORAGE_UPLOAD_TIMEOUT_MS);
+    }catch(e){
+      lastErr=e;
+      if(i===attempts-1)break;
+      const delay=STORAGE_UPLOAD_RETRY_DELAYS[i];
+      console.warn('[Storage] Upload attempt '+(i+1)+'/'+attempts+' failed. Retrying in '+(delay/1000)+'s.',e);
+      showSync('syncing','Uploading photo failed (try '+(i+1)+'/'+attempts+'). Retrying in '+(delay/1000)+'s...');
+      await wait(delay);
+    }
+  }
+  console.error("Storage upload failed",{...(context||{}),error:lastErr});
+  throw lastErr;
+}
+function normalizeStorageUploadError(err){
+  const raw=String(err?.message||err?.error_description||err?.statusText||err||'');
+  if(/invalid image file/i.test(raw))return new Error('Invalid image file.');
+  if(/too large|payload too large|entity too large|exceeded|413|file size/i.test(raw))return new Error('Image is too large. Please use a smaller photo.');
+  if(/failed to fetch|network|timeout|load failed|abort|offline|connection/i.test(raw))return new Error('Network interrupted during upload. Please retry.');
+  return new Error(raw?'Photo upload failed: '+raw:'Network interrupted during upload. Please retry.');
 }
 function uploadErrorDetail(err){
   const msg=String(err?.message||err||'');
   if(!msg)return '';
   return msg.length>180?msg.slice(0,177)+'...':msg;
+}
+function friendlyUploadErrorMessage(err){
+  const msg=String(err?.message||err||'');
+  if(/network interrupted|failed to fetch|network|timeout|load failed|abort|offline|connection/i.test(msg))return 'Network interrupted during upload. Please retry.';
+  if(/too large|payload too large|entity too large|exceeded|413|file size/i.test(msg))return 'Image is too large. Please use a smaller photo.';
+  if(/invalid image file|invalid format|could not read/i.test(msg))return 'Invalid image file.';
+  return msg||'Network interrupted during upload. Please retry.';
 }
 async function uploadPhotosSequential(files,options){
   const list=Array.from(files||[]);
@@ -318,7 +355,7 @@ async function uploadPhotosSequential(files,options){
       photos.push({url:url,name:file?.name||`photo_${photoNo}.jpg`,meta:opts.metas?.[i]||null});
     }catch(e){
       console.error('[Storage] Photo '+photoNo+' failed:',{fileName:file?.name,fileSize:file?.size,error:e});
-      throw new Error('Photo '+photoNo+' failed to upload. Please retry or use a smaller image. '+uploadErrorDetail(e));
+      throw new Error('Photo '+photoNo+': '+friendlyUploadErrorMessage(e));
     }
     if(photoNo<total)await wait(opts.betweenMs||BULK_UPLOAD_BETWEEN_FILES_MS);
   }
@@ -1121,8 +1158,8 @@ function handleBulkPhotos(event){
 function processBulkPhoto(file){
   const errEl=document.getElementById('bulkErrMsg');
   const ext=file.name.split('.').pop().toLowerCase();
-  if(!['jpg','jpeg','png','webp'].includes(ext)){if(errEl){errEl.textContent=`Skipped "${file.name}": invalid format.`;errEl.style.display='block';}return;}
-  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(errEl){errEl.textContent=`Skipped "${file.name}": max ${PRINT_MAX_IMAGE_MB} MB.`;errEl.style.display='block';}return;}
+  if(!['jpg','jpeg','png','webp'].includes(ext)||!file.size){if(errEl){errEl.textContent='Invalid image file.';errEl.style.display='block';}return;}
+  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(errEl){errEl.textContent='Image is too large. Please use a smaller photo.';errEl.style.display='block';}return;}
   const img=new Image(),url=URL.createObjectURL(file);
   const fileName=file.name;
   img.onload=function(){
@@ -1224,7 +1261,7 @@ async function submitBulkGallerySafe(){
   const submitterName=(document.getElementById('ff-submitterName')?.value||'').trim();
   if(!submitterName){alert('Please enter your name before submitting.');document.getElementById('ff-submitterName')?.focus();return;}
   const submitterRole=(document.getElementById('ff-submitterRole')?.value||'').trim()||'';
-  const btn=document.getElementById('bulkSubmitBtn');
+  const btn=document.getElementById('bulkSubmitBtn')||document.querySelector('.bulk-submit-card .submit-btn');
   const errEl=document.getElementById('bulkErrMsg');
   const originalText=btn?btn.textContent:'Submit All Bulk Photos';
   const total=bulkPhotos.length;
@@ -1270,9 +1307,9 @@ async function submitBulkGallerySafe(){
     await dbSaveSubmissionsBulk(ready,{strict:true});
   }catch(e){
     const failedNo=Math.min(ready.length+1,total);
-    const msg='Photo '+failedNo+' failed to upload. Please retry or use a smaller image.';
+    const msg=friendlyUploadErrorMessage(e);
     console.error('[Gallery] Bulk upload stopped at photo '+failedNo+':',e);
-    if(errEl){errEl.textContent=msg+' '+uploadErrorDetail(e);errEl.style.display='block';errEl.scrollIntoView({behavior:'smooth',block:'center'});}
+    if(errEl){errEl.textContent=msg;errEl.style.display='block';errEl.scrollIntoView({behavior:'smooth',block:'center'});}
     showSync('err',msg);
     alert(msg);
     release();
@@ -1657,26 +1694,23 @@ function handlePhoto(e,idx){if(e.target.files[0])processPhoto(e.target.files[0],
 function processPhoto(file,idx){
   idx=idx||0;const entry=bulkEntry(idx);const err=document.getElementById(photoDomId('photoErrMsg',idx));if(err)err.style.display='none';
   const ext=file.name.split('.').pop().toLowerCase();
-  if(!['jpg','jpeg','png','webp'].includes(ext)){if(err){err.textContent='Invalid format. Use JPG, PNG, or WebP.';err.style.display='block';}return;}
-  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(err){err.textContent=`File too large. Max ${PRINT_MAX_IMAGE_MB} MB.`;err.style.display='block';}return;}
+  if(!['jpg','jpeg','png','webp'].includes(ext)||!file.size){if(err){err.textContent='Invalid image file.';err.style.display='block';}return;}
+  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(err){err.textContent='Image is too large. Please use a smaller photo.';err.style.display='block';}return;}
   const img=new Image(),url=URL.createObjectURL(file);
   img.onload=function(){
     if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
+    revokePreviewUrl(entry.photoDataURL);
     entry.photoFile=file;entry.photoMeta={w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)};
-    const r=new FileReader();
-    r.onload=ev=>{
-      entry.photoDataURL=ev.target.result;if(idx===0)syncPrimaryPhotoGlobals();
-      const prev=document.getElementById(photoDomId('photoPreview',idx)),fn=document.getElementById(photoDomId('photoFilename',idx)),dims=document.getElementById(photoDomId('photoDims',idx)),ph=document.getElementById(photoDomId('photoPlaceholder',idx)),wrap=document.getElementById(photoDomId('photoPreviewWrap',idx)),drop=document.getElementById(photoDomId('photoDrop',idx));
-      if(prev)prev.src=entry.photoDataURL;if(fn)fn.textContent=file.name;if(dims)dims.textContent=`${img.width}x${img.height}px - ${(file.size/1024).toFixed(0)} KB - ${entry.photoMeta.printQuality}${Math.min(img.width,img.height)<PRINT_IMAGE_RECOMMENDED_PX?' - '+PRINT_IMAGE_RECOMMENDED_PX+'x'+PRINT_IMAGE_RECOMMENDED_PX+'px or higher recommended for print':''}`;if(ph)ph.style.display='none';if(wrap)wrap.style.display='flex';if(drop)drop.classList.add('uploaded');
-    };
-    r.readAsDataURL(file);URL.revokeObjectURL(url);
+    entry.photoDataURL=url;if(idx===0)syncPrimaryPhotoGlobals();
+    const prev=document.getElementById(photoDomId('photoPreview',idx)),fn=document.getElementById(photoDomId('photoFilename',idx)),dims=document.getElementById(photoDomId('photoDims',idx)),ph=document.getElementById(photoDomId('photoPlaceholder',idx)),wrap=document.getElementById(photoDomId('photoPreviewWrap',idx)),drop=document.getElementById(photoDomId('photoDrop',idx));
+    if(prev)prev.src=entry.photoDataURL;if(fn)fn.textContent=file.name;if(dims)dims.textContent=`${img.width}x${img.height}px - ${(file.size/1024).toFixed(0)} KB - ${entry.photoMeta.printQuality}${Math.min(img.width,img.height)<PRINT_IMAGE_RECOMMENDED_PX?' - '+PRINT_IMAGE_RECOMMENDED_PX+'x'+PRINT_IMAGE_RECOMMENDED_PX+'px or higher recommended for print':''}`;if(ph)ph.style.display='none';if(wrap)wrap.style.display='flex';if(drop)drop.classList.add('uploaded');
   };
   img.onerror=()=>{if(err){err.textContent='Could not read this image. Try another JPG, PNG, or WebP.';err.style.display='block';}URL.revokeObjectURL(url);};
   img.src=url;
 }
 function resetPhoto(e,idx){
   if(e)e.stopPropagation();idx=idx||0;const entry=bulkEntry(idx);
-  entry.photoFile=null;entry.photoDataURL=null;entry.photoMeta=null;if(idx===0)syncPrimaryPhotoGlobals();
+  revokePreviewUrl(entry.photoDataURL);entry.photoFile=null;entry.photoDataURL=null;entry.photoMeta=null;if(idx===0)syncPrimaryPhotoGlobals();
   const input=document.getElementById(photoDomId('photoInput',idx)),prev=document.getElementById(photoDomId('photoPreview',idx)),ph=document.getElementById(photoDomId('photoPlaceholder',idx)),wrap=document.getElementById(photoDomId('photoPreviewWrap',idx)),drop=document.getElementById(photoDomId('photoDrop',idx));
   if(input)input.value='';if(prev)prev.src='';if(ph)ph.style.display='block';if(wrap)wrap.style.display='none';if(drop)drop.classList.remove('uploaded');
 }
@@ -1684,8 +1718,8 @@ function handlePhotoMulti(event,max,idx){idx=idx||0;const files=Array.from(event
 function processPhotoForMulti(file,max,idx){
   idx=idx||0;const entry=bulkEntry(idx),err=document.getElementById(photoDomId('photoErrMsg',idx));
   const ext=file.name.split('.').pop().toLowerCase();
-  if(!['jpg','jpeg','png','webp'].includes(ext)){if(err){err.textContent=`Skipped "${file.name}": invalid format.`;err.style.display='block';}return;}
-  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(err){err.textContent=`Skipped "${file.name}": too large (max ${PRINT_MAX_IMAGE_MB} MB).`;err.style.display='block';}return;}
+  if(!['jpg','jpeg','png','webp'].includes(ext)||!file.size){if(err){err.textContent='Invalid image file.';err.style.display='block';}return;}
+  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(err){err.textContent='Image is too large. Please use a smaller photo.';err.style.display='block';}return;}
   const img=new Image();const url=URL.createObjectURL(file);
   img.onload=function(){
     if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Skipped "${file.name}": image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
@@ -1907,7 +1941,7 @@ async function submitForm(){
       const sub=await buildSubmissionPayload(data,bulkEntry(0),0,null,categoryKey);
       return saveSubmissionBatch([sub],releaseSubmit);
     }catch(e){
-      const msg=e.message||'Please check your connection and try again.';
+      const msg=friendlyUploadErrorMessage(e);
       const err=document.getElementById('photoErrMsg')||document.getElementById('bulkErrMsg');
       if(err){err.textContent=msg;err.style.display='block';err.scrollIntoView({behavior:'smooth',block:'center'});}
       alert(msg);
@@ -1931,7 +1965,7 @@ async function submitForm(){
       if(i<collected.items.length-1)await wait(BULK_UPLOAD_BETWEEN_FILES_MS);
     }
   }catch(e){
-    const msg=e.message||'Please check your connection and try again.';
+    const msg=friendlyUploadErrorMessage(e);
     const err=document.querySelector('.photo-err-msg')||document.getElementById('photoErrMsg');
     if(err){err.textContent=msg;err.style.display='block';err.scrollIntoView({behavior:'smooth',block:'center'});}
     alert(msg);
