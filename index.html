@@ -879,8 +879,20 @@
           </div>
           <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="wsAddManualTextBox()">Add Text Box</button>
-            <button class="ws-prod-btn" onclick="wsAddManualImageBox()">Add Image Box</button>
+            <button class="ws-prod-btn" onclick="document.getElementById('wsProductionImageInput').click()">Add Image</button>
           </div>
+          <input type="file" id="wsProductionImageInput" accept=".jpg,.jpeg,.png,.webp" style="display:none;" onchange="wsUploadProductionImage(event)"/>
+          <label class="ws-font-label">New image placement</label>
+          <select class="ws-font-select" id="wsProductionImagePlacement">
+            <option value="feature">Feature image above title</option>
+            <option value="after-heading">After heading</option>
+            <option value="inline">Inline after paragraph</option>
+            <option value="after-text">After text</option>
+            <option value="side">Side image</option>
+            <option value="full-width">Full-width image block</option>
+            <option value="gallery">Gallery block</option>
+          </select>
+          <input class="ws-font-select" id="wsProductionImageCaption" type="text" placeholder="Caption for new production image"/>
           <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="wsAddManualCaption()">Add Caption</button>
             <button class="ws-prod-btn" onclick="wsSplitLongTextToCopy()">Split Long Text</button>
@@ -941,6 +953,10 @@
             <button class="ws-prod-btn" onclick="wsResetImageEdit()">Reset</button>
           </div>
           <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsToggleSelectedImageHidden(true)">Hide Image</button>
+            <button class="ws-prod-btn" onclick="wsToggleSelectedImageHidden(false)">Restore Image</button>
+          </div>
+          <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="wsApplyImageEdit('page')">Apply Page</button>
             <button class="ws-prod-btn" onclick="wsApplyImageEdit('category')">Apply Category</button>
           </div>
@@ -958,6 +974,8 @@
           <label class="ws-font-label">Text item</label>
           <select class="ws-font-select" id="wsTextEditSelect" onchange="wsUpdateTextStats()"></select>
           <div id="wsTextStats" class="ws-empty-mini">No editable text on this page.</div>
+          <textarea class="ws-text-edit-area" id="wsTextEditArea" rows="8" placeholder="Select text to edit the production version only." oninput="wsSaveSelectedTextArea()"></textarea>
+          <label class="ws-field-check ws-hide-text-check"><input type="checkbox" id="wsTextHiddenCheck" onchange="wsToggleSelectedTextHidden(this.checked)"/><span>Hide this text in production output</span></label>
           <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="wsShortenSelectedText()">Shorten</button>
             <button class="ws-prod-btn" onclick="wsExpandSelectedText()">Expand</button>
@@ -972,6 +990,9 @@
           </div>
           <button class="ws-export-btn" onclick="wsResetSelectedText()">
             <span class="ws-export-icon">?</span><span>Reset Text<span class="ws-export-desc">Restore original submission text</span></span>
+          </button>
+          <button class="ws-export-btn" onclick="wsResetCurrentProductionPage()">
+            <span class="ws-export-icon">?</span><span>Reset Production Version<span class="ws-export-desc">Clear page text, image, and manual production edits</span></span>
           </button>
         </div>
       </div>

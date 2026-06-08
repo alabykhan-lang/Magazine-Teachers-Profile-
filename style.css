@@ -1478,3 +1478,18 @@ figcaption{break-before:avoid;page-break-before:avoid;}
   .submission-preview-titlebar h2{font-size:23px;}
   .submission-preview-text{font-size:15px;line-height:1.75;}
 }
+
+/* Production Workspace direct editing and print flow fixes */
+.ws-text-edit-area{width:100%;min-height:132px;resize:vertical;background:var(--ws-surface3);border:1px solid var(--ws-border);border-radius:6px;color:var(--ws-text);padding:9px 10px;font-size:12px;line-height:1.55;font-family:'Lato',sans-serif;margin:8px 0;}
+.ws-text-edit-area:focus{outline:none;border-color:var(--ws-accent);}
+.ws-hide-text-check{border:1px solid var(--ws-border);border-radius:6px;background:var(--ws-surface3);padding:7px 8px;margin-bottom:8px;}
+.ws-page-edit-row.ws-page-edit-row-content{grid-template-columns:minmax(0,1fr) auto auto;}
+.ws-page-edit-row .ws-row-muted{font-size:9px;color:var(--ws-text3);display:block;margin-top:2px;}
+.ws-prod-btn.warn{color:var(--ws-yellow);border-color:rgba(249,226,175,.35);}
+.mag-page,.mag-page-inner,.mag-page-flow,.mag-flow-content{height:auto;max-height:none;overflow:visible;}
+.mag-item,.mag-item-gallery,.mag-item-event,.mag-item-teacher,.mag-item-student,.mag-image-frame,.mag-manual-block,.mag-production-image,figure{break-inside:avoid;page-break-inside:avoid;}
+.mag-heading-block,h1,h2,h3{break-after:avoid;page-break-after:avoid;}
+figcaption{break-before:avoid;page-break-before:avoid;}
+.mag-item-field-value,.mag-item-body,p{orphans:3;widows:3;}
+.mag-image-frame img,.mag-production-image img{object-fit:contain!important;object-position:center top;max-width:100%;height:auto;}
+.mag-production-images{break-inside:avoid;page-break-inside:avoid;}
