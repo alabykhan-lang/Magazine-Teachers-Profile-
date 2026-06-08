@@ -2815,16 +2815,18 @@ function renderCurrentPage(){
     }
     function renderManualBlocks(blocks,placement){
       if(!Array.isArray(blocks)||!blocks.length)return '';
-      const filtered=blocks.filter(b=>(b?.placement||'after-text')===(placement||'after-text'));
+      const filtered=blocks.filter(b=>!b?.hidden&&(b?.placement||'after-text')===(placement||'after-text'));
       if(!filtered.length)return '';
       return `<div class="mag-manual-blocks mag-production-images" style="display:grid;gap:8px;margin:${placement==='feature'?'0 0 12px':'10px 0'};">
         ${filtered.map((b,i)=>{
           if(!b)return '';
           if(b.type==='image'){
             const place=b.placement||placement||'after-text';
-            const h=place==='feature'?'210px':place==='full-width'?'190px':place==='gallery'?'135px':place==='side'?'150px':'160px';
+            const h=place==='feature'?'210px':place==='full-width'?'190px':place==='gallery'?'135px':place==='side'?'150px':place==='background'?'100%':'160px';
             const grid=place==='gallery'?'display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;':'';
-            return `<figure class="mag-manual-block mag-manual-image mag-production-image ${esc(place)}" style="margin:0;padding:${place==='feature'?'0':'8px'};border:${place==='feature'?'0':`1px solid ${c2}44`};border-radius:7px;background:#fff;${grid}">
+            const side=place==='side'?'float:right;width:38%;max-width:210px;margin:0 0 10px 14px;':'';
+            const bgStyle=place==='background'?'position:absolute;inset:0;z-index:0;opacity:.18;border:0;padding:0;border-radius:0;':'';
+            return `<figure class="mag-manual-block mag-manual-image mag-production-image ${esc(place)}" style="margin:0;padding:${place==='feature'||place==='background'?'0':'8px'};border:${place==='feature'||place==='background'?'0':`1px solid ${c2}44`};border-radius:7px;background:#fff;${grid}${side}${bgStyle}">
             ${b.src?renderImageFrame(b.src,'manual:'+(b.id||i),{frame:`width:100%;height:${h};border-radius:5px;`,fit:'contain'},b.caption||'Manual image'):`<div style="height:110px;border-radius:5px;background:#f0f0ea;display:flex;align-items:center;justify-content:center;color:#888;font-size:11px;">Image box</div>`}
             ${b.caption?`<figcaption style="font-size:8px;color:#777;line-height:1.4;margin-top:5px;">${esc(b.caption)}</figcaption>`:''}
           </figure>`;
@@ -3057,7 +3059,7 @@ function renderCurrentPage(){
     }
 
     contentHtml=renderManualBlocks(page.manualBlocks,'inline')+contentHtml+renderManualBlocks(page.manualBlocks,'after-text')+renderManualBlocks(page.manualBlocks,'side')+renderManualBlocks(page.manualBlocks,'full-width')+renderManualBlocks(page.manualBlocks,'gallery');
-    inner=`<div class="mag-page-flow" style="background:${pageBg};min-height:100%;height:auto;display:flex;flex-direction:column;">${renderManualBlocks(page.manualBlocks,'feature')}${page.isFirst?`<div class="mag-heading-block" style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.25rem 2rem;min-height:90px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:5px;">${esc(magazineTheme)}</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(secLabel)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div>`:`<div class="mag-heading-block" style="background:${c1};padding:6px 2rem;"><span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:${c2};font-weight:700;">${esc(secLabel)} (continued)</span></div>`}${renderManualBlocks(page.manualBlocks,'after-heading')}<div class="mag-flow-content" style="padding:1rem 1.5rem;flex:1;overflow:visible;height:auto;max-height:none;">${contentHtml}</div>${s.pageNums!=='no'?foot:''}</div>`;
+    inner=`<div class="mag-page-flow" style="background:${pageBg};min-height:100%;height:auto;display:flex;flex-direction:column;position:relative;overflow:visible;">${renderManualBlocks(page.manualBlocks,'background')}${renderManualBlocks(page.manualBlocks,'feature')}${page.isFirst?`<div class="mag-heading-block" style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.25rem 2rem;min-height:90px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:5px;">${esc(magazineTheme)}</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(secLabel)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div>`:`<div class="mag-heading-block" style="background:${c1};padding:6px 2rem;position:relative;"><span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:${c2};font-weight:700;">${esc(secLabel)} (continued)</span></div>`}${renderManualBlocks(page.manualBlocks,'after-heading')}<div class="mag-flow-content" style="padding:1rem 1.5rem;flex:1;overflow:visible;height:auto;max-height:none;position:relative;z-index:1;">${contentHtml}</div>${s.pageNums!=='no'?foot:''}</div>`;
   }
   canvas.innerHTML=`<div class="mag-page" data-category="${esc(page.sec?.key || page.type)}" style="width:${w}px;height:${h}px;transform:scale(${scale});transform-origin:top center;"><div class="mag-page-inner">${inner}</div></div>`;
   document.getElementById('previewPageTitle').textContent=`Page ${currentPageIdx+1} — ${page.sec?.label||page.type}`;
@@ -3079,22 +3081,23 @@ function openPrintView(){
   const orient=s.orientation||'portrait';
   const{w,h}=getPageDimensions();
 
-  /* Render every page to HTML by cycling through each page index */
-  const savedIdx=currentPageIdx;
   let allPagesHtml='';
-  for(let i=0;i<magPages.length;i++){
-    currentPageIdx=i;
+  if(window.__wsFastPrintPagesHtml){
+    allPagesHtml=window.__wsFastPrintPagesHtml;
+    window.__wsFastPrintPagesHtml='';
+  }else{
+    const savedIdx=currentPageIdx;
+    for(let i=0;i<magPages.length;i++){
+      currentPageIdx=i;
+      renderCurrentPage();
+      const pageEl=document.getElementById('magCanvas');
+      const inner=pageEl.innerHTML.replace(/transform:scale\([^)]+\);?/g,'').replace(/transform-origin:[^;]+;?/g,'');
+      allPagesHtml+=`<div class="mag-sheet">${inner}</div>`;
+    }
+    currentPageIdx=savedIdx;
     renderCurrentPage();
-    const pageEl=document.getElementById('magCanvas');
-    /* Strip the scale transform — print window uses real dimensions */
-    const inner=pageEl.innerHTML.replace(/transform:scale\([^)]+\);?/g,'').replace(/transform-origin:[^;]+;?/g,'');
-    allPagesHtml+=`<div class="mag-sheet">${inner}</div>`;
+    updatePageNavUI();
   }
-  /* Restore original page */
-  currentPageIdx=savedIdx;
-  renderCurrentPage();
-  updatePageNavUI();
-
   const win=window.open('','_blank','width=960,height=800');
   if(!win){alert('Please allow popups for this site to open the print window.');return;}
   win.document.write(`<!DOCTYPE html>
@@ -3145,11 +3148,24 @@ function openPrintView(){
   <div class="no-print">
     <h2>🖨 ${esc(s.magTitle||'The Torch')} &mdash; ${magPages.length} pages</h2>
     <button onclick="window.print()">Print / Save as PDF</button>
+    <p id="printPrepStatus">Preparing PDF preview...</p>
     <p>Paper: ${ps} &middot; ${orient} &middot; Margins: None &middot; <strong>Enable Background graphics ✓</strong></p>
   </div>
   <div id="printPages">
     ${allPagesHtml}
   </div>
+  <script>
+    (function(){
+      var status=document.getElementById("printPrepStatus");
+      var imgs=Array.prototype.slice.call(document.images||[]);
+      var pending=imgs.filter(function(img){return !img.complete;});
+      if(!pending.length){if(status)status.textContent="PDF preview ready.";return;}
+      var done=0,settled=false;
+      function tick(){done++;if(status)status.textContent="Preparing PDF preview... "+done+" / "+pending.length+" images";if(done>=pending.length&&!settled){settled=true;if(status)status.textContent="PDF preview ready.";}}
+      pending.forEach(function(img){img.addEventListener("load",tick,{once:true});img.addEventListener("error",tick,{once:true});});
+      setTimeout(function(){if(!settled){settled=true;if(status)status.textContent="PDF preview ready. Some slow images may continue loading in the browser.";}},6000);
+    })();
+  <\/script>
 </body>
 </html>`);
   win.document.close();
@@ -3714,7 +3730,7 @@ function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:
 function wsIsProfilePage(page){const key=page?.sec?.key;return page?.type==='section-content'&&(key==='teachers'||['primary5','jss3','ss3'].includes(key)||page?.sec?.layout==='teacher-grid'||page?.sec?.layout==='grid');}
 function wsGetProfileControls(page,meta){const prod=wsEnsureProduction();const key=page?.sec?.key;return Object.assign({},wsDefaultProfileControls(key),prod.profileDefaults?.[key]||{},meta?.profileControls||{});}
 function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,hidden:false,itemOrder:null,removedItemIds:[],addedItemIds:[],manualBlocks:[],textLimit:null,textEdits:{},imageEdits:{},selectedImageKey:'',namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});}
-function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);prod.pages[key]=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{});saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
+function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);prod.pages[key]=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{},{updatedAt:new Date().toISOString()});saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
 function wsApplyItemOrder(items,order){if(!Array.isArray(items)||!Array.isArray(order)||!order.length)return items;const rank=new Map(order.map((id,i)=>[String(id),i]));return items.slice().sort((a,b)=>{const ar=rank.has(String(a.id))?rank.get(String(a.id)):9999;const br=rank.has(String(b.id))?rank.get(String(b.id)):9999;return ar-br;});}
 function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,hidden:!!meta.hidden,manualBlocks:Array.isArray(meta.manualBlocks)?meta.manualBlocks:[],textLimit:meta.textLimit,textEdits:meta.textEdits||{},imageEdits:meta.imageEdits||{},namePlacement:meta.namePlacement,profileControls});if(copy.items){const removed=new Set((meta.removedItemIds||[]).map(String));const added=(meta.addedItemIds||[]).map(id=>loadAll().find(s=>String(s.id)===String(id))).filter(Boolean);const seen=new Set();copy.items=copy.items.concat(added).filter(x=>x&&!removed.has(String(x.id))).filter(x=>{const id=String(x.id);if(seen.has(id))return false;seen.add(id);return true;});copy.items=wsApplyItemOrder(copy.items,meta.itemOrder);}if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
 function wsCurrentMeta(){return wsGetPageMeta(wsPages[wsPageIdx],wsPageIdx);}
@@ -3950,7 +3966,11 @@ function wsRenderPageEditPanel(page,meta){
   const cols=wsPageGridCols(wsPageWithMeta(page,wsPageIdx),ordered.length);
   const cards=ordered.length?'<div class="ws-profile-title">Content</div><select class="ws-font-select" id="wsMoveItemSelect">'+ordered.map(sub=>`<option value="${esc(sub.id)}">${esc(wsItemLabel(sub))}</option>`).join('')+'</select>'+ordered.map((sub,i)=>`<div class="ws-page-edit-row ws-page-edit-row-content"><span>${esc(wsItemLabel(sub))}<span class="ws-row-muted">${esc(CATEGORIES[sub.category]?.label||sub.category||'Content')}</span></span><button onclick="wsFocusProductionEdit('${sub.id}')">Edit Production Version</button><button onclick="wsRemoveContentFromPage('${sub.id}')">Hide</button></div><div class="ws-page-edit-row"><span>Order</span><button onclick="wsMovePageItem('${sub.id}',${-cols})" ${i-cols<0?'disabled':''}>Up</button><button onclick="wsMovePageItem('${sub.id}',${cols})" ${i+cols>=ordered.length?'disabled':''}>Down</button><button onclick="wsMovePageItem('${sub.id}',-1)" ${i===0?'disabled':''}>Left</button><button onclick="wsMovePageItem('${sub.id}',1)" ${i===ordered.length-1?'disabled':''}>Right</button></div>`).join(''):'<div class="ws-empty-mini">No reorderable cards on this page.</div>';
   const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks:[];
-  const blockHtml=blocks.length?'<div class="ws-profile-title" style="margin-top:10px;">Manual Blocks</div>'+blocks.map((b,i)=>`<div class="ws-manual-row"><span>${esc((b.type||'text').toUpperCase())}: ${esc((b.text||b.caption||b.src||'Manual block').slice(0,36))}</span><button onclick="wsEditManualBlock(${i})">Edit</button><button onclick="wsDeleteManualBlock(${i})">Delete</button></div>`).join(''):'';
+  const blockHtml=blocks.length?'<div class="ws-profile-title" style="margin-top:10px;">Manual Blocks</div>'+blocks.map((b,i)=>{
+    const label=esc((b.type||'text').toUpperCase())+(b.hidden?' (hidden)':'')+': '+esc((b.text||b.caption||b.src||'Manual block').slice(0,36));
+    const imgBtns=b.type==='image'?`<button onclick="wsReplaceManualBlockImage(${i})">Replace</button><button onclick="wsToggleManualBlockHidden(${i},${b.hidden?'false':'true'})">${b.hidden?'Restore':'Hide'}</button>`:'';
+    return `<div class="ws-manual-row${b.hidden?' hidden':''}"><span>${label}</span><button onclick="wsEditManualBlock(${i})">Edit</button>${imgBtns}<button onclick="wsDeleteManualBlock(${i})">Remove</button></div>`;
+  }).join(''):'';
   list.innerHTML=cards+blockHtml;
 }
 function wsTogglePageHidden(){
@@ -4031,6 +4051,33 @@ function wsDeleteManualBlock(i){
   const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before deleting manual blocks.');return;}
   const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];blocks.splice(i,1);
   wsSavePageMeta(wsPageIdx,{manualBlocks:blocks});wsRenderCurrentPage();wsUpdateProductionControls();
+}
+function wsToggleManualBlockHidden(i,hidden){
+  const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before hiding images.');return;}
+  const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];if(!blocks[i])return;
+  blocks[i]=Object.assign({},blocks[i],{hidden:!!hidden});
+  wsSavePageMeta(wsPageIdx,{manualBlocks:blocks});wsRenderCurrentPage();wsUpdateProductionControls();wsRunPreflight(false);
+}
+function wsReplaceManualBlockImage(i){
+  const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before replacing images.');return;}
+  const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];if(!blocks[i]||blocks[i].type!=='image')return;
+  const input=document.createElement('input');
+  input.type='file';input.accept='.jpg,.jpeg,.png,.webp';
+  input.onchange=async()=>{
+    const file=input.files?.[0];if(!file)return;
+    if(!/^image\//.test(file.type)){alert('Choose a JPG, PNG, or WebP image.');return;}
+    try{
+      wsSetProductionUploadStatus('syncing','Replacing production image in Supabase Storage...');
+      const url=await uploadToStorage(file,'production_'+String(wsPages[wsPageIdx]?.sec?.key||'page')+'_'+Date.now());
+      const latest=wsCurrentMeta(),next=Array.isArray(latest.manualBlocks)?latest.manualBlocks.slice():[];
+      if(!next[i])return;
+      next[i]=Object.assign({},next[i],{src:url,hidden:false});
+      wsSavePageMeta(wsPageIdx,{manualBlocks:next});wsRenderCurrentPage();wsUpdateProductionControls();wsRunPreflight(false);
+      wsSetProductionUploadStatus('ok','Replacement uploaded and saved as a production-only image.');
+      showSync('ok','Production image replaced');
+    }catch(e){wsSetProductionUploadStatus('err',friendlyUploadErrorMessage(e));alert(friendlyUploadErrorMessage(e));showSync('err','Production image upload failed');}
+  };
+  input.click();
 }
 function wsSplitLongTextToCopy(){
   const page=wsPages[wsPageIdx],meta=wsCurrentMeta();if(!page)return;
@@ -4235,7 +4282,7 @@ function wsCollectPageImages(page,idx){
     if(sub.photoData)out.push({key:'sub:'+sub.id+':photo',src:sub.photoData,label,meta:sub.photoMeta||null,subId:String(sub.id)});
     if(Array.isArray(sub.photos))sub.photos.forEach((p,i)=>{const src=wsPhotoSrc(p);if(src)out.push({key:'sub:'+sub.id+':photo:'+i,src,label:label+' photo '+(i+1),meta:p.meta||null,subId:String(sub.id)});});
   });
-  (rendered.manualBlocks||[]).forEach((b,i)=>{if(b?.type==='image'&&b.src)out.push({key:'manual:'+(b.id||i),src:b.src,label:(b.caption||'Manual image '+(i+1))});});
+  (rendered.manualBlocks||[]).forEach((b,i)=>{if(!b?.hidden&&b?.type==='image'&&b.src)out.push({key:'manual:'+(b.id||i),src:b.src,label:(b.caption||'Manual image '+(i+1))});});
   return out;
 }
 function wsSelectedImage(meta,imgs){
@@ -4361,14 +4408,21 @@ async function wsReplaceSelectedImage(event){
   if(!/^image\//.test(file.type)){alert('Choose a JPG, PNG, or WebP image.');return;}
   const imgs=wsCollectPageImages(wsPages[wsPageIdx],wsPageIdx),img=wsSelectedImage(meta,imgs);if(!img)return;
   try{
+    wsSetProductionUploadStatus('syncing','Uploading replacement to Supabase Storage...');
     showSync('syncing','Uploading production replacement image...');
     const url=await uploadToStorage(file,'production_'+String(wsPages[wsPageIdx]?.sec?.key||'page')+'_'+Date.now());
     const edits=Object.assign({},meta.imageEdits||{}),ed=wsImageEditFor(meta,img.key);
     ed.replaceSrc=url;ed.fit=ed.fit||'contain';ed.zoom=ed.zoom||1;ed.x=ed.x||50;ed.y=ed.y||50;ed.hidden=false;
     edits[img.key]=ed;delete wsImageQualityCache[img.key];
     wsSavePageMeta(wsPageIdx,{imageEdits:edits,selectedImageKey:img.key});wsRenderCurrentPage();wsUpdateProductionControls();wsRunPreflight(false);
+    wsSetProductionUploadStatus('ok','Replacement uploaded. Original submitted image remains preserved.');
     showSync('ok','Production image uploaded');
-  }catch(e){alert(friendlyUploadErrorMessage(e));showSync('err','Production image upload failed');}
+  }catch(e){wsSetProductionUploadStatus('err',friendlyUploadErrorMessage(e));alert(friendlyUploadErrorMessage(e));showSync('err','Production image upload failed');}
+}
+function wsSetProductionUploadStatus(state,msg){
+  const el=document.getElementById('wsProductionUploadStatus');if(!el)return;
+  el.className='ws-upload-status '+(state||'');
+  el.textContent=msg||'Images upload to Supabase Storage and are saved as production-only blocks.';
 }
 async function wsUploadProductionImage(event){
   const file=event.target.files?.[0];event.target.value='';if(!file)return;
@@ -4377,12 +4431,14 @@ async function wsUploadProductionImage(event){
   const placement=document.getElementById('wsProductionImagePlacement')?.value||'after-text';
   const caption=(document.getElementById('wsProductionImageCaption')?.value||'').trim();
   try{
+    wsSetProductionUploadStatus('syncing','Uploading 1 image to Supabase Storage...');
     showSync('syncing','Uploading production image...');
     const url=await uploadToStorage(file,'production_'+String(wsPages[wsPageIdx]?.sec?.key||'page')+'_'+Date.now());
     wsAddManualBlock({type:'image',src:url,caption,placement});
     const cap=document.getElementById('wsProductionImageCaption');if(cap)cap.value='';
+    wsSetProductionUploadStatus('ok','Upload complete. Storage URL saved as a production-only image block.');
     showSync('ok','Production image uploaded');
-  }catch(e){alert(friendlyUploadErrorMessage(e));showSync('err','Production image upload failed');}
+  }catch(e){wsSetProductionUploadStatus('err',friendlyUploadErrorMessage(e));alert(friendlyUploadErrorMessage(e));showSync('err','Production image upload failed');}
 }
 function wsRunPreflight(showAlert){
   const box=document.getElementById('wsPreflightList');if(!box)return;
@@ -4831,7 +4887,23 @@ function wsExportPrintPDF(){
   if(report&&report.errors>0&&!confirm('Preflight found '+report.errors+' blocking press issue(s). Export anyway?'))return;
   magPages=wsPages.map((p,i)=>wsPageWithMeta(p,i)).filter(p=>!p.hidden);currentPageIdx=0;
   if(!magPages.length){alert('No visible workspace pages to print. Show at least one page first.');magPages=origPages;currentPageIdx=origIdx;return;}
+  showSync('syncing','Preparing PDF preview...');
+  const iframe=document.getElementById('ws-preview-iframe');
+  const doc=iframe?.contentDocument||iframe?.contentWindow?.document;
+  if(doc){
+    const parts=[];
+    wsPages.forEach((p,i)=>{
+      if(wsGetPageMeta(p,i).hidden)return;
+      const sheet=doc.getElementById('ws-page-'+i);
+      if(sheet){
+        const html=sheet.outerHTML.replace(/transform:scale\([^)]+\);?/g,'').replace(/transform-origin:[^;]+;?/g,'').replace(/margin-bottom:[^;]+;?/g,'margin-bottom:24px;');
+        parts.push(html);
+      }
+    });
+    if(parts.length)window.__wsFastPrintPagesHtml=parts.join('');
+  }
   openPrintView();
+  showSync('ok','PDF preview opened');
   magPages=origPages;currentPageIdx=origIdx;
 }
 

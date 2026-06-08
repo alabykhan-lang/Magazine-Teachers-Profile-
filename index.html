@@ -887,12 +887,14 @@
             <option value="feature">Feature image above title</option>
             <option value="after-heading">After heading</option>
             <option value="inline">Inline after paragraph</option>
+            <option value="side">Beside text</option>
             <option value="after-text">After text</option>
-            <option value="side">Side image</option>
             <option value="full-width">Full-width image block</option>
             <option value="gallery">Gallery block</option>
+            <option value="background">Cover/page background</option>
           </select>
           <input class="ws-font-select" id="wsProductionImageCaption" type="text" placeholder="Caption for new production image"/>
+          <div id="wsProductionUploadStatus" class="ws-upload-status">Images upload to Supabase Storage and are saved as production-only blocks.</div>
           <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="wsAddManualCaption()">Add Caption</button>
             <button class="ws-prod-btn" onclick="wsSplitLongTextToCopy()">Split Long Text</button>
@@ -1277,7 +1279,7 @@
     }
   }
 </script>
-<script src="script.js?v=18"></script>
+<script src="script.js?v=19"></script>
 <script>
   (function landingFallback(){
     const cards = [
