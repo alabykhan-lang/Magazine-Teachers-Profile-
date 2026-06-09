@@ -1501,3 +1501,18 @@ figcaption{break-before:avoid;page-break-before:avoid;}
 .mag-item-field-value,.mag-item-body,p{orphans:3;widows:3;}
 .mag-image-frame img,.mag-production-image img{object-fit:contain!important;object-position:center top;max-width:100%;height:auto;}
 .mag-production-images{break-inside:avoid;page-break-inside:avoid;}
+
+/* Production/export print-safe section flow */
+.mag-page,.mag-page-inner,.mag-page-flow,.mag-flow-content{max-height:none!important;overflow:visible!important;height:auto!important;}
+.mag-page{break-after:page;page-break-after:always;}
+.mag-page:last-child{break-after:auto;page-break-after:auto;}
+.mag-flow-content{break-inside:auto;page-break-inside:auto;}
+.mag-heading-block,h1,h2,h3{break-after:avoid;page-break-after:avoid;}
+.mag-item,.mag-item-gallery,.mag-item-event,.mag-item-teacher,.mag-item-student,.mag-editor-board-card,.mag-image-frame,figure{break-inside:avoid;page-break-inside:avoid;overflow:visible!important;height:auto!important;max-height:none!important;}
+figcaption{break-before:avoid;page-break-before:avoid;}
+.mag-item-field-value,.mag-item-body,p{orphans:3;widows:3;}
+.mag-image-frame img,.mag-page img,.mag-sheet img{object-fit:contain!important;object-position:center top;max-width:100%;height:auto;}
+@media print{
+  .mag-page,.mag-sheet{break-after:page;page-break-after:always;}
+  .mag-page:last-child,.mag-sheet:last-child{break-after:auto;page-break-after:auto;}
+}

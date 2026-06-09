@@ -71,8 +71,9 @@ let CATEGORIES={
     {id:'speakerOrg',label:'Organization / affiliation',type:'text',required:false,placeholder:'Optional'},
     {id:'speechTitle',label:'Speech title',type:'text',required:false,placeholder:'Optional'},
     {id:'speechDate',label:'Date of speech',type:'date',required:false},
+    {id:'photoCaption',label:'Image caption',type:'text',required:false,placeholder:'Optional caption for the speech image'},
     {id:'speechBody',label:'Full speech text',type:'textarea',required:true,long:true,hint:'Paste the complete speech here.'}
-  ]},
+  ],photoOptional:true,photoTitle:'Speech image',photoPrompt:'Upload optional speech image',photoPill:'Optional - speaker, event, or related image'},
   creative:{label:'Creative Corner',tag:'Creative',title:'Creative Submission',subtitle:'Poems, stories, jokes, and riddles.',icon:'✍️',photoRequired:false,fields:[
     {id:'contribType',label:'Type of submission',type:'select',required:true,options:['Poem','Short Story','Joke','Riddle','Other']},
     {id:'contribName',label:'Your name',type:'text',required:true,placeholder:'As it should appear in print'},
@@ -105,9 +106,11 @@ let CATEGORIES={
     {id:'interviewerName',label:'Interviewer name',type:'text',required:true,placeholder:'Who conducted the interview'},
     {id:'interviewDate',label:'Date of interview',type:'date',required:false},
     {id:'introParagraph',label:'Introduction paragraph',type:'textarea',required:true,hint:'2-3 sentences introducing the interviewee.'},
+    {id:'profileImageCaption',label:'Profile image caption',type:'text',required:false,placeholder:'Optional caption for top image'},
+    {id:'middleImageCaption',label:'Middle image caption',type:'text',required:false,placeholder:'Optional caption for second image'},
     {id:'qaBody',label:'Interview Q&A',type:'textarea',required:true,long:true,hint:'Q: [question]\nA: [answer]'},
     {id:'closingNote',label:'Closing note',type:'textarea',required:false,hint:'Optional'}
-  ]},
+  ],extraPhotoOptional:true,extraPhotoTitle:'Second interview image',extraPhotoPrompt:'Upload optional middle image',extraPhotoPill:'Optional - preserved in the middle of the interview layout'},
   motivational:{label:'Motivational Articles',tag:'Motivation',title:'Motivational Article Submission',subtitle:'Inspirational pieces for the graduating class.',icon:'💡',photoRequired:false,fields:[
     {id:'authorName',label:'Author name',type:'text',required:true,placeholder:'As it should appear in print'},
     {id:'authorRole',label:'Role',type:'text',required:true,placeholder:'e.g. Principal, Teacher, Alumnus'},
@@ -127,6 +130,13 @@ let CATEGORIES={
     {id:'businessName',label:'Business name',type:'text',required:true,placeholder:'As it should appear in print'},
     {id:'contactInfo',label:'Contact information',type:'text',required:false,placeholder:'Phone, address, or social handle'},
     {id:'advertCaption',label:'Short advert note',type:'textarea',required:false,hint:'Optional note to the editor.'}
+  ]},
+  editor_board:{label:'Editor Board / Crew',tag:'Editor Board',title:'Editor Board / Crew Profile Submission',subtitle:'Profiles for editorial board members and magazine production crew.',icon:'Crew',photoRequired:true,fields:[
+    {id:'name',label:'Full name',type:'text',required:true,placeholder:'As it should appear in print'},
+    {id:'title',label:'Role / position',type:'text',required:true,placeholder:'e.g. Editor-in-Chief, Designer, Photographer'},
+    {id:'bio',label:'Portfolio / short profile',type:'textarea',required:true,long:true,hint:'Brief profile, responsibilities, or portfolio note.'},
+    {id:'message',label:'Message / note',type:'textarea',required:false,hint:'Optional message from this crew member.'},
+    {id:'photoCaption',label:'Photo caption',type:'text',required:false,placeholder:'Optional'}
   ]}
 };
 let CATEGORY_KEYS=Object.keys(CATEGORIES);
@@ -232,7 +242,7 @@ const BULK_CLOUD_CONCURRENCY=1;
 const CLOUD_RETRY_DELAYS=[800,1500,3000];
 const CLOUD_TIMEOUT_MS=20000;
 const STORAGE_BUCKET='photos';
-const STORAGE_UPLOAD_RETRY_DELAYS=[1000,2000,4000,8000];
+const STORAGE_UPLOAD_RETRY_DELAYS=[1000,2000,4000,8000,12000];
 const STORAGE_UPLOAD_TIMEOUT_MS=180000;
 const BULK_PHOTO_MAX=15;
 const BULK_UPLOAD_BETWEEN_FILES_MS=700;
@@ -264,7 +274,8 @@ function waitForSupabase(maxMs){
   });
 }
 /* ── Supabase Storage: full-quality photo uploads ── */
-async function uploadToStorage(file, subId){
+async function uploadToStorage(file, subId, options){
+  const opts=options||{};
   if(!file)throw new Error('No photo selected.');
   if(!(file instanceof Blob))throw new Error('Invalid image file.');
   if(!file.size||file.size<=0)throw new Error('Invalid image file.');
@@ -294,7 +305,7 @@ async function uploadToStorage(file, subId){
         throw error;
       }
       if(!data?.path)throw new Error('Upload finished without a storage path.');
-    },{fileName,fileSize:file.size,fileType,path});
+    },{fileName,fileSize:file.size,fileType,path,onStatus:opts.onStatus});
     const{data}=sb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
     const publicUrl=data?.publicUrl;
     if(!storageUrlOnly(publicUrl))throw new Error('Could not create a valid public URL for the uploaded photo.');
@@ -309,13 +320,16 @@ async function storageUploadWithRetry(operation,context){
   const attempts=STORAGE_UPLOAD_RETRY_DELAYS.length+1;
   for(let i=0;i<attempts;i++){
     try{
+      if(context?.onStatus)context.onStatus(i===0?'Uploading photo...':'Uploading photo... retry '+i+'/'+STORAGE_UPLOAD_RETRY_DELAYS.length);
       return await withTimeout(Promise.resolve().then(operation),'Uploading photo',STORAGE_UPLOAD_TIMEOUT_MS);
     }catch(e){
       lastErr=e;
       if(i===attempts-1)break;
       const delay=STORAGE_UPLOAD_RETRY_DELAYS[i];
       console.warn('[Storage] Upload attempt '+(i+1)+'/'+attempts+' failed. Retrying in '+(delay/1000)+'s.',e);
-      showSync('syncing','Uploading photo failed (try '+(i+1)+'/'+attempts+'). Retrying in '+(delay/1000)+'s...');
+      const retryMsg='Uploading photo... retry '+(i+1)+'/'+STORAGE_UPLOAD_RETRY_DELAYS.length;
+      if(context?.onStatus)context.onStatus(retryMsg);
+      showSync('syncing',retryMsg);
       await wait(delay);
     }
   }
@@ -351,7 +365,7 @@ async function uploadPhotosSequential(files,options){
     const photoNo=i+1;
     if(opts.onProgress)opts.onProgress(photoNo,total,file);
     try{
-      const url=await uploadToStorage(file,(opts.idPrefix||genId())+'_'+i);
+      const url=await uploadToStorage(file,(opts.idPrefix||genId())+'_'+i,{onStatus:msg=>opts.onProgress&&opts.onProgress(photoNo,total,file,msg)});
       photos.push({url:url,name:file?.name||`photo_${photoNo}.jpg`,meta:opts.metas?.[i]||null});
     }catch(e){
       console.error('[Storage] Photo '+photoNo+' failed:',{fileName:file?.name,fileSize:file?.size,error:e});
@@ -1282,7 +1296,12 @@ async function submitBulkGallerySafe(){
       showSync('syncing',progressMsg);
 
       const subId=genId();
-      const photoData=await uploadToStorage(p.file,subId);
+      const photoData=await uploadToStorage(p.file,subId,{onStatus:msg=>{
+        const text='Photo '+photoNo+' of '+total+' - '+msg;
+        if(btn)btn.textContent=text;
+        if(errEl){errEl.style.display='block';errEl.textContent=text;}
+        showSync('syncing',text);
+      }});
       const photoName=p.fileName||('photo_'+photoNo+'.jpg');
       ready.push({
         id:subId,
@@ -1331,6 +1350,7 @@ const DEFAULT_SECTION_ORDER=[
   {key:'cover',label:'Cover Page',icon:'📕',editable:false,visible:true,layout:'cover'},
   {key:'toc',label:'Table of Contents',icon:'📑',editable:false,visible:true,layout:'toc'},
   {key:'editorial-note',label:'Editorial Note',icon:'✎',editable:true,visible:true,layout:'single'},
+  {key:'editor_board',label:'Editor Board / Crew',icon:'Crew',editable:true,visible:true,layout:'editor-board'},
   {key:'speeches',label:'Speeches & Addresses',icon:'🎤',editable:true,visible:true,layout:'single'},
   {key:'primary5',label:'Primary 5 Graduates',icon:'🧒',editable:true,visible:true,layout:'grid'},
   {key:'primary5_class_photo',label:'Primary 5 Full Class Picture',icon:'P5',editable:true,visible:true,layout:'class-photo'},
@@ -1438,8 +1458,8 @@ function renderLandingCards(){
   if(!grid) return;
   try {
     const h=document.getElementById('landingHeading');if(h)h.textContent=getLabel('landing_heading','Choose a content category');
-    const DESCS={teachers:'For teaching staff and management. Share your journey, subjects, and message to the graduating class.',primary5:'For Primary 5 pupils moving on. Tell the world who you are.',primary5_class_photo:'Upload the general Primary 5 full class picture for the end of the section.',jss3:'For Junior Secondary 3 students finishing this phase.',jss3_class_photo:'Upload the general JSS3 full class picture for the end of the section.',ss3_class_message:'Submit the SS3 graduating class message with one full class picture before profile pages.',ss3:'For the main graduating class. Your legacy, your ambitions, your message.',speeches:'Proprietor, Senior Boy, guest speakers — formal addresses for the magazine.',creative:'Poems, short stories, jokes, riddles — creative writing from across the school.',events:'Sports days, excursions, competitions, achievements — the year\'s highlights.',academic:'Articles, subject features, research write-ups, and educational content.',interviews:'Q&A with old students, guest speakers, and notable voices.',motivational:'Inspirational messages and wisdom for the graduating class.',gallery:'Submit standalone photos with captions for the gallery section.',advertisements:'Submit business flyer images only for advertisement pages.'};
-    const STRIPES={teachers:'stripe-gold',primary5:'stripe-green',primary5_class_photo:'stripe-green',jss3:'stripe-green',jss3_class_photo:'stripe-green',ss3_class_message:'stripe-blue',ss3:'stripe-green',speeches:'stripe-blue',creative:'stripe-purple',events:'stripe-amber',academic:'stripe-blue',interviews:'stripe-mint',motivational:'stripe-purple',gallery:'stripe-gold',advertisements:'stripe-amber'};
+    const DESCS={teachers:'For teaching staff and management. Share your journey, subjects, and message to the graduating class.',primary5:'For Primary 5 pupils moving on. Tell the world who you are.',primary5_class_photo:'Upload the general Primary 5 full class picture for the end of the section.',jss3:'For Junior Secondary 3 students finishing this phase.',jss3_class_photo:'Upload the general JSS3 full class picture for the end of the section.',ss3_class_message:'Submit the SS3 graduating class message with one full class picture before profile pages.',ss3:'For the main graduating class. Your legacy, your ambitions, your message.',editor_board:'For editorial board members and production crew profiles.',speeches:'Proprietor, Senior Boy, guest speakers — formal addresses for the magazine.',creative:'Poems, short stories, jokes, riddles — creative writing from across the school.',events:'Sports days, excursions, competitions, achievements — the year\'s highlights.',academic:'Articles, subject features, research write-ups, and educational content.',interviews:'Q&A with old students, guest speakers, and notable voices.',motivational:'Inspirational messages and wisdom for the graduating class.',gallery:'Submit standalone photos with captions for the gallery section.',advertisements:'Submit business flyer images only for advertisement pages.'};
+    const STRIPES={teachers:'stripe-gold',primary5:'stripe-green',primary5_class_photo:'stripe-green',jss3:'stripe-green',jss3_class_photo:'stripe-green',ss3_class_message:'stripe-blue',ss3:'stripe-green',editor_board:'stripe-blue',speeches:'stripe-blue',creative:'stripe-purple',events:'stripe-amber',academic:'stripe-blue',interviews:'stripe-mint',motivational:'stripe-purple',gallery:'stripe-gold',advertisements:'stripe-amber'};
     
     if(!CATEGORY_KEYS || !CATEGORY_KEYS.length) {
       grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--ink2);">No categories found. Please check configuration.</div>';
@@ -1506,11 +1526,15 @@ function openForm(k){
   }
   window.scrollTo(0,0);
 }
-function makeBulkFormEntry(){return{values:{},photoFile:null,photoDataURL:null,photoMeta:null,photoFilesMulti:[],photoDataURLsMulti:[],photoMetasMulti:[]};}
+function makeBulkFormEntry(){return{values:{},photoFile:null,photoDataURL:null,photoMeta:null,extraPhotoFile:null,extraPhotoDataURL:null,extraPhotoMeta:null,photoFilesMulti:[],photoDataURLsMulti:[],photoMetasMulti:[]};}
 function ensureBulkFormEntries(){if(!Array.isArray(bulkFormEntries)||!bulkFormEntries.length)bulkFormEntries=[makeBulkFormEntry()];return bulkFormEntries;}
 function resetFormState(){
   photoDataURLsMulti.forEach(revokePreviewUrl);
-  if(Array.isArray(bulkFormEntries))bulkFormEntries.forEach(entry=>(entry.photoDataURLsMulti||[]).forEach(revokePreviewUrl));
+  if(Array.isArray(bulkFormEntries))bulkFormEntries.forEach(entry=>{
+    revokePreviewUrl(entry.photoDataURL);
+    revokePreviewUrl(entry.extraPhotoDataURL);
+    (entry.photoDataURLsMulti||[]).forEach(revokePreviewUrl);
+  });
   photoFile=null;photoDataURL=null;photoMeta=null;photoFilesMulti=[];photoDataURLsMulti=[];photoMetasMulti=[];bulkFormEntries=[makeBulkFormEntry()];
 }
 function buildForm(k){
@@ -1583,22 +1607,32 @@ function buildSubmissionFormEntry(k,idx){
   return h;
 }
 function buildPhotoCardForEntry(k,idx){
-  const cat=CATEGORIES[k];if(!cat.photoRequired)return '';
+  const cat=CATEGORIES[k];if(!cat.photoRequired&&!cat.photoOptional&&!cat.extraPhotoOptional)return '';
   const entry=bulkEntry(idx);
+  const cards=[];
   if(cat.photoMulti){
     const max=cat.photoMax||5;
     const hasPhotos=entry.photoDataURLsMulti.length>0;
     const thumbs=entry.photoDataURLsMulti.map((url,i)=>`<div class="multi-photo-thumb"><img src="${url}" alt="Photo ${i+1}"/><button class="multi-photo-remove" type="button" onclick="removeMultiPhoto(${i},${max},${idx})">x</button></div>`).join('');
     return `<div class="f-card"><div class="f-card-title">Bulk Event Photos (up to ${max})</div><div class="photo-drop" id="${photoDomId('photoDrop',idx)}" onclick="document.getElementById('${photoDomId('photoInputMulti',idx)}').click()" ondragover="dragOver(event,${idx})" ondragleave="dragLeave(${idx})" ondrop="dropPhoto(event,${idx})"><input type="file" id="${photoDomId('photoInputMulti',idx)}" accept=".jpg,.jpeg,.png,.webp" multiple onchange="handlePhotoMulti(event,${max},${idx})"/><div id="${photoDomId('photoPlaceholderMulti',idx)}" style="display:${hasPhotos?'none':'block'};"><span class="photo-drop-icon">Photos</span><h3>Bulk upload event photos <span class="req">*</span></h3><p>Tap to choose 1-${max} photos for this form</p><span class="photo-pill">Action shots - Group photos - Min ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px</span></div></div><div id="${photoDomId('multiPhotoGrid',idx)}" class="multi-photo-grid">${thumbs}</div><div id="${photoDomId('multiPhotoCount',idx)}" class="multi-photo-count${entry.photoDataURLsMulti.length>=max?' full':''}" style="display:${hasPhotos?'inline-block':'none'};">${entry.photoDataURLsMulti.length} of ${max} photos selected</div><div class="photo-err-msg" id="${photoDomId('photoErrMsg',idx)}"></div><div class="photo-reqs"><p><strong>For print quality:</strong> minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px accepted, ${PRINT_IMAGE_RECOMMENDED_PX}x${PRINT_IMAGE_RECOMMENDED_PX}px or higher recommended. JPG/PNG/WebP originals are preserved for print.</p></div></div>`;
   }
-  const isClass=k.includes('_class_')||k==='ss3_class_message';
-  const isAdvert=k==='advertisements';
-  const photoTitle=isAdvert?'Business flyer':isClass?'Full class picture':'Profile photo';
-  const photoPrompt=isAdvert?'Upload business flyer':isClass?'Upload full class picture':'Upload your profile photo';
-  const photoPill=isAdvert?`Business flyer only - Min ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px`:isClass?`Full group photo - Min ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px`:`Passport-style - Clear face - Min ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px`;
-  const hasPhoto=!!entry.photoDataURL;
-  const dims=entry.photoMeta?`${entry.photoMeta.w}x${entry.photoMeta.h}px - ${Math.round((entry.photoMeta.size||0)/1024)} KB - ${entry.photoMeta.printQuality||''}`:'';
-  return `<div class="f-card"><div class="f-card-title">${photoTitle}</div><div class="photo-drop${hasPhoto?' uploaded':''}" id="${photoDomId('photoDrop',idx)}" onclick="document.getElementById('${photoDomId('photoInput',idx)}').click()" ondragover="dragOver(event,${idx})" ondragleave="dragLeave(${idx})" ondrop="dropPhoto(event,${idx})"><input type="file" id="${photoDomId('photoInput',idx)}" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event,${idx})"/><div id="${photoDomId('photoPlaceholder',idx)}" style="display:${hasPhoto?'none':'block'};"><span class="photo-drop-icon">Photo</span><h3>${photoPrompt} <span class="req">*</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">${photoPill}</span></div><div class="photo-preview-wrap" id="${photoDomId('photoPreviewWrap',idx)}" style="display:${hasPhoto?'flex':'none'};"><img id="${photoDomId('photoPreview',idx)}" src="${entry.photoDataURL||''}" alt="Preview"/><div class="photo-filename" id="${photoDomId('photoFilename',idx)}">${esc(entry.photoFile?.name||'')}</div><div class="photo-dims" id="${photoDomId('photoDims',idx)}">${esc(dims)}</div><button class="photo-change" onclick="resetPhoto(event,${idx})">Change photo</button></div></div><div class="photo-err-msg" id="${photoDomId('photoErrMsg',idx)}"></div><div class="photo-reqs"><p><strong>For print quality:</strong> minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px accepted, ${PRINT_IMAGE_RECOMMENDED_PX}x${PRINT_IMAGE_RECOMMENDED_PX}px or higher recommended. Original JPG/PNG/WebP kept for press output.</p></div></div>`;
+  if(cat.photoRequired||cat.photoOptional){
+    const isClass=k.includes('_class_')||k==='ss3_class_message';
+    const isAdvert=k==='advertisements';
+    const photoTitle=cat.photoTitle||(isAdvert?'Business flyer':isClass?'Full class picture':'Profile photo');
+    const photoPrompt=cat.photoPrompt||(isAdvert?'Upload business flyer':isClass?'Upload full class picture':'Upload your profile photo');
+    const photoPill=cat.photoPill||(isAdvert?`Business flyer only - Min ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px`:isClass?`Full group photo - Min ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px`:`Passport-style - Clear face - Min ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px`);
+    const reqMark=cat.photoRequired?'<span class="req">*</span>':'<span class="opt">(optional)</span>';
+    const hasPhoto=!!entry.photoDataURL;
+    const dims=entry.photoMeta?`${entry.photoMeta.w}x${entry.photoMeta.h}px - ${Math.round((entry.photoMeta.size||0)/1024)} KB - ${entry.photoMeta.printQuality||''}`:'';
+    cards.push(`<div class="f-card"><div class="f-card-title">${photoTitle}</div><div class="photo-drop${hasPhoto?' uploaded':''}" id="${photoDomId('photoDrop',idx)}" onclick="document.getElementById('${photoDomId('photoInput',idx)}').click()" ondragover="dragOver(event,${idx})" ondragleave="dragLeave(${idx})" ondrop="dropPhoto(event,${idx})"><input type="file" id="${photoDomId('photoInput',idx)}" accept=".jpg,.jpeg,.png,.webp" onchange="handlePhoto(event,${idx})"/><div id="${photoDomId('photoPlaceholder',idx)}" style="display:${hasPhoto?'none':'block'};"><span class="photo-drop-icon">Photo</span><h3>${photoPrompt} ${reqMark}</h3><p>Click here or drag &amp; drop</p><span class="photo-pill">${photoPill}</span></div><div class="photo-preview-wrap" id="${photoDomId('photoPreviewWrap',idx)}" style="display:${hasPhoto?'flex':'none'};"><img id="${photoDomId('photoPreview',idx)}" src="${entry.photoDataURL||''}" alt="Preview"/><div class="photo-filename" id="${photoDomId('photoFilename',idx)}">${esc(entry.photoFile?.name||'')}</div><div class="photo-dims" id="${photoDomId('photoDims',idx)}">${esc(dims)}</div><button class="photo-change" onclick="resetPhoto(event,${idx})">Change photo</button></div></div><div class="photo-err-msg" id="${photoDomId('photoErrMsg',idx)}"></div><div class="photo-reqs"><p><strong>For print quality:</strong> minimum ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px accepted, ${PRINT_IMAGE_RECOMMENDED_PX}x${PRINT_IMAGE_RECOMMENDED_PX}px or higher recommended. Original JPG/PNG/WebP kept for press output.</p></div></div>`);
+  }
+  if(cat.extraPhotoOptional){
+    const hasExtra=!!entry.extraPhotoDataURL;
+    const dims=entry.extraPhotoMeta?`${entry.extraPhotoMeta.w}x${entry.extraPhotoMeta.h}px - ${Math.round((entry.extraPhotoMeta.size||0)/1024)} KB - ${entry.extraPhotoMeta.printQuality||''}`:'';
+    cards.push(`<div class="f-card"><div class="f-card-title">${esc(cat.extraPhotoTitle||'Second image')}</div><div class="photo-drop${hasExtra?' uploaded':''}" id="${photoDomId('extraPhotoDrop',idx)}" onclick="document.getElementById('${photoDomId('extraPhotoInput',idx)}').click()" ondragover="dragOverExtra(event,${idx})" ondragleave="dragLeaveExtra(${idx})" ondrop="dropExtraPhoto(event,${idx})"><input type="file" id="${photoDomId('extraPhotoInput',idx)}" accept=".jpg,.jpeg,.png,.webp" onchange="handleExtraPhoto(event,${idx})"/><div id="${photoDomId('extraPhotoPlaceholder',idx)}" style="display:${hasExtra?'none':'block'};"><span class="photo-drop-icon">Photo</span><h3>${esc(cat.extraPhotoPrompt||'Upload optional image')} <span class="opt">(optional)</span></h3><p>Click here or drag &amp; drop</p><span class="photo-pill">${esc(cat.extraPhotoPill||'Optional image')}</span></div><div class="photo-preview-wrap" id="${photoDomId('extraPhotoPreviewWrap',idx)}" style="display:${hasExtra?'flex':'none'};"><img id="${photoDomId('extraPhotoPreview',idx)}" src="${entry.extraPhotoDataURL||''}" alt="Preview"/><div class="photo-filename" id="${photoDomId('extraPhotoFilename',idx)}">${esc(entry.extraPhotoFile?.name||'')}</div><div class="photo-dims" id="${photoDomId('extraPhotoDims',idx)}">${esc(dims)}</div><button class="photo-change" onclick="resetExtraPhoto(event,${idx})">Change photo</button></div></div><div class="photo-err-msg" id="${photoDomId('extraPhotoErrMsg',idx)}"></div></div>`);
+  }
+  return cards.join('');
 }
 function buildFieldHtml(f,idx){
   idx=idx||0;
@@ -1712,6 +1746,32 @@ function resetPhoto(e,idx){
   if(e)e.stopPropagation();idx=idx||0;const entry=bulkEntry(idx);
   revokePreviewUrl(entry.photoDataURL);entry.photoFile=null;entry.photoDataURL=null;entry.photoMeta=null;if(idx===0)syncPrimaryPhotoGlobals();
   const input=document.getElementById(photoDomId('photoInput',idx)),prev=document.getElementById(photoDomId('photoPreview',idx)),ph=document.getElementById(photoDomId('photoPlaceholder',idx)),wrap=document.getElementById(photoDomId('photoPreviewWrap',idx)),drop=document.getElementById(photoDomId('photoDrop',idx));
+  if(input)input.value='';if(prev)prev.src='';if(ph)ph.style.display='block';if(wrap)wrap.style.display='none';if(drop)drop.classList.remove('uploaded');
+}
+function dragOverExtra(e,idx){e.preventDefault();document.getElementById(photoDomId('extraPhotoDrop',idx||0))?.classList.add('drag');}
+function dragLeaveExtra(idx){document.getElementById(photoDomId('extraPhotoDrop',idx||0))?.classList.remove('drag');}
+function dropExtraPhoto(e,idx){e.preventDefault();dragLeaveExtra(idx||0);const f=e.dataTransfer.files[0];if(f)processExtraPhoto(f,idx||0);}
+function handleExtraPhoto(e,idx){if(e.target.files[0])processExtraPhoto(e.target.files[0],idx||0);}
+function processExtraPhoto(file,idx){
+  idx=idx||0;const entry=bulkEntry(idx);const err=document.getElementById(photoDomId('extraPhotoErrMsg',idx));if(err)err.style.display='none';
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['jpg','jpeg','png','webp'].includes(ext)||!file.size){if(err){err.textContent='Invalid image file.';err.style.display='block';}return;}
+  if(file.size>PRINT_MAX_IMAGE_MB*1024*1024){if(err){err.textContent='Image is too large. Please use a smaller photo.';err.style.display='block';}return;}
+  const img=new Image(),url=URL.createObjectURL(file);
+  img.onload=function(){
+    if(img.width<PRINT_IMAGE_MIN_PX||img.height<PRINT_IMAGE_MIN_PX){if(err){err.textContent=`Image is too tiny to use. Minimum accepted size is ${PRINT_IMAGE_MIN_PX}x${PRINT_IMAGE_MIN_PX}px.`;err.style.display='block';}URL.revokeObjectURL(url);return;}
+    revokePreviewUrl(entry.extraPhotoDataURL);
+    entry.extraPhotoFile=file;entry.extraPhotoDataURL=url;entry.extraPhotoMeta={w:img.width,h:img.height,size:file.size,type:file.type||'',printQuality:wsImageQualityLevel(img.width,img.height)};
+    const prev=document.getElementById(photoDomId('extraPhotoPreview',idx)),fn=document.getElementById(photoDomId('extraPhotoFilename',idx)),dims=document.getElementById(photoDomId('extraPhotoDims',idx)),ph=document.getElementById(photoDomId('extraPhotoPlaceholder',idx)),wrap=document.getElementById(photoDomId('extraPhotoPreviewWrap',idx)),drop=document.getElementById(photoDomId('extraPhotoDrop',idx));
+    if(prev)prev.src=entry.extraPhotoDataURL;if(fn)fn.textContent=file.name;if(dims)dims.textContent=`${img.width}x${img.height}px - ${(file.size/1024).toFixed(0)} KB - ${entry.extraPhotoMeta.printQuality}`;if(ph)ph.style.display='none';if(wrap)wrap.style.display='flex';if(drop)drop.classList.add('uploaded');
+  };
+  img.onerror=()=>{if(err){err.textContent='Could not read this image. Try another JPG, PNG, or WebP.';err.style.display='block';}URL.revokeObjectURL(url);};
+  img.src=url;
+}
+function resetExtraPhoto(e,idx){
+  if(e)e.stopPropagation();idx=idx||0;const entry=bulkEntry(idx);
+  revokePreviewUrl(entry.extraPhotoDataURL);entry.extraPhotoFile=null;entry.extraPhotoDataURL=null;entry.extraPhotoMeta=null;
+  const input=document.getElementById(photoDomId('extraPhotoInput',idx)),prev=document.getElementById(photoDomId('extraPhotoPreview',idx)),ph=document.getElementById(photoDomId('extraPhotoPlaceholder',idx)),wrap=document.getElementById(photoDomId('extraPhotoPreviewWrap',idx)),drop=document.getElementById(photoDomId('extraPhotoDrop',idx));
   if(input)input.value='';if(prev)prev.src='';if(ph)ph.style.display='block';if(wrap)wrap.style.display='none';if(drop)drop.classList.remove('uploaded');
 }
 function handlePhotoMulti(event,max,idx){idx=idx||0;const files=Array.from(event.target.files||[]);if(!files.length)return;const entry=bulkEntry(idx),err=document.getElementById(photoDomId('photoErrMsg',idx));if(err)err.style.display='none';const rem=max-entry.photoFilesMulti.length;if(rem<=0){if(err){err.textContent=`Maximum ${max} photos reached.`;err.style.display='block';}event.target.value='';return;}const toAdd=files.slice(0,rem);if(files.length>rem&&err){err.textContent=`Only ${rem} more can be added.`;err.style.display='block';}toAdd.forEach(f=>processPhotoForMulti(f,max,idx));event.target.value='';}
@@ -1846,18 +1906,30 @@ async function buildSubmissionPayload(data,entry,batchIndex,onUploadProgress,cat
   const cat=CATEGORIES[categoryKey],subId=genId();
   let finalPhotoData=null;
   if(entry.photoFile&&!cat.photoMulti){
-    finalPhotoData=await uploadToStorage(entry.photoFile,subId);
+    if(onUploadProgress)onUploadProgress(1,cat.extraPhotoOptional&&entry.extraPhotoFile?2:1,entry.photoFile,batchIndex,'Uploading photo...');
+    finalPhotoData=await uploadToStorage(entry.photoFile,subId,{onStatus:msg=>onUploadProgress&&onUploadProgress(1,cat.extraPhotoOptional&&entry.extraPhotoFile?2:1,entry.photoFile,batchIndex,msg)});
   }
   let finalPhotos=null;
   if(cat.photoMulti&&entry.photoFilesMulti.length){
     finalPhotos=await uploadPhotosSequential(entry.photoFilesMulti,{
       idPrefix:subId,
       metas:entry.photoMetasMulti,
-      onProgress:(photoNo,total,file)=>{
-        if(onUploadProgress)onUploadProgress(photoNo,total,file,batchIndex);
+      onProgress:(photoNo,total,file,msg)=>{
+        if(onUploadProgress)onUploadProgress(photoNo,total,file,batchIndex,msg);
       }
     });
     if(finalPhotos.length)finalPhotoData=finalPhotos[0].url;
+  }
+  if(cat.extraPhotoOptional&&entry.extraPhotoFile){
+    const total=entry.photoFile?2:1;
+    const photoNo=entry.photoFile?2:1;
+    if(onUploadProgress)onUploadProgress(photoNo,total,entry.extraPhotoFile,batchIndex,'Uploading photo...');
+    const extraUrl=await uploadToStorage(entry.extraPhotoFile,subId+'_extra',{onStatus:msg=>onUploadProgress&&onUploadProgress(photoNo,total,entry.extraPhotoFile,batchIndex,msg)});
+    finalPhotos=Array.isArray(finalPhotos)?finalPhotos:[];
+    finalPhotos.push({url:extraUrl,name:entry.extraPhotoFile?.name||'second_image.jpg',caption:data.middleImageCaption?.value||'',role:'middle',meta:entry.extraPhotoMeta||null});
+  }
+  if(finalPhotoData&&categoryKey==='speeches'){
+    finalPhotos=[{url:finalPhotoData,name:entry.photoFile?.name||'speech_image.jpg',caption:data.photoCaption?.value||'',role:'speech',meta:entry.photoMeta||null}];
   }
   return{id:subId,category:categoryKey,
     ts:new Date().toLocaleString(),createdAt:Date.now()+batchIndex,
@@ -1938,7 +2010,11 @@ async function submitForm(){
     if(cat.photoRequired&&!photoDataURL){const e=document.getElementById('photoErrMsg');if(e){e.textContent='A photo is required.';e.style.display='block';}valid=false;}
     if(!valid){const fe=document.querySelector('.has-error')||document.getElementById('photoErrMsg');if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'});releaseSubmit();return;}
     try{
-      const sub=await buildSubmissionPayload(data,bulkEntry(0),0,null,categoryKey);
+      const sub=await buildSubmissionPayload(data,bulkEntry(0),0,(photoNo,total,file,batchIndex,msg)=>{
+        const status=msg||('Uploading photo '+photoNo+' of '+total+'...');
+        if(submitBtn)submitBtn.textContent=status;
+        showSync('syncing',status);
+      },categoryKey);
       return saveSubmissionBatch([sub],releaseSubmit);
     }catch(e){
       const msg=friendlyUploadErrorMessage(e);
@@ -1958,9 +2034,12 @@ async function submitForm(){
     submissions=[];
     for(let i=0;i<collected.items.length;i++){
       const item=collected.items[i];
-      submissions.push(await buildSubmissionPayload(item.data,item.entry,i,(photoNo,total)=>{
-        if(submitBtn)submitBtn.textContent='Uploading photo '+photoNo+' of '+total+'...';
-        showSync('syncing','Uploading photo '+photoNo+' of '+total+'...');
+      submissions.push(await buildSubmissionPayload(item.data,item.entry,i,(photoNo,total,file,batchIndex,msg)=>{
+        const prefix=collected.items.length>1?'Submission '+(batchIndex+1)+'/'+collected.items.length+' - ':'';
+        const status=prefix+(msg||('Uploading photo '+photoNo+' of '+total+'...'));
+        if(submitBtn)submitBtn.textContent=status;
+        const txt=document.getElementById('uploadProgressText');if(txt)txt.textContent=status;
+        showSync('syncing',status);
       },item.category||categoryKey));
       if(i<collected.items.length-1)await wait(BULK_UPLOAD_BETWEEN_FILES_MS);
     }
@@ -2539,7 +2618,7 @@ function applyLsColors(s){
 }
 
 /* SECTION MANAGER */
-function renderSectionManager(){const list=document.getElementById('sectionList');subs=loadAll();list.innerHTML=sectionOrder.map((sec,i)=>{const count=subs.filter(s=>s.category===sec.key&&(s.status==='approved'||s.status==='finalized')).length;const lbl=getLabel('section_'+sec.key,sec.label);return`<div class="section-row" draggable="true" data-idx="${i}" ondragstart="sectionDragStart(event,${i})" ondragover="sectionDragOver(event,${i})" ondrop="sectionDrop(event,${i})" ondragleave="sectionDragLeave(event)"><span class="section-handle">⠿</span><span class="section-row-num">${i+1}</span><div class="section-row-info"><div class="section-row-name">${sec.icon} ${esc(lbl)}</div><div class="section-row-meta">${count} approved · Layout: ${sec.layout}</div></div><div class="section-row-controls"><button class="section-toggle ${sec.visible?'on':''}" onclick="toggleSection(${i})">${sec.visible?'Visible':'Hidden'}</button><select class="section-layout-select" onchange="changeSectionLayout(${i},this.value)"><option value="single" ${sec.layout==='single'?'selected':''}>Single</option><option value="double" ${sec.layout==='double'?'selected':''}>Double</option><option value="grid" ${sec.layout==='grid'?'selected':''}>Grid</option><option value="teacher-grid" ${sec.layout==='teacher-grid'?'selected':''}>Teacher Grid</option><option value="gallery" ${sec.layout==='gallery'?'selected':''}>Gallery</option><option value="events" ${sec.layout==='events'?'selected':''}>Events</option><option value="cover" ${sec.layout==='cover'?'selected':''}>Cover</option><option value="toc" ${sec.layout==='toc'?'selected':''}>TOC</option></select>${sec.editable!==false?`<button class="section-rename-btn" onclick="openRenameModal('${sec.key}','${esc(lbl)}')">✎ Rename</button>`:''}</div></div>`;}).join('');
+function renderSectionManager(){const list=document.getElementById('sectionList');subs=loadAll();list.innerHTML=sectionOrder.map((sec,i)=>{const count=subs.filter(s=>s.category===sec.key&&(s.status==='approved'||s.status==='finalized')).length;const lbl=getLabel('section_'+sec.key,sec.label);return`<div class="section-row" draggable="true" data-idx="${i}" ondragstart="sectionDragStart(event,${i})" ondragover="sectionDragOver(event,${i})" ondrop="sectionDrop(event,${i})" ondragleave="sectionDragLeave(event)"><span class="section-handle">⠿</span><span class="section-row-num">${i+1}</span><div class="section-row-info"><div class="section-row-name">${sec.icon} ${esc(lbl)}</div><div class="section-row-meta">${count} approved · Layout: ${sec.layout}</div></div><div class="section-row-controls"><button class="section-toggle ${sec.visible?'on':''}" onclick="toggleSection(${i})">${sec.visible?'Visible':'Hidden'}</button><select class="section-layout-select" onchange="changeSectionLayout(${i},this.value)"><option value="single" ${sec.layout==='single'?'selected':''}>Single</option><option value="double" ${sec.layout==='double'?'selected':''}>Double</option><option value="grid" ${sec.layout==='grid'?'selected':''}>Grid</option><option value="teacher-grid" ${sec.layout==='teacher-grid'?'selected':''}>Teacher Grid</option><option value="editor-board" ${sec.layout==='editor-board'?'selected':''}>Editor Board</option><option value="gallery" ${sec.layout==='gallery'?'selected':''}>Gallery</option><option value="events" ${sec.layout==='events'?'selected':''}>Events</option><option value="cover" ${sec.layout==='cover'?'selected':''}>Cover</option><option value="toc" ${sec.layout==='toc'?'selected':''}>TOC</option></select>${sec.editable!==false?`<button class="section-rename-btn" onclick="openRenameModal('${sec.key}','${esc(lbl)}')">✎ Rename</button>`:''}</div></div>`;}).join('');
   /* SortableJS — smooth drag-and-drop (if library loaded) */
   if(typeof Sortable!=='undefined'){
     const listEl=document.getElementById('sectionList');
@@ -2745,7 +2824,7 @@ function renderCurrentPage(){
       return [name,role].filter(Boolean).join(' - ');
     }
     function usedContentFieldIds(sub){
-      const keys=['articleTitle','contribTitle','speechTitle','messageTitle','title','authorName','speakerName','contribName','reporterName','interviewerName','intervieweeName','submitterName','submittedBy','authorRole','speakerTitle','contribRole','submitterRole','intervieweeTitle','speakerOrg','classMessage','speechBody','articleBody','contribBody','qaBody','eventReport','message','introParagraph','advertCaption','pullQuote'];
+      const keys=['articleTitle','contribTitle','speechTitle','messageTitle','title','authorName','speakerName','contribName','reporterName','interviewerName','intervieweeName','submitterName','submittedBy','authorRole','speakerTitle','contribRole','submitterRole','intervieweeTitle','speakerOrg','classMessage','speechBody','articleBody','contribBody','qaBody','eventReport','message','bio','introParagraph','closingNote','advertCaption','pullQuote','photoCaption','profileImageCaption','middleImageCaption'];
       return keys.filter(k=>sub.data[k]?.value);
     }
     function resolveMainText(sub){
@@ -2992,6 +3071,28 @@ function renderCurrentPage(){
       </div>`;
     }
 
+    else if(layout==='editor-board'){
+      const cols=items.length===1?'1fr':items.length<=4?'1fr 1fr':'1fr 1fr 1fr';
+      contentHtml=`<div class="mag-editor-board-grid" style="display:grid;grid-template-columns:${cols};gap:12px;align-items:start;">
+        ${items.map(sub=>{
+          const name=resolveName(sub);
+          const role=productionText(sub,'title')||resolveSubtitle(sub);
+          const bio=productionText(sub,'bio')||'';
+          const message=productionText(sub,'message')||'';
+          const caption=productionText(sub,'photoCaption')||role;
+          const photo=sub.photoData?renderImageFrame(sub.photoData,'sub:'+sub.id+':photo',{frame:`width:100%;aspect-ratio:4/5;border-radius:7px;border:1px solid ${c2}55;`,fit:'contain',bg:'#fff'},name):'';
+          return `<article class="mag-item mag-editor-board-card" style="padding:12px;border:1px solid ${c2}44;border-radius:8px;background:#fff;break-inside:avoid;page-break-inside:avoid;overflow:visible;height:auto;max-height:none;">
+            ${photo}
+            ${caption?`<div style="font-size:8px;color:#777;line-height:1.35;text-align:center;margin-top:5px;">${esc(caption)}</div>`:''}
+            <h3 class="mag-item-name" style="font-family:${hFont};font-size:15px;line-height:1.2;color:${c1};margin-top:9px;margin-bottom:3px;">${esc(name)}</h3>
+            ${role?`<div class="mag-item-subtitle" style="font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:${c2};font-weight:800;margin-bottom:7px;">${esc(role)}</div>`:''}
+            ${bio?`<div class="mag-item-body" style="font-family:${bFont};font-size:${bSize};line-height:1.65;color:${textColor};white-space:pre-line;text-align:justify;">${esc(bio)}</div>`:''}
+            ${message?`<div style="font-size:9px;line-height:1.55;color:${textColor};border-left:3px solid ${c2};padding:6px 8px;margin-top:8px;background:${c2}16;">${esc(message)}</div>`:''}
+          </article>`;
+        }).join('')}
+      </div>`;
+    }
+
     else if(layout==='double'){
       const cols = items.length > 1 ? '1fr 1fr' : '1fr';
       contentHtml = `<div style="display:grid;grid-template-columns:${cols};gap:12px;">
@@ -3041,6 +3142,39 @@ function renderCurrentPage(){
         const pullQuote = productionText(sub,'pullQuote') || '';
         const allFields = renderAllFields(sub, {skipFirst:false, maxChars:99999, skipIds:usedContentFieldIds(sub), textColor, bFont});
         const ph = sub.photoData ? resolvePhotoBlock(sub,'52px','58px','6px',`2px solid ${c2}44`) : '';
+        if(sub.category==='interviews'){
+          const intro=productionText(sub,'introParagraph')||'';
+          const qa=productionText(sub,'qaBody')||mainText;
+          const closing=productionText(sub,'closingNote')||'';
+          const topCaption=productionText(sub,'profileImageCaption')||subtitle;
+          const middle=(Array.isArray(sub.photos)?sub.photos.find(p=>p?.role==='middle')||sub.photos[0]:null);
+          const middleCaption=middle?.caption||productionText(sub,'middleImageCaption')||'';
+          const topImg=sub.photoData?renderImageFrame(sub.photoData,'sub:'+sub.id+':photo',{frame:'width:100%;max-width:260px;height:210px;border-radius:8px;border:1px solid #e0e0d8;margin:0 auto 6px;',fit:'contain',bg:'#fff'},title):'';
+          const midImg=middle?renderImageFrame(wsPhotoSrc(middle),'sub:'+sub.id+':photo:middle',{frame:'width:100%;height:240px;border-radius:8px;border:1px solid #e0e0d8;margin:12px 0 6px;',fit:'contain',bg:'#fff'},title):'';
+          return `<article class="mag-item mag-item-single mag-item-interview" style="margin-bottom:16px;break-inside:avoid;page-break-inside:avoid;overflow:visible;height:auto;max-height:none;">
+            ${topImg?`<figure style="margin:0 0 10px;text-align:center;">${topImg}${topCaption?`<figcaption style="font-size:8px;color:#777;line-height:1.35;">${esc(topCaption)}</figcaption>`:''}</figure>`:''}
+            <div class="mag-item-header" style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #e8e8e0;">
+              <div class="mag-item-name" style="font-size:16px;font-weight:700;color:${c1};font-family:${hFont};line-height:1.25;">${esc(title)}</div>
+              ${subtitle ? `<div class="mag-item-subtitle" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:${c2};font-weight:700;">${esc(subtitle)}</div>` : ''}
+            </div>
+            ${intro?`<p class="mag-item-body" style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;text-align:justify;margin-bottom:10px;">${esc(intro)}</p>`:''}
+            ${midImg?`<figure style="margin:0 0 12px;break-inside:avoid;page-break-inside:avoid;">${midImg}${middleCaption?`<figcaption style="font-size:8px;color:#777;line-height:1.35;text-align:center;">${esc(middleCaption)}</figcaption>`:''}</figure>`:''}
+            ${qa?`<div class="mag-item-body" style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;text-align:justify;margin-bottom:10px;">${esc(qa)}</div>`:''}
+            ${closing?`<div style="font-size:9px;line-height:1.55;color:${textColor};border-left:3px solid ${c2};padding:6px 8px;margin-top:8px;background:${c2}16;">${esc(closing)}</div>`:''}
+            <div class="mag-item-fields">${allFields}</div>
+          </article>`;
+        }
+        if(sub.category==='speeches'&&sub.photoData){
+          const cap=productionText(sub,'photoCaption')||subtitle;
+          const hero=renderImageFrame(sub.photoData,'sub:'+sub.id+':photo',{frame:'width:100%;height:230px;border-radius:8px;border:1px solid #e0e0d8;margin-bottom:5px;',fit:'contain',bg:'#fff'},title);
+          return `<div class="mag-item mag-item-single mag-item-speech" style="margin-bottom:16px;break-inside:avoid;page-break-inside:avoid;overflow:visible;height:auto;max-height:none;">
+            <figure style="margin:0 0 12px;">${hero}${cap?`<figcaption style="font-size:8px;color:#777;line-height:1.35;text-align:center;">${esc(cap)}</figcaption>`:''}</figure>
+            ${title ? `<div class="mag-item-header" style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #e8e8e0;"><div class="mag-item-name" style="font-size:15px;font-weight:700;color:${c1};font-family:${hFont};line-height:1.25;">${esc(title)}</div>${subtitle ? `<div class="mag-item-subtitle" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:${c2};font-weight:700;">${esc(subtitle)}</div>` : ''}</div>` : ''}
+            ${pullQuote ? `<div class="mag-item-quote" style="border-left:4px solid ${c2};padding:8px 12px;margin:8px 0;background:${c2}22;border-radius:0 8px 8px 0;"><p style="font-family:${hFont};font-size:12px;color:${c1};font-style:italic;">${esc(pullQuote)}</p></div>` : ''}
+            ${mainText ? `<p class="mag-item-body" style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;margin-bottom:10px;text-align:justify;">${esc(mainText)}</p>` : ''}
+            <div class="mag-item-fields">${allFields}</div>
+          </div>`;
+        }
         return `<div class="mag-item mag-item-single" style="margin-bottom:16px;">
           ${title ? `<div class="mag-item-header" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #e8e8e0;">
             <div class="mag-item-photo-wrap">${ph}</div>
@@ -3075,7 +3209,10 @@ function renderTOC(){const c=document.getElementById('tocPreview');if(!c)return;
 
 /* PRINT */
 function openPrintView(){
-  if(!magPages.length){alert('Please click "Generate Preview" first to build your magazine pages.');return;}
+  if(!magPages.length){
+    generateMagPreview();
+    if(!magPages.length){alert('No approved content is available to export yet.');return;}
+  }
   const s=lsSettings;
   const ps=s.pageSize==='a4'?'A4':s.pageSize==='a5'?'A5':'letter';
   const orient=s.orientation||'portrait';
@@ -3132,9 +3269,12 @@ function openPrintView(){
       box-shadow:0 4px 24px rgba(0,0,0,.35);overflow:visible;
       background:#fff;position:relative;
     }
-    .mag-page{width:${w}px!important;min-height:${h}px!important;height:auto!important;overflow:visible!important;}
+    .mag-page{width:${w}px!important;min-height:${h}px!important;height:auto!important;overflow:visible!important;break-after:page;page-break-after:always;}
+    .mag-page:last-child{break-after:auto;page-break-after:auto;}
     .mag-page-inner{width:100%;min-height:${h}px;height:auto!important;overflow:visible!important;}
     .mag-page-flow,.mag-flow-content{height:auto!important;max-height:none!important;overflow:visible!important;}
+    .mag-flow-content{break-inside:auto;page-break-inside:auto;}
+    .mag-sheet,.mag-page,.mag-page-inner,.mag-page-flow,.mag-flow-content{max-height:none!important;}
     .mag-heading-block,h1,h2,h3{break-after:avoid;page-break-after:avoid;}
     .mag-item,.mag-item-gallery,.mag-item-event,.mag-item-teacher,.mag-item-student,.mag-image-frame,figure{break-inside:avoid;page-break-inside:avoid;}
     figcaption{break-before:avoid;page-break-before:avoid;}
@@ -3147,8 +3287,8 @@ function openPrintView(){
 <body>
   <div class="no-print">
     <h2>🖨 ${esc(s.magTitle||'The Torch')} &mdash; ${magPages.length} pages</h2>
-    <button onclick="window.print()">Print / Save as PDF</button>
-    <p id="printPrepStatus">Preparing PDF preview...</p>
+    <button onclick="window.print()">Download PDF</button>
+    <p id="printPrepStatus">Preparing PDF...</p>
     <p>Paper: ${ps} &middot; ${orient} &middot; Margins: None &middot; <strong>Enable Background graphics ✓</strong></p>
   </div>
   <div id="printPages">
@@ -3159,11 +3299,11 @@ function openPrintView(){
       var status=document.getElementById("printPrepStatus");
       var imgs=Array.prototype.slice.call(document.images||[]);
       var pending=imgs.filter(function(img){return !img.complete;});
-      if(!pending.length){if(status)status.textContent="PDF preview ready.";return;}
+      if(!pending.length){if(status)status.textContent="PDF ready.";setTimeout(function(){window.print();},250);return;}
       var done=0,settled=false;
-      function tick(){done++;if(status)status.textContent="Preparing PDF preview... "+done+" / "+pending.length+" images";if(done>=pending.length&&!settled){settled=true;if(status)status.textContent="PDF preview ready.";}}
+      function tick(){done++;if(status)status.textContent="Preparing PDF... "+done+" / "+pending.length+" images";if(done>=pending.length&&!settled){settled=true;if(status)status.textContent="PDF ready.";setTimeout(function(){window.print();},250);}}
       pending.forEach(function(img){img.addEventListener("load",tick,{once:true});img.addEventListener("error",tick,{once:true});});
-      setTimeout(function(){if(!settled){settled=true;if(status)status.textContent="PDF preview ready. Some slow images may continue loading in the browser.";}},6000);
+      setTimeout(function(){if(!settled){settled=true;if(status)status.textContent="PDF ready. Some slow images may continue loading in the browser.";window.print();}},3000);
     })();
   <\/script>
 </body>
