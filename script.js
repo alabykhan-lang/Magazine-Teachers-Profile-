@@ -2746,6 +2746,8 @@ function renderCurrentPage(){
   const foot=`<div style="border-top:1px solid #e8e8e0;padding:5px 2rem;display:flex;justify-content:space-between;align-items:center;background:#fafaf8;"><span style="font-size:8px;font-weight:700;color:${c1};letter-spacing:.5px;text-transform:uppercase;">${esc(schoolName)}</span><div style="width:18px;height:2px;background:${c2};border-radius:1px;"></div><span style="font-size:8px;color:#888;">${currentPageIdx+1}</span></div>`;
   const productionText=(sub,key)=>wsTextValue(page,String(sub?.id)+'|'+key,sub?.data?.[key]?.value||'');
   function findCoverImage(){
+    const manual=(Array.isArray(page.manualBlocks)?page.manualBlocks:[]).find(b=>b&&b.type==='image'&&!b.hidden&&['cover-hero','feature','background'].includes(b.placement||''));
+    if(manual?.src)return manual.src;
     const imgSub=loadAll().find(x=>['gallery','events'].includes(x.category)&&((Array.isArray(x.photos)&&x.photos.length)||x.photoData));
     if(!imgSub)return '';
     return Array.isArray(imgSub.photos)&&imgSub.photos.length?wsPhotoSrc(imgSub.photos[0]):(imgSub.photoData||'');
@@ -2894,13 +2896,13 @@ function renderCurrentPage(){
     }
     function renderManualBlocks(blocks,placement){
       if(!Array.isArray(blocks)||!blocks.length)return '';
-      const filtered=blocks.filter(b=>!b?.hidden&&(b?.placement||'after-text')===(placement||'after-text'));
+      const filtered=blocks.filter(b=>!b?.hidden&&wsNormalizeImagePlacement(b?.placement||'after-text')===(placement||'after-text'));
       if(!filtered.length)return '';
       return `<div class="mag-manual-blocks mag-production-images" style="display:grid;gap:8px;margin:${placement==='feature'?'0 0 12px':'10px 0'};">
         ${filtered.map((b,i)=>{
           if(!b)return '';
           if(b.type==='image'){
-            const place=b.placement||placement||'after-text';
+            const place=wsNormalizeImagePlacement(b.placement||placement||'after-text');
             const h=place==='feature'?'210px':place==='full-width'?'190px':place==='gallery'?'135px':place==='side'?'150px':place==='background'?'100%':'160px';
             const grid=place==='gallery'?'display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;':'';
             const side=place==='side'?'float:right;width:38%;max-width:210px;margin:0 0 10px 14px;':'';
@@ -3288,8 +3290,8 @@ function openPrintView(){
   <div class="no-print">
     <h2>🖨 ${esc(s.magTitle||'The Torch')} &mdash; ${magPages.length} pages</h2>
     <button onclick="window.print()">Download PDF</button>
-    <p id="printPrepStatus">Preparing PDF...</p>
-    <p>Paper: ${ps} &middot; ${orient} &middot; Margins: None &middot; <strong>Enable Background graphics ✓</strong></p>
+    <p id="printPrepStatus">Preparing print document...</p>
+    <p>Paper: ${ps} &middot; ${orient} &middot; Margins: None &middot; <strong>Enable Background graphics</strong>. Desktop export is recommended for the final PDF.</p>
   </div>
   <div id="printPages">
     ${allPagesHtml}
@@ -3298,12 +3300,42 @@ function openPrintView(){
     (function(){
       var status=document.getElementById("printPrepStatus");
       var imgs=Array.prototype.slice.call(document.images||[]);
-      var pending=imgs.filter(function(img){return !img.complete;});
-      if(!pending.length){if(status)status.textContent="PDF ready.";setTimeout(function(){window.print();},250);return;}
-      var done=0,settled=false;
-      function tick(){done++;if(status)status.textContent="Preparing PDF... "+done+" / "+pending.length+" images";if(done>=pending.length&&!settled){settled=true;if(status)status.textContent="PDF ready.";setTimeout(function(){window.print();},250);}}
-      pending.forEach(function(img){img.addEventListener("load",tick,{once:true});img.addEventListener("error",tick,{once:true});});
-      setTimeout(function(){if(!settled){settled=true;if(status)status.textContent="PDF ready. Some slow images may continue loading in the browser.";window.print();}},3000);
+      var total=imgs.length,done=0,failed=0,printed=false;
+      imgs.forEach(function(img){img.loading="eager";img.decoding="sync";img.style.objectFit="contain";});
+      function setStatus(msg){if(status)status.textContent=msg;}
+      function finish(msg){
+        if(printed)return;
+        printed=true;
+        setStatus(msg||"PDF ready.");
+        setTimeout(function(){window.print();},250);
+      }
+      if(!total){finish("PDF ready.");return;}
+      setStatus("Preparing PDF... 0 / "+total+" images");
+      function preloadOne(img){
+        return new Promise(function(resolve){
+          var settled=false;
+          function doneOne(ok){
+            if(settled)return;
+            settled=true;
+            done++;
+            if(!ok)failed++;
+            setStatus("Preparing PDF... "+done+" / "+total+" images"+(failed?" ("+failed+" skipped)":""));
+            resolve();
+          }
+          if(img.complete&&img.naturalWidth!==0){
+            if(img.decode){img.decode().then(function(){doneOne(true);}).catch(function(){doneOne(false);});}
+            else doneOne(true);
+            return;
+          }
+          img.addEventListener("load",function(){doneOne(true);},{once:true});
+          img.addEventListener("error",function(){doneOne(false);},{once:true});
+          setTimeout(function(){doneOne(false);},4500);
+        });
+      }
+      Promise.all(imgs.map(preloadOne)).then(function(){
+        finish(failed?"PDF ready. "+failed+" slow/failed image(s) were skipped.":"PDF ready.");
+      });
+      setTimeout(function(){finish("PDF ready. Continuing after image timeout.");},6500);
     })();
   <\/script>
 </body>
@@ -3863,14 +3895,34 @@ let wsUndoStack=[],wsRedoStack=[],wsAutoSaveTimer=null;
 const wsImageQualityCache={};
 const PRODUCTION_MAGAZINE_THEME='The Making of Tomorrow: From Humble Beginnings to Limitless Horizons';
 function wsEnsureProduction(){if(!lsSettings.production||typeof lsSettings.production!=='object')lsSettings.production={pages:{}};if(!lsSettings.production.pages)lsSettings.production.pages={};if(!lsSettings.production.profileDefaults)lsSettings.production.profileDefaults={};if(!lsSettings.production.imageDefaults)lsSettings.production.imageDefaults={fit:'contain',zoom:1,x:50,y:50,rotate:0};if(!Array.isArray(lsSettings.production.duplicates))lsSettings.production.duplicates=[];return lsSettings.production;}
+function wsProductionEditShape(meta){
+  meta=meta||{};
+  const imageEdits=meta.imageEdits||{};
+  return {
+    editedFields:meta.textEdits||{},
+    hiddenImages:Object.entries(imageEdits).filter(([,v])=>v&&v.hidden).map(([k])=>k),
+    addedImages:(Array.isArray(meta.manualBlocks)?meta.manualBlocks:[]).filter(b=>b&&b.type==='image').map(b=>({url:b.src||'',caption:b.caption||'',placement:b.placement||'after-text',afterParagraph:b.afterParagraph||null,source:'production',createdAt:b.createdAt||b.id||meta.updatedAt||''})),
+    layout:{template:meta.template,namePlacement:meta.namePlacement,profileControls:meta.profileControls||{},manualBlocks:meta.manualBlocks||[]},
+    pageOrder:meta.itemOrder||[],
+    updatedAt:meta.updatedAt||''
+  };
+}
+function wsNormalizeImagePlacement(placement){
+  const p=String(placement||'after-text');
+  if(p==='cover-hero')return 'feature';
+  if(p==='after-paragraph')return 'inline';
+  if(p==='interview-portrait')return 'feature';
+  if(p==='interview-middle')return 'inline';
+  return p;
+}
 function wsGlobalImageDefaults(){const d=wsEnsureProduction().imageDefaults||{};return {fit:d.fit||'contain',zoom:Math.max(.5,Math.min(3,parseFloat(d.zoom)||1)),x:d.x??50,y:d.y??50,rotate:parseInt(d.rotate)||0};}
 function wsPageKey(page,idx){if(page?.duplicateId)return 'duplicate|'+page.duplicateId;if(!page)return 'page-'+idx;const ids=(page.items||[]).map(x=>x.id).join('-')||(page.sub?.id||'');return [page.type,page.sec?.key||'global',page.pageInSection||1,ids||idx].join('|');}
 function wsDefaultProfileFieldIds(secKey){const fields=(CATEGORIES[secKey]?.fields||[]).filter(f=>f.id!=='name');if(secKey==='teachers')return ['title','subject','years','qualification'].filter(id=>fields.some(f=>f.id===id));return ['nickname','favSubject','ambition','hobbies'].filter(id=>fields.some(f=>f.id===id));}
 function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',cardDesign:'classic',fieldsMode:'all',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'staff-detailed'}:{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',cardDesign:'classic',fieldsMode:'key',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'student-balanced'};}
 function wsIsProfilePage(page){const key=page?.sec?.key;return page?.type==='section-content'&&(key==='teachers'||['primary5','jss3','ss3'].includes(key)||page?.sec?.layout==='teacher-grid'||page?.sec?.layout==='grid');}
 function wsGetProfileControls(page,meta){const prod=wsEnsureProduction();const key=page?.sec?.key;return Object.assign({},wsDefaultProfileControls(key),prod.profileDefaults?.[key]||{},meta?.profileControls||{});}
-function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));return Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,hidden:false,itemOrder:null,removedItemIds:[],addedItemIds:[],manualBlocks:[],textLimit:null,textEdits:{},imageEdits:{},selectedImageKey:'',namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});}
-function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);prod.pages[key]=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{},{updatedAt:new Date().toISOString()});saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
+function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));const meta=Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,hidden:false,itemOrder:null,removedItemIds:[],addedItemIds:[],manualBlocks:[],textLimit:null,textEdits:{},imageEdits:{},selectedImageKey:'',namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});meta.production_edits=wsProductionEditShape(meta);return meta;}
+function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);const meta=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{},{updatedAt:new Date().toISOString()});meta.production_edits=wsProductionEditShape(meta);prod.pages[key]=meta;saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
 function wsApplyItemOrder(items,order){if(!Array.isArray(items)||!Array.isArray(order)||!order.length)return items;const rank=new Map(order.map((id,i)=>[String(id),i]));return items.slice().sort((a,b)=>{const ar=rank.has(String(a.id))?rank.get(String(a.id)):9999;const br=rank.has(String(b.id))?rank.get(String(b.id)):9999;return ar-br;});}
 function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,hidden:!!meta.hidden,manualBlocks:Array.isArray(meta.manualBlocks)?meta.manualBlocks:[],textLimit:meta.textLimit,textEdits:meta.textEdits||{},imageEdits:meta.imageEdits||{},namePlacement:meta.namePlacement,profileControls});if(copy.items){const removed=new Set((meta.removedItemIds||[]).map(String));const added=(meta.addedItemIds||[]).map(id=>loadAll().find(s=>String(s.id)===String(id))).filter(Boolean);const seen=new Set();copy.items=copy.items.concat(added).filter(x=>x&&!removed.has(String(x.id))).filter(x=>{const id=String(x.id);if(seen.has(id))return false;seen.add(id);return true;});copy.items=wsApplyItemOrder(copy.items,meta.itemOrder);}if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
 function wsCurrentMeta(){return wsGetPageMeta(wsPages[wsPageIdx],wsPageIdx);}
@@ -4108,8 +4160,8 @@ function wsRenderPageEditPanel(page,meta){
   const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks:[];
   const blockHtml=blocks.length?'<div class="ws-profile-title" style="margin-top:10px;">Manual Blocks</div>'+blocks.map((b,i)=>{
     const label=esc((b.type||'text').toUpperCase())+(b.hidden?' (hidden)':'')+': '+esc((b.text||b.caption||b.src||'Manual block').slice(0,36));
-    const imgBtns=b.type==='image'?`<button onclick="wsReplaceManualBlockImage(${i})">Replace</button><button onclick="wsToggleManualBlockHidden(${i},${b.hidden?'false':'true'})">${b.hidden?'Restore':'Hide'}</button>`:'';
-    return `<div class="ws-manual-row${b.hidden?' hidden':''}"><span>${label}</span><button onclick="wsEditManualBlock(${i})">Edit</button>${imgBtns}<button onclick="wsDeleteManualBlock(${i})">Remove</button></div>`;
+    const imgBtns=b.type==='image'?`<button class="ws-prod-btn" onclick="wsReplaceManualBlockImage(${i})">Replace</button><button class="ws-prod-btn" onclick="wsToggleManualBlockHidden(${i},${b.hidden?'false':'true'})">${b.hidden?'Restore':'Hide'}</button>`:'';
+    return `<div class="ws-manual-row${b.hidden?' hidden':''}"><span>${label}</span><button class="ws-prod-btn" onclick="wsMoveManualBlock(${i},-1)" ${i===0?'disabled':''}>Up</button><button class="ws-prod-btn" onclick="wsMoveManualBlock(${i},1)" ${i===blocks.length-1?'disabled':''}>Down</button><button class="ws-prod-btn" onclick="wsEditManualBlock(${i})">Edit</button>${imgBtns}<button class="ws-prod-btn" onclick="wsDeleteManualBlock(${i})">Remove</button></div>`;
   }).join(''):'';
   list.innerHTML=cards+blockHtml;
 }
@@ -4174,7 +4226,7 @@ function wsMoveSelectedItemToPage(dir){
 }
 function wsAddManualBlock(block){
   const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before adding manual blocks.');wsUpdateProductionControls();return;}
-  const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];blocks.push(Object.assign({id:'block-'+Date.now()},block));
+  const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];blocks.push(Object.assign({id:'block-'+Date.now(),createdAt:new Date().toISOString(),source:'production'},block));
   wsSavePageMeta(wsPageIdx,{manualBlocks:blocks});wsRenderCurrentPage();wsUpdateProductionControls();
 }
 function wsAddManualTextBox(){const text=prompt('Text box content:');if(text!==null&&text.trim())wsAddManualBlock({type:'text',text:text.trim()});}
@@ -4183,9 +4235,16 @@ function wsAddManualCaption(){const text=prompt('Caption text:');if(text!==null&
 function wsEditManualBlock(i){
   const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before editing manual blocks.');return;}
   const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];const b=blocks[i];if(!b)return;
-  if(b.type==='image'){const src=prompt('Supabase Storage image URL:',b.src||'');if(src===null)return;if(/^data:image\//i.test(src.trim())){alert('Production images must use Storage URLs, not data URLs.');return;}const caption=prompt('Image caption:',b.caption||'');if(caption===null)return;const placement=prompt('Placement: feature, after-heading, inline, after-text, side, full-width, gallery',b.placement||'after-text');if(placement===null)return;blocks[i]=Object.assign({},b,{src:src.trim(),caption:caption.trim(),placement:(placement.trim()||'after-text')});}
+  if(b.type==='image'){const src=prompt('Supabase Storage image URL:',b.src||'');if(src===null)return;if(/^data:image\//i.test(src.trim())){alert('Production images must use Storage URLs, not data URLs.');return;}const caption=prompt('Image caption:',b.caption||'');if(caption===null)return;const placement=prompt('Placement: cover-hero, feature, after-heading, after-paragraph, side, after-text, full-width, gallery, background, interview-portrait, interview-middle',b.placement||'after-text');if(placement===null)return;const afterParagraph=placement.trim()==='after-paragraph'?parseInt(prompt('Paragraph number:',b.afterParagraph||'1')||'1')||1:b.afterParagraph||null;blocks[i]=Object.assign({},b,{src:src.trim(),caption:caption.trim(),placement:(placement.trim()||'after-text'),afterParagraph});}
   else{const text=prompt((b.type==='caption'?'Caption':'Text box')+' content:',b.text||'');if(text===null)return;blocks[i]=Object.assign({},b,{text:text.trim()});}
   wsSavePageMeta(wsPageIdx,{manualBlocks:blocks});wsRenderCurrentPage();wsUpdateProductionControls();
+}
+function wsMoveManualBlock(i,dir){
+  const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before moving production blocks.');return;}
+  const blocks=Array.isArray(meta.manualBlocks)?meta.manualBlocks.slice():[];const next=i+dir;
+  if(!blocks[i]||next<0||next>=blocks.length)return;
+  [blocks[i],blocks[next]]=[blocks[next],blocks[i]];
+  wsSavePageMeta(wsPageIdx,{manualBlocks:blocks});wsRenderCurrentPage();wsUpdateProductionControls();wsRunPreflight(false);
 }
 function wsDeleteManualBlock(i){
   const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before deleting manual blocks.');return;}
@@ -4569,12 +4628,13 @@ async function wsUploadProductionImage(event){
   const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before adding images.');return;}
   if(!/^image\//.test(file.type)){alert('Choose a JPG, PNG, or WebP image.');return;}
   const placement=document.getElementById('wsProductionImagePlacement')?.value||'after-text';
+  const afterParagraph=parseInt(document.getElementById('wsProductionImageAfterParagraph')?.value||'')||null;
   const caption=(document.getElementById('wsProductionImageCaption')?.value||'').trim();
   try{
     wsSetProductionUploadStatus('syncing','Uploading 1 image to Supabase Storage...');
     showSync('syncing','Uploading production image...');
     const url=await uploadToStorage(file,'production_'+String(wsPages[wsPageIdx]?.sec?.key||'page')+'_'+Date.now());
-    wsAddManualBlock({type:'image',src:url,caption,placement});
+    wsAddManualBlock({type:'image',src:url,caption,placement,afterParagraph});
     const cap=document.getElementById('wsProductionImageCaption');if(cap)cap.value='';
     wsSetProductionUploadStatus('ok','Upload complete. Storage URL saved as a production-only image block.');
     showSync('ok','Production image uploaded');

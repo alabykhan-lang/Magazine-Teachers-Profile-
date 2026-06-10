@@ -884,15 +884,19 @@
           <input type="file" id="wsProductionImageInput" accept=".jpg,.jpeg,.png,.webp" style="display:none;" onchange="wsUploadProductionImage(event)"/>
           <label class="ws-font-label">New image placement</label>
           <select class="ws-font-select" id="wsProductionImagePlacement">
+            <option value="cover-hero">Cover/hero image</option>
             <option value="feature">Feature image above title</option>
             <option value="after-heading">After heading</option>
-            <option value="inline">Inline after paragraph</option>
+            <option value="after-paragraph">After selected paragraph</option>
             <option value="side">Beside text</option>
             <option value="after-text">After text</option>
             <option value="full-width">Full-width image block</option>
             <option value="gallery">Gallery block</option>
-            <option value="background">Cover/page background</option>
+            <option value="interview-portrait">Interview portrait at top</option>
+            <option value="interview-middle">Second interview image in middle</option>
+            <option value="background">Page background</option>
           </select>
+          <input class="ws-font-select" id="wsProductionImageAfterParagraph" type="number" min="1" step="1" placeholder="Paragraph number for after selected paragraph"/>
           <input class="ws-font-select" id="wsProductionImageCaption" type="text" placeholder="Caption for new production image"/>
           <div id="wsProductionUploadStatus" class="ws-upload-status">Images upload to Supabase Storage and are saved as production-only blocks.</div>
           <div class="ws-prod-actions">
