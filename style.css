@@ -14,6 +14,13 @@
   --admin:#1a2744;--admin2:#243460;--admin3:#7dd4a8;
   --editor:#2d1b4e;--editor2:#4a2d7a;
   --cloud: #e2e8f0; /* Added missing cloud variable for rendering */
+  --mag-navy:#0B1F3A;
+  --mag-gold:#D6A84F;
+  --mag-emerald:#0F7C5C;
+  --mag-ivory:#F8F3E7;
+  --mag-mist:#E8EEF6;
+  --mag-charcoal:#1F2933;
+  --mag-white:#FFFFFF;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}

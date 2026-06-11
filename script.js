@@ -253,7 +253,7 @@ function loadLsSettingsFromStorage(){
     const s=JSON.parse(localStorage.getItem('me_ls_settings')||'null');
     if(s&&typeof s==='object')return s;
   }catch(e){}
-  return {magTitle:'The Torch',schoolName:'Way To Success Standard Schools',edition:'1st Edition',year:'2025/2026',color1:'#1a2744',color2:'#7dd4a8',color3:'#8b1a1a',pageSize:'a4',orientation:'portrait',pageNums:'yes'};
+  return {magTitle:'Maiden Magazine',schoolName:'Way To Success Standard Schools',edition:'2026 Edition',year:'2026',theme:'The Making of Tomorrow: From Humble Beginnings to Limitless Horizons',color1:'#0B1F3A',color2:'#D6A84F',color3:'#0F7C5C',pageBg:'#F8F3E7',textColor:'#1F2933',pageSize:'a4',orientation:'portrait',pageNums:'yes'};
 }
 
 function getSupa(){
@@ -2714,14 +2714,111 @@ function getProductionItemsPerPage(sec,settings){
   return 1;
 }
 
+const LEGACY_HORIZON_MAG_CSS=`
+<style>
+:root{--mag-navy:#0B1F3A;--mag-gold:#D6A84F;--mag-emerald:#0F7C5C;--mag-ivory:#F8F3E7;--mag-mist:#E8EEF6;--mag-charcoal:#1F2933;--mag-white:#FFFFFF;}
+.mag-opening-page{width:100%;min-height:100%;height:100%;position:relative;overflow:hidden;background:var(--mag-ivory);color:var(--mag-charcoal);font-family:'Lato',sans-serif;display:flex;flex-direction:column;}
+.mag-opening-page h1,.mag-opening-page h2,.mag-opening-page h3{font-family:'Playfair Display',serif;color:var(--mag-navy);letter-spacing:0;}
+.mag-page-shell{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;padding:58px 72px 46px;min-height:100%;}
+.mag-horizon-page::before{content:'';position:absolute;left:-170px;top:-150px;width:500px;height:500px;border:18px solid var(--mag-gold);border-right-color:transparent;border-bottom-color:transparent;border-radius:50%;opacity:.96;}
+.mag-horizon-page::after{content:'';position:absolute;right:-160px;bottom:-160px;width:470px;height:470px;border:13px solid var(--mag-gold);border-left-color:transparent;border-top-color:transparent;border-radius:50%;opacity:.96;}
+.mag-horizon-curve-top,.mag-horizon-curve-bottom{position:absolute;border-radius:50%;pointer-events:none;z-index:0;}
+.mag-horizon-curve-top{left:-114px;top:-98px;width:420px;height:420px;border:10px solid var(--mag-emerald);border-right-color:transparent;border-bottom-color:transparent;}
+.mag-horizon-curve-bottom{right:-98px;bottom:-98px;width:372px;height:372px;border:9px solid var(--mag-emerald);border-left-color:transparent;border-top-color:transparent;}
+.mag-watermark{position:absolute;inset:170px 86px auto;min-height:520px;opacity:.035;font-family:'Playfair Display',serif;font-size:430px;line-height:.8;color:var(--mag-navy);text-align:center;pointer-events:none;z-index:0;}
+.mag-footer-fixed{position:absolute;left:40px;right:40px;bottom:20px;height:26px;border-top:2px solid var(--mag-emerald);display:flex;align-items:flex-end;justify-content:space-between;background:transparent;z-index:4;}
+.mag-footer-fixed span:first-child{font-size:8px;font-weight:800;letter-spacing:5px;text-transform:uppercase;color:var(--mag-charcoal);white-space:nowrap;}
+.mag-footer-fixed span:last-child{font-family:'Playfair Display',serif;font-size:18px;color:var(--mag-navy);line-height:1;}
+.mag-cover-page{background:var(--mag-navy);color:var(--mag-white);padding:16px;border:2px solid var(--mag-gold);}
+.mag-cover-border{position:absolute;inset:8px;border:1px solid var(--mag-gold);pointer-events:none;z-index:4;}
+.mag-cover-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.08fr .92fr;grid-template-rows:auto auto 1fr auto;gap:18px 28px;height:100%;padding:36px 40px 30px;}
+.mag-cover-top{grid-column:1/2;display:grid;grid-template-columns:146px 1fr;gap:22px;align-items:center;}
+.mag-school-mark{width:122px;height:122px;border:3px solid var(--mag-gold);border-radius:28px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.04);color:var(--mag-gold);font-family:'Playfair Display',serif;font-size:48px;line-height:1;box-shadow:0 0 0 1px rgba(214,168,79,.35) inset;}
+.mag-cover-school{border-left:2px solid var(--mag-gold);padding-left:24px;}
+.mag-cover-school h2{font-family:'Lato',sans-serif;color:var(--mag-white);font-size:27px;line-height:1.18;text-transform:uppercase;margin:0 0 12px;font-weight:900;}
+.mag-cover-school p{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--mag-emerald);font-weight:900;}
+.mag-edition-ribbon{position:absolute;right:38px;top:0;width:100px;min-height:168px;background:linear-gradient(180deg,#0F7C5C,#095742);border:2px solid var(--mag-gold);border-top:0;color:var(--mag-white);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-weight:900;clip-path:polygon(0 0,100% 0,100% 100%,50% 84%,0 100%);z-index:3;}
+.mag-edition-ribbon strong{font-size:30px;line-height:1;}.mag-edition-ribbon span{font-size:14px;letter-spacing:1.4px;margin-top:5px;}
+.mag-cover-title{grid-column:1/2;align-self:end;}.mag-cover-title h1{font-size:82px;line-height:.92;color:var(--mag-gold);font-weight:700;margin:0 0 20px;}.mag-cover-title .rule{height:2px;background:var(--mag-gold);width:100%;position:relative;}.mag-cover-title .rule::after{content:'';position:absolute;left:50%;top:-5px;width:10px;height:10px;background:var(--mag-gold);transform:translateX(-50%) rotate(45deg);}
+.mag-cover-theme{grid-column:1/2;}.mag-cover-theme .label{display:inline-block;background:var(--mag-emerald);color:var(--mag-white);font-size:11px;letter-spacing:2px;font-weight:900;padding:5px 16px;margin-left:190px;text-transform:uppercase;}.mag-cover-theme h3{font-size:35px;line-height:1.08;color:var(--mag-white);margin:10px 0 6px;}.mag-cover-theme h3 em{font-style:normal;color:var(--mag-gold);}.mag-cover-theme p{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.86);font-weight:900;}
+.mag-cover-photos{grid-column:1/3;grid-row:2/4;display:grid;grid-template-columns:1.2fr .84fr;grid-template-rows:1fr .48fr .48fr;gap:14px 20px;align-self:stretch;pointer-events:none;}.mag-cover-photo{border:3px solid var(--mag-gold);background:var(--mag-mist);border-radius:22px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#718096;font-weight:900;text-align:center;box-shadow:0 0 0 2px var(--mag-navy) inset;}.mag-cover-photo img{width:100%;height:100%;object-fit:contain;display:block;background:var(--mag-mist);}.mag-cover-photo.hero{grid-column:2;grid-row:1;height:410px;align-self:start;margin-top:28px;}.mag-cover-photo.event{grid-column:1;grid-row:3;height:170px;}.mag-cover-photo.small-one{grid-column:2;grid-row:2;height:108px;align-self:end;}.mag-cover-photo.small-two{grid-column:2;grid-row:3;height:108px;align-self:start;}.mag-cover-photo .caption{position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);background:var(--mag-navy);border:2px solid var(--mag-gold);border-radius:5px;padding:6px 18px;color:var(--mag-white);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;white-space:nowrap;}
+.mag-cover-horizon{grid-column:1/3;align-self:end;min-height:182px;position:relative;margin-top:auto;}.mag-cover-horizon::before{content:'';position:absolute;left:-60px;right:-60px;bottom:34px;height:130px;background:radial-gradient(circle at 52% 60%,rgba(214,168,79,.95) 0 5%,transparent 12%),linear-gradient(160deg,transparent 0 32%,rgba(15,124,92,.95) 33% 43%,transparent 44%),linear-gradient(173deg,transparent 0 50%,rgba(255,255,255,.12) 51%,transparent 52%),linear-gradient(180deg,transparent,#06162a);border-bottom:1px solid rgba(214,168,79,.7);}.mag-cover-horizon .path{position:absolute;left:43%;bottom:40px;width:86px;height:142px;background:linear-gradient(180deg,var(--mag-gold),#f3d178);clip-path:polygon(44% 0,60% 0,100% 100%,0 100%);transform:perspective(160px) rotateX(52deg) translateX(-50%);border-radius:50% 50% 0 0;}.mag-values{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;color:var(--mag-white);}.mag-value{display:flex;gap:10px;align-items:center;border-right:1px solid rgba(214,168,79,.45);}.mag-value:last-child{border-right:0;}.mag-value b{width:42px;height:42px;border:2px solid var(--mag-gold);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--mag-emerald);font-size:18px;}.mag-value span{font-size:10px;line-height:1.25;letter-spacing:1px;text-transform:uppercase;font-weight:900;}
+.mag-inside-head{text-align:center;margin-top:8px;margin-bottom:34px;}.mag-inside-logo{width:104px;height:104px;border:1px solid var(--mag-gold);border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;color:var(--mag-charcoal);font-size:13px;background:rgba(255,255,255,.25);box-shadow:0 0 0 7px rgba(214,168,79,.08);overflow:hidden;}.mag-inside-logo img{width:100%;height:100%;object-fit:contain;}.mag-inside-head h1{font-size:58px;line-height:1;color:var(--mag-navy);margin:0 0 14px;}.mag-gold-rule{height:1px;background:var(--mag-gold);width:320px;margin:0 auto;position:relative;}.mag-gold-rule::after{content:'';position:absolute;left:50%;top:-5px;width:10px;height:10px;background:var(--mag-gold);transform:translateX(-50%) rotate(45deg);}.mag-inside-location{font-size:20px;color:var(--mag-emerald);margin-top:16px;}.mag-inside-meta{font-size:14px;color:var(--mag-gold);letter-spacing:1px;margin-top:10px;}.mag-inside-body{display:grid;grid-template-columns:1fr 1fr;gap:46px;position:relative;}.mag-inside-body::after{content:'';position:absolute;left:50%;top:10px;bottom:0;width:1px;background:rgba(214,168,79,.55);}.mag-ant-title{text-align:center;font-size:25px;color:var(--mag-navy);margin:16px 0 24px;}.mag-inside-section{break-inside:avoid;page-break-inside:avoid;margin-bottom:34px;}.mag-inside-section h3{font-size:24px;color:var(--mag-navy);display:flex;align-items:center;gap:12px;margin-bottom:18px;}.mag-inside-section h3 .round{width:42px;height:42px;border-radius:50%;background:var(--mag-emerald);color:var(--mag-white);display:flex;align-items:center;justify-content:center;font-family:'Lato',sans-serif;font-size:16px;}.mag-line-text{font-size:13px;line-height:2.08;color:var(--mag-charcoal);white-space:pre-line;}.mag-placeholder-lines{background:repeating-linear-gradient(to bottom,transparent 0,transparent 22px,rgba(31,41,51,.45) 23px,transparent 24px);min-height:118px;}.mag-objective{display:grid;grid-template-columns:24px 1fr;gap:8px;align-items:center;margin:8px 0;}.mag-objective b{width:20px;height:20px;border-radius:50%;background:var(--mag-emerald);color:var(--mag-white);display:flex;align-items:center;justify-content:center;font-size:11px;}.mag-optional-photo{width:64%;height:108px;border:1px solid rgba(214,168,79,.45);margin:28px auto 0;display:flex;align-items:center;justify-content:center;color:var(--mag-charcoal);font-size:13px;background:rgba(255,255,255,.25);}.mag-optional-photo img{width:100%;height:100%;object-fit:contain;display:block;}
+.mag-contents-head{text-align:center;margin-top:32px;margin-bottom:58px;}.mag-kicker{font-size:12px;letter-spacing:9px;text-transform:uppercase;color:var(--mag-navy);font-weight:900;margin-bottom:16px;}.mag-contents-head h1{font-size:64px;color:var(--mag-navy);line-height:1;margin-bottom:22px;}.mag-theme-line{font-size:16px;letter-spacing:5px;color:var(--mag-emerald);text-transform:uppercase;font-weight:900;}.mag-theme-sub{font-family:'Playfair Display',serif;font-size:17px;font-style:italic;color:var(--mag-navy);margin-top:6px;}.mag-contents-grid{display:grid;grid-template-columns:1fr 1fr;gap:44px 64px;position:relative;}.mag-contents-grid::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(214,168,79,.5);}.mag-content-section{display:grid;grid-template-columns:70px 1fr;column-gap:18px;margin-bottom:33px;break-inside:avoid;page-break-inside:avoid;}.mag-content-num{width:62px;height:62px;border:2px solid rgba(214,168,79,.55);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--mag-gold);font-family:'Playfair Display',serif;font-size:36px;background:rgba(255,255,255,.3);}.mag-content-items h3{font-size:24px;color:var(--mag-navy);margin:14px 0 16px;display:inline-block;border-bottom:1px solid var(--mag-gold);padding-right:30px;}.mag-content-line{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:end;font-size:12px;color:var(--mag-charcoal);margin:10px 0;}.mag-content-line .dots{border-bottom:1px dotted rgba(31,41,51,.55);height:1px;margin-bottom:5px;}.mag-content-line .pg{font-weight:900;color:var(--mag-charcoal);}.mag-contents-quote{width:54%;margin:42px auto 0;border:1px solid rgba(15,124,92,.5);padding:18px 26px;display:grid;grid-template-columns:42px 1fr;gap:18px;color:var(--mag-charcoal);font-size:14px;line-height:1.55;}.mag-contents-quote b{font-family:'Playfair Display',serif;font-size:42px;color:var(--mag-emerald);line-height:1;}
+.mag-board-head{text-align:center;margin-top:18px;margin-bottom:30px;}.mag-board-head h1{font-size:59px;color:var(--mag-navy);line-height:1;margin-bottom:16px;}.mag-board-sub{font-size:14px;letter-spacing:6px;color:var(--mag-emerald);text-transform:uppercase;font-weight:900;display:flex;align-items:center;justify-content:center;gap:18px;}.mag-board-sub::before,.mag-board-sub::after{content:'';height:1px;width:86px;background:var(--mag-gold);}.mag-feature-card{width:78%;margin:0 auto 42px;border:1px solid rgba(214,168,79,.7);border-radius:13px;background:rgba(255,255,255,.35);padding:18px 22px;display:grid;grid-template-columns:186px 1fr;gap:36px;align-items:center;position:relative;break-inside:avoid;page-break-inside:avoid;}.mag-feature-photo{height:292px;border-radius:12px;background:var(--mag-mist);overflow:hidden;display:flex;align-items:center;justify-content:center;}.mag-feature-info{text-align:center;}.mag-feature-info .crown{font-size:30px;color:var(--mag-gold);line-height:1;margin-bottom:10px;}.mag-feature-info .role{font-size:11px;letter-spacing:3px;color:var(--mag-emerald);font-weight:900;text-transform:uppercase;margin-bottom:12px;}.mag-feature-info h2{font-size:29px;color:var(--mag-navy);margin-bottom:14px;}.mag-chair-badge{display:inline-block;background:var(--mag-gold);color:var(--mag-white);font-size:11px;letter-spacing:2px;font-weight:900;text-transform:uppercase;padding:6px 12px;}.mag-crew-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px 28px;}.mag-crew-card{min-height:214px;border:1px solid rgba(214,168,79,.42);border-radius:10px;background:rgba(255,255,255,.46);padding:18px 14px 14px;text-align:center;break-inside:avoid;page-break-inside:avoid;}.mag-crew-photo{width:92px;height:92px;border-radius:50%;border:1px solid rgba(214,168,79,.8);background:var(--mag-mist);overflow:hidden;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;}.mag-crew-photo img,.mag-feature-photo img{width:100%;height:100%;object-fit:contain;display:block;}.mag-silhouette{width:64%;height:74%;border-radius:46% 46% 8% 8%;background:linear-gradient(180deg,#aeb7c1,#909aa5);position:relative;}.mag-silhouette::before{content:'';position:absolute;left:50%;top:-22%;width:52%;aspect-ratio:1;border-radius:50%;background:#aeb7c1;transform:translateX(-50%);}.mag-crew-card h3{font-size:16px;color:var(--mag-navy);margin-bottom:8px;}.mag-crew-role{display:inline-block;background:var(--mag-gold);color:var(--mag-white);font-size:9px;letter-spacing:.8px;padding:4px 8px;max-width:100%;overflow-wrap:anywhere;}.mag-crew-rule{height:1px;background:var(--mag-emerald);width:70%;margin:0 auto 12px;position:relative;}.mag-crew-rule::after{content:'';position:absolute;left:50%;top:-3px;width:7px;height:7px;background:var(--mag-emerald);transform:translateX(-50%) rotate(45deg);}
+</style>`;
+function magOpeningCss(){return LEGACY_HORIZON_MAG_CSS;}
+function magNumberForIndex(idx){return String(Math.max(1,(parseInt(idx)||0)-1)).padStart(2,'0');}
+function magFooterHtml(schoolName,pageNum){return `<div class="mag-footer-fixed"><span>${esc((schoolName||'WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO').toUpperCase())}</span><span>${esc(pageNum)}</span></div>`;}
+function magTitleCaseSchoolName(name){return String(name||'Way To Success Standard Schools, Ejigbo').replace(/\s+/g,' ').trim();}
+function magApprovedMagazineTitle(s){const title=String(s?.magTitle||'').trim();return (!title||/^the torch$/i.test(title))?'Maiden Magazine':title;}
+function magSchoolNameWithLocation(s){const base=s.schoolName||'Way To Success Standard Schools';const loc=s.location||s.schoolLocation||'Ejigbo';return /ejigbo/i.test(base)?base:(base+', '+loc);}
+function magTextOrPlaceholder(value,placeholder){const v=String(value||'').trim();return v||placeholder;}
+function magPlainLines(text,fallbackLines){const v=String(text||'').trim();if(v)return `<div class="mag-line-text">${esc(v)}</div>`;return `<div class="mag-placeholder-lines" style="min-height:${fallbackLines||118}px;"></div>`;}
+function magFindProductionImages(page){
+  const images=[];
+  (Array.isArray(page?.manualBlocks)?page.manualBlocks:[]).forEach(b=>{if(b&&b.type==='image'&&!b.hidden&&b.src)images.push(b.src);});
+  loadAll().filter(x=>['gallery','events'].includes(x.category)).forEach(sub=>{
+    if(sub.photoData)images.push(sub.photoData);
+    (Array.isArray(sub.photos)?sub.photos:[]).forEach(p=>{const src=typeof wsPhotoSrc==='function'?wsPhotoSrc(p):(p?.data||p?.src||'');if(src)images.push(src);});
+  });
+  return images.filter(Boolean);
+}
+function magCoverFrame(label,cls,src){return `<div class="mag-cover-photo ${cls||''}">${src?`<img src="${esc(src)}" alt="${esc(label)}"/>`:`<div>IMAGE<br/>${esc(label)}</div>`}<span class="caption">${esc(label)}</span></div>`;}
+function renderOpeningCoverPage(ctx){
+  const s=ctx.s,imgs=magFindProductionImages(ctx.page),school=magSchoolNameWithLocation(s).toUpperCase(),year=String(s.issueYear||s.year||'2026').match(/\d{4}/)?.[0]||'2026';
+  const theme=magTextOrPlaceholder(s.theme,PRODUCTION_MAGAZINE_THEME||'The Making of Tomorrow: From Humble Beginnings to Limitless Horizons');
+  const parts=theme.split(':');const themeTop=(parts[0]||theme).trim()+':';const themeRest=(parts.slice(1).join(':')||'From Humble Beginnings to Limitless Horizons').trim();
+  return `${magOpeningCss()}<div class="mag-opening-page mag-cover-page" style="min-height:${ctx.h||1123}px;height:${ctx.h||1123}px;"><div class="mag-cover-border"></div><div class="mag-edition-ribbon"><strong>${esc(year)}</strong><span>EDITION</span></div><div class="mag-cover-grid">
+    <div class="mag-cover-top"><div class="mag-school-mark">WT</div><div class="mag-cover-school"><h2>${esc(school)}</h2><p>Excellence &bull; Character &bull; Purpose</p></div></div>
+    <div class="mag-cover-title"><h1>${esc(magApprovedMagazineTitle(s)).replace(/\s+/g,'<br/>')}</h1><div class="rule"></div></div>
+    <div class="mag-cover-theme"><span class="label">Theme:</span><h3>${esc(themeTop)}<br/><em>${esc(themeRest)}</em></h3><p>Our journey. Our legacy. Our future.</p></div>
+    <div class="mag-cover-photos">${magCoverFrame('Our School','hero',imgs[0])}${magCoverFrame('School Events','event',imgs[1])}${magCoverFrame('Classroom Moment','small-one',imgs[2])}${magCoverFrame('Student Life','small-two',imgs[3])}</div>
+    <div class="mag-cover-horizon"><div class="path"></div><div class="mag-values"><div class="mag-value"><b>A</b><span>Academic<br/>Excellence</span></div><div class="mag-value"><b>C</b><span>Character<br/>and Discipline</span></div><div class="mag-value"><b>S</b><span>Service<br/>to Others</span></div><div class="mag-value"><b>I</b><span>Innovation<br/>for the Future</span></div></div></div>
+  </div></div>`;
+}
+function magSchoolIdentityData(s){const id=s.schoolIdentity||{};return {logo:id.logo||s.logo||'',schoolName:magTitleCaseSchoolName(id.schoolName||magSchoolNameWithLocation(s)),location:id.location||s.location||'Ejigbo',established:id.establishedYear||s.establishedYear||'{established_year}',motto:id.motto||s.motto||'{school_motto}',anthemTitle:id.anthemTitle||'{school_anthem_title}',anthemText:id.anthemText||'',missionTitle:id.missionTitle||'{mission_title}',missionText:id.missionText||'',visionTitle:id.visionTitle||'{vision_title}',visionText:id.visionText||'',objectivesTitle:id.objectivesTitle||'{objectives_title}',objectives:Array.isArray(id.objectives)?id.objectives:[],photo:id.photo||s.optionalSchoolPhoto||''};}
+function renderInsideCoverPage(ctx){
+  const d=magSchoolIdentityData(ctx.s);const school=(d.schoolName||'{school_name}').replace(/,\s*Ejigbo$/i,'');
+  const objectives=d.objectives.length?d.objectives:['','','','',''];
+  return `${magOpeningCss()}<div class="mag-opening-page mag-horizon-page" style="min-height:${ctx.h||1123}px;height:${ctx.h||1123}px;"><div class="mag-horizon-curve-top"></div><div class="mag-horizon-curve-bottom"></div><div class="mag-watermark">W</div><div class="mag-page-shell">
+    <header class="mag-inside-head"><div class="mag-inside-logo">${d.logo?`<img src="${esc(d.logo)}" alt="School logo"/>`:'{school_logo}'}</div><h1>${esc(school||'{school_name}')}</h1><div class="mag-gold-rule"></div><div class="mag-inside-location">${esc(d.location||'{school_location}')}</div><div class="mag-inside-meta">EST. ${esc(d.established)} &nbsp;&nbsp; &bull; &nbsp;&nbsp; ${esc(d.motto)} &nbsp;&nbsp; &bull;</div></header>
+    <main class="mag-inside-body"><section><h2 class="mag-ant-title">${esc(d.anthemTitle)}</h2>${magPlainLines(d.anthemText,324)}</section><section><div class="mag-inside-section"><h3><span class="round">M</span>${esc(d.missionTitle)}</h3>${magPlainLines(d.missionText,96)}</div><div class="mag-inside-section"><h3><span class="round">V</span>${esc(d.visionTitle)}</h3>${magPlainLines(d.visionText,82)}</div><div class="mag-inside-section"><h3><span class="round">O</span>${esc(d.objectivesTitle)}</h3>${objectives.slice(0,5).map((o,i)=>`<div class="mag-objective"><b>${i+1}</b>${o?`<span>${esc(o)}</span>`:'<div class="mag-placeholder-lines" style="min-height:16px;"></div>'}</div>`).join('')}</div></section></main>
+    ${d.photo?`<div class="mag-optional-photo"><img src="${esc(d.photo)}" alt="School photo"/></div>`:'<div class="mag-optional-photo">{optional_school_photo}</div>'}
+  </div></div>`;
+}
+function buildOpeningContentsSections(){return [
+  {number:'01',title:'Opening Pages',items:['School Identity','Editorial Crew','Editorial Chairman\'s Note']},
+  {number:'02',title:'Leadership & Staff',items:['Management Address','Staff Profiles','Editor Board / Crew']},
+  {number:'03',title:'Graduating Stars',items:['Primary 5 Graduates','JSS3 Graduates','SS3 Graduates']},
+  {number:'04',title:'Voices & Reflections',items:['Speeches','Interviews','Academic Articles','Creative Writings']},
+  {number:'05',title:'Memories & Moments',items:['School Events','Photo Gallery']},
+  {number:'06',title:'Partners & Appreciation',items:['Advertisements','Appreciation','Back Cover']}
+];}
+function renderContentsPage(ctx){
+  const sections=(ctx.page.contentsSections&&Array.isArray(ctx.page.contentsSections))?ctx.page.contentsSections:buildOpeningContentsSections();const theme=ctx.s.theme||PRODUCTION_MAGAZINE_THEME||'';const pageNum=magNumberForIndex(ctx.index);
+  return `${magOpeningCss()}<div class="mag-opening-page mag-horizon-page" style="min-height:${ctx.h||1123}px;height:${ctx.h||1123}px;"><div class="mag-horizon-curve-top"></div><div class="mag-horizon-curve-bottom"></div><div class="mag-watermark">W</div><div class="mag-page-shell"><header class="mag-contents-head"><div class="mag-kicker">CONTENTS</div><h1>Inside This Edition</h1><div class="mag-gold-rule"></div><div class="mag-theme-line">${esc((theme.split(':')[0]||'The Making of Tomorrow').replace(/\.$/,''))}:</div><div class="mag-theme-sub">${esc((theme.split(':').slice(1).join(':')||'From Humble Beginnings to Limitless Horizons').trim())}</div></header><main class="mag-contents-grid">${sections.map(sec=>`<section class="mag-content-section"><div class="mag-content-num">${esc(sec.number)}</div><div class="mag-content-items"><h3>${esc(sec.title)}</h3>${(sec.items||[]).map(item=>`<div class="mag-content-line"><span>${esc(item.title||item)}</span><span class="dots"></span><span class="pg">p. ${esc(item.page||item.pageNumber||'00')}</span></div>`).join('')}</div></section>`).join('')}</main><div class="mag-contents-quote"><b>&ldquo;</b><span>Every page tells our story.<br/>Every chapter builds our legacy.</span></div></div>${magFooterHtml(magSchoolNameWithLocation(ctx.s),pageNum)}</div>`;
+}
+function magCrewFromSubmissions(){
+  const crew=loadAll().filter(s=>s.category==='editor_board'&&(s.status==='approved'||s.status==='finalized'||s.status==='pending'));
+  const mapped=crew.map(sub=>{const data=sub.data||{};const get=(keys)=>{for(const k of keys){if(data[k]?.value)return data[k].value;}return '';};return {name:get(['name','memberName','contribName','submitterName','title'])||'Untitled',role:get(['role','title','contribRole','authorRole'])||'Editorial Crew',photo:sub.photoData||'',raw:sub};});
+  return mapped;
+}
+function magBoardData(){const fromSubs=magCrewFromSubmissions();let chief=fromSubs.find(m=>/editor.?in.?chief|chairman/i.test((m.role||'')+' '+(m.name||'')))||fromSubs[0]||null;let rest=fromSubs.filter(m=>m!==chief);if(!chief)chief={name:'{editor_in_chief_name}',role:'Editor-in-Chief',photo:''};while(rest.length<6)rest.push({name:'{crew_member_name}',role:'{crew_member_role}',photo:''});return {chief,crew:rest.slice(0,6)};}
+function magPhotoOrSilhouette(src,big){return src?`<img src="${esc(src)}" alt="Profile photo"/>`:`<div class="mag-silhouette"></div>`;}
+function renderEditorialBoardPage(ctx){const data=magBoardData();const pageNum=magNumberForIndex(ctx.index);return `${magOpeningCss()}<div class="mag-opening-page mag-horizon-page" style="min-height:${ctx.h||1123}px;height:${ctx.h||1123}px;"><div class="mag-horizon-curve-top"></div><div class="mag-horizon-curve-bottom"></div><div class="mag-watermark">W</div><div class="mag-page-shell"><header class="mag-board-head"><h1>The Editorial Board</h1><div class="mag-board-sub">Magazine Crew &amp; Production Team</div></header><section class="mag-feature-card"><div class="mag-feature-photo">${magPhotoOrSilhouette(data.chief.photo,true)}</div><div class="mag-feature-info"><div class="crown">&crown;</div><div class="role">Editor-in-Chief</div><h2>${esc(data.chief.name||'{editor_in_chief_name}')}</h2><span class="mag-chair-badge">Editorial Chairman</span></div></section><section class="mag-crew-grid">${data.crew.map(m=>`<article class="mag-crew-card"><div class="mag-crew-photo">${magPhotoOrSilhouette(m.photo,false)}</div><div class="mag-crew-rule"></div><h3>${esc(m.name||'{crew_member_name}')}</h3><span class="mag-crew-role">${esc(m.role||'{crew_member_role}')}</span></article>`).join('')}</section></div>${magFooterHtml(magSchoolNameWithLocation(ctx.s),pageNum)}</div>`;}
 function generateMagPreview(){
   subs=loadAll();magPages=[];currentPageIdx=0;
   wsSetDefaultTheme();
   const s=lsSettings;
   const approved=subs.filter(sub=>sub.status==='approved'||sub.status==='finalized');
+  const byKey=key=>sectionOrder.find(sec=>sec.key===key)||{};
+  magPages.push({type:'cover',sec:Object.assign({key:'cover',label:'Front Cover',layout:'cover'},byKey('cover'))});
+  magPages.push({type:'inside-cover',sec:{key:'inside-cover',label:'School Identity',layout:'inside-cover'}});
+  magPages.push({type:'toc',sec:Object.assign({key:'toc',label:'Contents',layout:'toc'},byKey('toc'))});
+  magPages.push({type:'editorial-board',sec:Object.assign({key:'editor_board',label:'Editorial Board',layout:'editor-board'},byKey('editor_board'))});
   sectionOrder.filter(sec=>sec.visible).forEach(sec=>{
-    if(sec.key==='cover'){magPages.push({type:'cover',sec});return;}
-    if(sec.key==='toc'){magPages.push({type:'toc',sec});return;}
+    if(['cover','toc','editor_board'].includes(sec.key))return;
     const catSubs=approved.filter(sub=>sub.category===sec.key);
     if(sec.key==='editorial-note'){const sub=approved.find(sub=>sub.category==='editorial-note');if(sub)magPages.push({type:'editorial-note',sub,sec});return;}
     if(sec.key==='appreciation'){const sub=approved.find(sub=>sub.category==='appreciation');if(sub)magPages.push({type:'appreciation',sub,sec});return;}
@@ -2732,7 +2829,6 @@ function generateMagPreview(){
   magPages=magPages.map((p,i)=>wsPageWithMeta(p,i)).filter(p=>!p.hidden);
   renderCurrentPage();renderTOC();updatePageNavUI();
 }
-
 function renderCurrentPage(){
   const canvas=document.getElementById('magCanvas');
   if(!magPages.length){canvas.innerHTML=`<div style="text-align:center;color:var(--ink3);padding:4rem 1rem;"><div style="font-size:48px;margin-bottom:1rem;">🗞</div><h3 style="font-family:'Lato',sans-serif;color:var(--ink2);">No approved content yet</h3><p style="font-size:14px;">Approve submissions and click Generate Preview again.</p></div>`;return;}
@@ -2743,7 +2839,7 @@ function renderCurrentPage(){
   const hFont=s.headingFont||"'Playfair Display',serif",bFont=s.bodyFont||"'Crimson Text',serif",bSize=s.fontSize||'11px';
   const magTitle=s.magTitle||'The Torch',schoolName=s.schoolName||'Way To Success Standard Schools',edition=s.edition||'1st Edition',year=s.year||'2025/2026',pageBg=s.pageBg||'#ffffff',textColor=s.textColor||'#1c1c1e';
   const magazineTheme=s.theme||PRODUCTION_MAGAZINE_THEME;
-  const foot=`<div style="border-top:1px solid #e8e8e0;padding:5px 2rem;display:flex;justify-content:space-between;align-items:center;background:#fafaf8;"><span style="font-size:8px;font-weight:700;color:${c1};letter-spacing:.5px;text-transform:uppercase;">${esc(schoolName)}</span><div style="width:18px;height:2px;background:${c2};border-radius:1px;"></div><span style="font-size:8px;color:#888;">${currentPageIdx+1}</span></div>`;
+  const foot=magFooterHtml(magSchoolNameWithLocation(s),magNumberForIndex(currentPageIdx));
   const productionText=(sub,key)=>wsTextValue(page,String(sub?.id)+'|'+key,sub?.data?.[key]?.value||'');
   function findCoverImage(){
     const manual=(Array.isArray(page.manualBlocks)?page.manualBlocks:[]).find(b=>b&&b.type==='image'&&!b.hidden&&['cover-hero','feature','background'].includes(b.placement||''));
@@ -2754,12 +2850,15 @@ function renderCurrentPage(){
   }
 
   let inner='';
+  const openingCtx={page,s,index:currentPageIdx,w,h};
   if(page.type==='cover'){
-    const coverImg=findCoverImage();
-    inner=`<div style="background:${c1};min-height:100%;height:auto;display:flex;flex-direction:column;text-align:center;position:relative;overflow:visible;color:#fff;">${coverImg?`<div style="height:48%;min-height:330px;background:#fff;"><img src="${esc(coverImg)}" alt="Cover image" style="width:100%;height:100%;object-fit:contain;object-position:center;background:#fff;display:block;"/></div>`:''}<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem 2.25rem 2.5rem;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:.85rem;">${esc(edition)} - ${esc(year)}</div><h1 style="font-family:${hFont};font-size:32px;color:#fff;margin-bottom:1rem;line-height:1.12;max-width:620px;">${esc(magazineTheme)}</h1><div style="width:60px;height:3px;background:${c2};border-radius:2px;margin:0 auto 1rem;"></div><p style="font-size:13px;color:${c2};font-weight:800;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:.45rem;">${esc(magTitle)}</p><p style="font-size:12px;color:rgba(255,255,255,.82);">${esc(schoolName)}</p></div><div style="height:8px;background:linear-gradient(90deg,${c2},${c3});"></div></div>`;  } else if(page.type==='toc'){
-    const tocItems=buildTOCItems();
-    inner=`<div style="background:${pageBg};height:100%;padding:2rem;display:flex;flex-direction:column;"><h2 style="font-family:${hFont};font-size:24px;color:${c1};margin-bottom:4px;">Contents</h2><div style="height:3px;background:linear-gradient(90deg,${c2},transparent);margin-bottom:1.5rem;border-radius:2px;"></div><div style="flex:1;">${tocItems.map(item=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed #e8e8e0;"><span style="font-size:11px;font-weight:700;color:${c2};width:20px;">${item.num}</span><span style="font-size:12px;color:${textColor};flex:1;font-family:${bFont};">${esc(item.name)}</span><span style="flex:1;border-bottom:1px dotted #ccc;height:12px;margin:0 4px;"></span><span style="font-size:11px;color:#888;font-weight:700;">p. ${item.page}</span></div>`).join('')}</div>${s.pageNums!=='no'?foot:''}</div>`;
-  } else if(page.type==='editorial-note'||page.type==='appreciation'){
+    inner=renderOpeningCoverPage(openingCtx);
+  } else if(page.type==='inside-cover'){
+    inner=renderInsideCoverPage(openingCtx);
+  } else if(page.type==='toc'){
+    inner=renderContentsPage(openingCtx);
+  } else if(page.type==='editorial-board'){
+    inner=renderEditorialBoardPage(openingCtx);  } else if(page.type==='editorial-note'||page.type==='appreciation'){
     const sub=page.sub;const title=productionText(sub,'title')||sub.data.title?.value||magazineTheme||page.sec.label;const body=productionText(sub,'body')||'';
     inner=`<div class="mag-page-flow" style="background:${pageBg};min-height:100%;height:auto;display:flex;flex-direction:column;"><div class="mag-heading-block" style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.5rem 2rem;min-height:100px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:6px;">${esc(page.sec.label)}</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(title)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div><div class="mag-flow-content" style="padding:1.5rem 2rem;flex:1;overflow:visible;height:auto;max-height:none;"><p style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;">${esc(body)}</p></div>${s.pageNums!=='no'?foot:''}</div>`;
   } else if(page.type==='section-content'){
@@ -3977,9 +4076,14 @@ function wsGeneratePreview(){
   const finalized=subs.filter(sub=>sub.status==='approved'||sub.status==='finalized'||sub.status==='pending');
   document.getElementById('wsStatusFinalized').textContent=finalized.filter(x=>x.status==='approved'||x.status==='finalized').length+' approved | '+finalized.filter(x=>x.status==='pending').length+' pending';
 
+  const byKey=key=>sectionOrder.find(sec=>sec.key===key)||{};
+  wsPages.push({type:'cover',sec:Object.assign({key:'cover',label:'Front Cover',layout:'cover'},byKey('cover')),label:'Front Cover'});
+  wsPages.push({type:'inside-cover',sec:{key:'inside-cover',label:'School Identity',layout:'inside-cover'},label:'School Identity'});
+  wsPages.push({type:'toc',sec:Object.assign({key:'toc',label:'Contents',layout:'toc'},byKey('toc')),label:'Contents'});
+  wsPages.push({type:'editorial-board',sec:Object.assign({key:'editor_board',label:'Editorial Board',layout:'editor-board'},byKey('editor_board')),label:'Editorial Board'});
+
   sectionOrder.filter(sec=>sec.visible).forEach(sec=>{
-    if(sec.key==='cover'){wsPages.push({type:'cover',sec,label:'Cover Page'});return;}
-    if(sec.key==='toc'){wsPages.push({type:'toc',sec,label:'Table of Contents'});return;}
+    if(['cover','toc','editor_board'].includes(sec.key))return;
     const catSubs=finalized.filter(sub=>sub.category===sec.key);
     if(sec.key==='editorial-note'){const sub=finalized.find(sub=>sub.category==='editorial-note');if(sub)wsPages.push({type:'editorial-note',sub,sec,label:'Editorial Note'});return;}
     if(sec.key==='appreciation'){const sub=finalized.find(sub=>sub.category==='appreciation');if(sub)wsPages.push({type:'appreciation',sub,sec,label:'Appreciation'});return;}
@@ -4004,8 +4108,7 @@ function wsGeneratePreview(){
   wsRunPreflight(false);
   document.getElementById('wsStatusPages').textContent=wsPages.length+' pages';
 }
-
-/* ── Page List (Left Sidebar) ── */
+/* -- Page List (Left Sidebar) ── */
 function wsRenderPageList(){
   const c=document.getElementById('wsPageList');if(!c)return;
   if(!wsPages.length){c.innerHTML='<div style="font-size:11px;color:var(--ws-text3);text-align:center;padding:16px;">No finalized content yet.<br>Finalize submissions from the admin panel.</div>';return;}
