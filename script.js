@@ -2726,7 +2726,7 @@ const LEGACY_HORIZON_MAG_CSS=`
 .mag-horizon-page::after{content:'';position:absolute;right:0;bottom:0;width:330px;height:330px;background:var(--mag-gold);clip-path:polygon(100% 0,100% 100%,0 100%);opacity:.92;z-index:0;}
 .mag-horizon-curve-top,.mag-horizon-curve-bottom{position:absolute;border-radius:50%;pointer-events:none;z-index:0;}
 .mag-horizon-curve-top{left:-120px;top:-104px;width:440px;height:440px;border:10px solid var(--mag-emerald);border-right-color:transparent;border-bottom-color:transparent;box-shadow:0 0 0 2px rgba(214,168,79,.65);}
-.mag-horizon-curve-bottom{right:-118px;bottom:-102px;width:430px;height:430px;border:10px solid var(--mag-emerald);border-left-color:transparent;border-top-color:transparent;box-shadow:0 0 0 2px rgba(214,168,79,.65);}
+.mag-horizon-curve-bottom{display:none;}
 .mag-watermark{position:absolute;inset:210px 70px auto;min-height:520px;opacity:.035;font-family:'Playfair Display',serif;font-size:430px;line-height:.8;color:var(--mag-navy);text-align:center;pointer-events:none;z-index:0;}
 .mag-footer-fixed{position:absolute;left:40px;right:40px;bottom:20px;height:34px;border-top:2px solid var(--mag-emerald);display:flex;align-items:flex-end;justify-content:space-between;background:transparent;z-index:5;}
 .mag-footer-fixed span:first-child{font-size:8px;font-weight:800;letter-spacing:5px;text-transform:uppercase;color:var(--mag-charcoal);white-space:nowrap;}
@@ -2840,8 +2840,8 @@ function magBoardData(){const fromSubs=magCrewFromSubmissions();let chief=fromSu
 function magPhotoOrSilhouette(src,big){return src?`<img src="${esc(src)}" alt="Profile photo"/>`:`<div class="mag-silhouette"></div>`;}
 function renderEditorialBoardPage(ctx){const data=magBoardData();const pageNum=magNumberForIndex(ctx.index);return `${magOpeningCss()}<div class="mag-opening-page mag-horizon-page" style="min-height:${ctx.h||1123}px;height:${ctx.h||1123}px;"><div class="mag-horizon-curve-top"></div><div class="mag-horizon-curve-bottom"></div><div class="mag-watermark">W</div><div class="mag-page-shell"><header class="mag-board-head"><h1>The Editorial Board</h1><div class="mag-board-sub">Magazine Crew &amp; Production Team</div></header><section class="mag-feature-card"><div class="mag-feature-photo">${magPhotoOrSilhouette(data.chief.photo,true)}</div><div class="mag-feature-info"><div class="crown">&crown;</div><div class="role">Editor-in-Chief</div><h2>${esc(data.chief.name||'{editor_in_chief_name}')}</h2><span class="mag-chair-badge">Editorial Chairman</span></div></section><section class="mag-crew-grid">${data.crew.map(m=>`<article class="mag-crew-card"><div class="mag-crew-photo">${magPhotoOrSilhouette(m.photo,false)}</div><div class="mag-crew-rule"></div><h3>${esc(m.name||'{crew_member_name}')}</h3><span class="mag-crew-role">${esc(m.role||'{crew_member_role}')}</span></article>`).join('')}</section></div>${magFooterHtml(magSchoolNameWithLocation(ctx.s),pageNum)}</div>`;}
 function magSubVal(sub,keys){const d=sub?.data||{};for(const k of keys){const v=d[k]?.value;if(v)return String(v).trim();}return '';}
-function magSubHay(sub){return [sub?.category,magSubVal(sub,['speechType','speechTitle','speakerTitle','speakerName','articleTitle','subjectArea','title','authorRole','body'])].join(' ').toLowerCase();}
-function magIsEicAddressSub(sub){const h=magSubHay(sub);return (sub?.category==='editorial-note'||sub?.category==='speeches')&&(/editor.?in.?chief|editorial chairman/.test(h));}
+function magSubHay(sub){return [sub?.category,magSubVal(sub,['speechType','speechTitle','speakerTitle','speakerName','articleTitle','subjectArea','title','authorRole','name','message','quote','bio','body'])].join(' ').toLowerCase();}
+function magIsEicAddressSub(sub){const h=magSubHay(sub);return sub?.category!=='editor_board'&&(/editor.?in.?chief|editorial chairman/.test(h));}
 function magOpeningSpeechKind(sub){const h=magSubHay(sub);if(/proprietor/.test(h))return 'proprietor';if(/senior boy|head boy/.test(h))return 'senior-boy';if(/senior girl|head girl/.test(h))return 'senior-girl';return '';}
 function magIsHistorySub(sub){const h=magSubHay(sub);return /brief history|history of the school|school history/.test(h);}
 function magIsOpeningFeatureSub(sub){return magIsEicAddressSub(sub)||magOpeningSpeechKind(sub)||magIsHistorySub(sub);}
@@ -2920,7 +2920,7 @@ function renderCurrentPage(){
     inner=renderReferenceOpeningPage(openingCtx,page.type);
   } else if(page.type==='editorial-note'||page.type==='appreciation'){
     const sub=page.sub;const title=productionText(sub,'title')||sub.data.title?.value||magazineTheme||page.sec.label;const body=productionText(sub,'body')||'';
-    inner=`<div class="mag-page-flow" style="background:${pageBg};min-height:100%;height:auto;display:flex;flex-direction:column;"><div class="mag-heading-block" style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.5rem 2rem;min-height:100px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:6px;">${esc(page.sec.label)}</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(title)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div><div class="mag-flow-content" style="padding:1.5rem 2rem;flex:1;overflow:visible;height:auto;max-height:none;"><p style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;">${esc(body)}</p></div>${s.pageNums!=='no'?foot:''}</div>`;
+    inner=`<div class="mag-page-flow" style="background:${pageBg};min-height:100%;height:100%;display:flex;flex-direction:column;position:relative;overflow:hidden;padding-bottom:74px;"><div class="mag-heading-block" style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.5rem 2rem;min-height:100px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:6px;">${esc(page.sec.label)}</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(title)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div><div class="mag-flow-content" style="padding:1.5rem 2rem;flex:1;overflow:visible;height:auto;max-height:none;"><p style="font-family:${bFont};font-size:${bSize};color:${textColor};line-height:1.8;white-space:pre-line;">${esc(body)}</p></div></div>`;
   } else if(page.type==='section-content'){
     const sec=page.sec;const items=page.items;const layout=sec.layout;const secLabel=getLabel('section_'+sec.key,sec.label);
     let contentHtml='';
@@ -3354,9 +3354,11 @@ function renderCurrentPage(){
     }
 
     contentHtml=renderManualBlocks(page.manualBlocks,'inline')+contentHtml+renderManualBlocks(page.manualBlocks,'after-text')+renderManualBlocks(page.manualBlocks,'side')+renderManualBlocks(page.manualBlocks,'full-width')+renderManualBlocks(page.manualBlocks,'gallery');
-    inner=`<div class="mag-page-flow" style="background:${pageBg};min-height:100%;height:auto;display:flex;flex-direction:column;position:relative;overflow:visible;">${renderManualBlocks(page.manualBlocks,'background')}${renderManualBlocks(page.manualBlocks,'feature')}${page.isFirst?`<div class="mag-heading-block" style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.25rem 2rem;min-height:90px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:5px;">${esc(magazineTheme)}</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(secLabel)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div>`:`<div class="mag-heading-block" style="background:${c1};padding:6px 2rem;position:relative;"><span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:${c2};font-weight:700;">${esc(secLabel)} (continued)</span></div>`}${renderManualBlocks(page.manualBlocks,'after-heading')}<div class="mag-flow-content" style="padding:1rem 1.5rem;flex:1;overflow:visible;height:auto;max-height:none;position:relative;z-index:1;">${contentHtml}</div>${s.pageNums!=='no'?foot:''}</div>`;
+    inner=`<div class="mag-page-flow" style="background:${pageBg};min-height:100%;height:100%;display:flex;flex-direction:column;position:relative;overflow:hidden;padding-bottom:74px;">${renderManualBlocks(page.manualBlocks,'background')}${renderManualBlocks(page.manualBlocks,'feature')}${page.isFirst?`<div class="mag-heading-block" style="background:linear-gradient(135deg,${c1},${c1}dd);color:#fff;padding:1.25rem 2rem;min-height:90px;position:relative;"><div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:${c2};font-weight:700;margin-bottom:5px;">${esc(magazineTheme)}</div><h2 style="font-family:${hFont};font-size:20px;color:#fff;">${esc(secLabel)}</h2><div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:${c2};"></div></div>`:`<div class="mag-heading-block" style="background:${c1};padding:6px 2rem;position:relative;"><span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:${c2};font-weight:700;">${esc(secLabel)} (continued)</span></div>`}${renderManualBlocks(page.manualBlocks,'after-heading')}<div class="mag-flow-content" style="padding:1rem 1.5rem;flex:1;overflow:visible;height:auto;max-height:none;position:relative;z-index:1;">${contentHtml}</div></div>`;
   }
-  canvas.innerHTML=`<div class="mag-page" data-category="${esc(page.sec?.key || page.type)}" style="width:${w}px;height:${h}px;transform:scale(${scale});transform-origin:top center;"><div class="mag-page-inner">${inner}</div></div>`;
+  const ownFooter=/mag-opening-page/.test(inner);
+  const shellFooter=(!ownFooter&&s.pageNums!=='no')?foot:'';
+  canvas.innerHTML=`<div class="mag-page" data-category="${esc(page.sec?.key || page.type)}" style="width:${w}px;height:${h}px;transform:scale(${scale});transform-origin:top center;"><div class="mag-page-inner" style="position:relative;width:100%;height:${h}px;min-height:${h}px;overflow:hidden;">${inner}${shellFooter}</div></div>`;
   document.getElementById('previewPageTitle').textContent=`Page ${currentPageIdx+1} — ${page.sec?.label||page.type}`;
 }
 
@@ -3430,10 +3432,11 @@ function openPrintView(){
       box-shadow:0 4px 24px rgba(0,0,0,.35);overflow:visible;
       background:#fff;position:relative;
     }
-    .mag-page{width:${w}px!important;min-height:${h}px!important;height:auto!important;overflow:visible!important;break-after:page;page-break-after:always;}
+    .mag-page{width:${w}px!important;min-height:${h}px!important;height:${h}px!important;overflow:hidden!important;break-after:page;page-break-after:always;position:relative!important;}
     .mag-page:last-child{break-after:auto;page-break-after:auto;}
-    .mag-page-inner{width:100%;min-height:${h}px;height:auto!important;overflow:visible!important;}
-    .mag-page-flow,.mag-flow-content{height:auto!important;max-height:none!important;overflow:visible!important;}
+    .mag-page-inner{width:100%;min-height:${h}px;height:${h}px!important;overflow:hidden!important;position:relative!important;}
+    .mag-page-flow{height:100%!important;min-height:100%!important;max-height:${h}px!important;overflow:hidden!important;}
+    .mag-flow-content{height:auto!important;max-height:none!important;overflow:visible!important;}
     .mag-opening-page{width:100%!important;min-height:${h}px!important;height:${h}px!important;overflow:visible!important;}
     .mag-cover-page{overflow:hidden!important;}
     .mag-opening-page .mag-page-shell{min-height:100%!important;}
@@ -3441,7 +3444,9 @@ function openPrintView(){
     .mag-cover-photo img{width:100%!important;height:100%!important;object-fit:contain!important;object-position:center center!important;}
     .mag-crew-photo img,.mag-feature-photo img{width:100%!important;height:100%!important;object-fit:cover!important;object-position:center top!important;}
     .mag-flow-content{break-inside:auto;page-break-inside:auto;}
-    .mag-sheet,.mag-page,.mag-page-inner,.mag-page-flow,.mag-flow-content{max-height:none!important;}
+    .mag-sheet,.mag-page,.mag-page-inner{max-height:${h}px!important;}
+    .mag-page-flow{max-height:${h}px!important;}
+    .mag-flow-content{max-height:none!important;}
     .mag-heading-block,h1,h2,h3{break-after:avoid;page-break-after:avoid;}
     .mag-item,.mag-item-gallery,.mag-item-event,.mag-item-teacher,.mag-item-student,.mag-image-frame,figure{break-inside:avoid;page-break-inside:avoid;}
     figcaption{break-before:avoid;page-break-before:avoid;}
@@ -4089,7 +4094,8 @@ function wsGetProfileControls(page,meta){const prod=wsEnsureProduction();const k
 function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));const meta=Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,hidden:false,itemOrder:null,removedItemIds:[],addedItemIds:[],manualBlocks:[],textLimit:null,textEdits:{},imageEdits:{},selectedImageKey:'',namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});meta.production_edits=wsProductionEditShape(meta);return meta;}
 function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);const meta=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{},{updatedAt:new Date().toISOString()});meta.production_edits=wsProductionEditShape(meta);prod.pages[key]=meta;saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
 function wsApplyItemOrder(items,order){if(!Array.isArray(items)||!Array.isArray(order)||!order.length)return items;const rank=new Map(order.map((id,i)=>[String(id),i]));return items.slice().sort((a,b)=>{const ar=rank.has(String(a.id))?rank.get(String(a.id)):9999;const br=rank.has(String(b.id))?rank.get(String(b.id)):9999;return ar-br;});}
-function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,hidden:!!meta.hidden,manualBlocks:Array.isArray(meta.manualBlocks)?meta.manualBlocks:[],textLimit:meta.textLimit,textEdits:meta.textEdits||{},imageEdits:meta.imageEdits||{},namePlacement:meta.namePlacement,profileControls});if(copy.items){const removed=new Set((meta.removedItemIds||[]).map(String));const added=(meta.addedItemIds||[]).map(id=>loadAll().find(s=>String(s.id)===String(id))).filter(Boolean);const seen=new Set();copy.items=copy.items.concat(added).filter(x=>x&&!removed.has(String(x.id))).filter(x=>{const id=String(x.id);if(seen.has(id))return false;seen.add(id);return true;});copy.items=wsApplyItemOrder(copy.items,meta.itemOrder);}if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
+function magPageAllowsSub(page,sub){if(!sub||magIsOpeningFeatureSub(sub))return false;const key=page?.sec?.key;if(['primary5','jss3','ss3','teachers'].includes(key))return sub.category===key;return true;}
+function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,hidden:!!meta.hidden,manualBlocks:Array.isArray(meta.manualBlocks)?meta.manualBlocks:[],textLimit:meta.textLimit,textEdits:meta.textEdits||{},imageEdits:meta.imageEdits||{},namePlacement:meta.namePlacement,profileControls});if(copy.items){const removed=new Set((meta.removedItemIds||[]).map(String));const added=(meta.addedItemIds||[]).map(id=>loadAll().find(s=>String(s.id)===String(id))).filter(sub=>magPageAllowsSub(copy,sub));const seen=new Set();copy.items=copy.items.concat(added).filter(x=>x&&!removed.has(String(x.id))&&magPageAllowsSub(copy,x)).filter(x=>{const id=String(x.id);if(seen.has(id))return false;seen.add(id);return true;});copy.items=wsApplyItemOrder(copy.items,meta.itemOrder);}if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
 function wsCurrentMeta(){return wsGetPageMeta(wsPages[wsPageIdx],wsPageIdx);}
 function wsTextEditRecord(page,id){
   const raw=page?.textEdits?.[id];
@@ -4279,9 +4285,10 @@ function wsRenderCurrentPage(){
       transform:scale(${scale});transform-origin:top center;
       margin-bottom:${Math.round(h * scale - h + 24)}px;
     }
-    .mag-page{width:${w}px!important;min-height:${h}px!important;height:auto!important;overflow:visible!important;}
-    .mag-page-inner{width:100%;min-height:${h}px;height:auto!important;overflow:visible!important;}
-    .mag-page-flow,.mag-flow-content{height:auto!important;max-height:none!important;overflow:visible!important;}
+    .mag-page{width:${w}px!important;min-height:${h}px!important;height:${h}px!important;overflow:hidden!important;position:relative!important;}
+    .mag-page-inner{width:100%;min-height:${h}px;height:${h}px!important;overflow:hidden!important;position:relative!important;}
+    .mag-page-flow{height:100%!important;min-height:100%!important;max-height:${h}px!important;overflow:hidden!important;}
+    .mag-flow-content{height:auto!important;max-height:none!important;overflow:visible!important;}
     .mag-opening-page{width:100%!important;min-height:${h}px!important;height:${h}px!important;overflow:visible!important;}
     .mag-cover-page{overflow:hidden!important;}
     .mag-opening-page .mag-page-shell{min-height:100%!important;}
