@@ -1,6 +1,6 @@
 /* Locked digital reconstruction for Inside Cover / School Identity.
    Source of truth: approved Legacy Horizon inside-cover reference.
-   This keeps the page as live HTML/CSS while matching the fixed A4 design. */
+   This file keeps the page as live HTML/CSS while matching the fixed A4 design. */
 
 .mp-page--inside-cover.mp-page--inside-cover-locked{
   background:#fffaf2;
@@ -12,7 +12,7 @@
   z-index:1;
 }
 
-/* The Inside Cover draws its own footer to prevent site footer overlay. */
+/* The Inside Cover draws its own footer to prevent site-footer overlay. */
 .mp-page--inside-cover.mp-page--inside-cover-locked .mp-page__footer{
   display:none !important;
 }
@@ -26,12 +26,12 @@
   z-index:0;
 }
 
-/* Top-left horizon bands: kept outside the title area. */
+/* top-left horizon bands: tightened to stay like the reference corner sweep */
 .mp-page--inside-cover.mp-page--inside-cover-locked::before{
-  width:186mm;
-  height:186mm;
-  left:-131mm;
-  top:-104mm;
+  width:174mm;
+  height:174mm;
+  left:-112mm;
+  top:-91mm;
   border:1.05mm solid var(--mp-gold);
   box-shadow:
     3.0mm 2.7mm 0 -1.10mm var(--mp-emerald),
@@ -39,12 +39,12 @@
     7.2mm 6.9mm 0 -2.75mm var(--mp-emerald);
 }
 
-/* Bottom-right horizon bands: moved to the corner so it does not cross body text. */
+/* bottom-right horizon bands: reference-style edge curve without crossing content */
 .mp-page--inside-cover.mp-page--inside-cover-locked::after{
-  width:198mm;
-  height:198mm;
-  right:-145mm;
-  bottom:-118mm;
+  width:186mm;
+  height:186mm;
+  right:-126mm;
+  bottom:-108mm;
   border:1.05mm solid var(--mp-gold);
   box-shadow:
     -3.0mm -2.8mm 0 -1.10mm var(--mp-emerald),
@@ -57,8 +57,8 @@
   inset:0;
   overflow:hidden;
   background:
-    radial-gradient(circle at 50% 56%, rgba(214,168,79,.08) 0 20mm, transparent 70mm),
-    radial-gradient(circle at 50% 49%, rgba(11,31,58,.032) 0 44mm, transparent 78mm),
+    radial-gradient(circle at 50% 54%, rgba(214,168,79,.072) 0 20mm, transparent 70mm),
+    radial-gradient(circle at 50% 49%, rgba(11,31,58,.030) 0 44mm, transparent 78mm),
     linear-gradient(180deg,#fffdf8 0%,#fbf4e6 58%,#fffaf4 100%);
   color:var(--mp-charcoal);
 }
@@ -71,12 +71,12 @@
   z-index:0;
 }
 
-/* soft legacy watermark */
+/* subtle legacy watermark */
 .mp-inside-cover-exact::before{
   left:22mm;
   right:22mm;
-  top:62mm;
-  bottom:38mm;
+  top:61mm;
+  bottom:39mm;
   opacity:.10;
   background:
     radial-gradient(ellipse at 20% 50%, transparent 0 21mm, rgba(214,168,79,.20) 21.3mm 21.8mm, transparent 22mm),
@@ -85,12 +85,12 @@
   border-radius:50%;
 }
 
-/* bottom gold sweep */
+/* bottom-right gold corner field */
 .mp-inside-cover-exact::after{
   right:-1mm;
   bottom:-3mm;
-  width:58mm;
-  height:46mm;
+  width:57mm;
+  height:43mm;
   background:linear-gradient(135deg, transparent 0 49%, rgba(214,168,79,.94) 49.4% 100%);
   opacity:.98;
 }
@@ -102,9 +102,9 @@
 
 .mp-inside-logo-exact{
   left:50%;
-  top:10mm;
-  width:31.5mm;
-  height:31.5mm;
+  top:9.2mm;
+  width:33.2mm;
+  height:33.2mm;
   transform:translateX(-50%);
   display:grid;
   place-items:center;
@@ -134,75 +134,79 @@
 }
 
 .mp-inside-top-diamond,
-.mp-inside-est-diamond,
 .mp-inside-footer-diamond{
-  width:3.2mm;
-  height:3.2mm;
+  width:3.15mm;
+  height:3.15mm;
   transform:rotate(45deg);
   background:var(--mp-gold);
 }
 
 .mp-inside-top-diamond{
-  left:calc(50% - 1.6mm);
-  top:45.6mm;
+  left:calc(50% - 1.575mm);
+  top:46mm;
 }
 
 .mp-inside-school-title{
-  left:20mm;
-  right:20mm;
-  top:56.5mm;
+  left:19mm;
+  right:19mm;
+  top:56.2mm;
   margin:0;
   color:var(--mp-midnight);
   font-family:var(--mp-heading);
-  font-size:27.4pt;
-  line-height:1.06;
+  font-size:30.2pt;
+  line-height:1.04;
   font-weight:800;
-  letter-spacing:.018em;
+  letter-spacing:.016em;
   text-align:center;
   text-transform:uppercase;
 }
 
 .mp-inside-location-line{
-  top:87mm;
-  left:41mm;
-  right:41mm;
+  top:86.6mm;
+  left:37mm;
+  right:37mm;
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:8mm;
+  gap:7mm;
   color:var(--mp-emerald);
-  font:900 12.5pt/1.1 var(--mp-body);
+  font:900 13.3pt/1.1 var(--mp-body);
   letter-spacing:.01em;
+  white-space:nowrap;
 }
 
 .mp-inside-location-line::before,
 .mp-inside-location-line::after{
   content:"";
-  width:31mm;
+  flex:0 0 28mm;
   border-top:.35mm solid rgba(214,168,79,.86);
+}
+
+.mp-inside-location-line span{
+  white-space:nowrap;
 }
 
 .mp-inside-location-line span::before,
 .mp-inside-location-line span::after{
   content:"";
   display:inline-block;
-  width:1.8mm;
-  height:1.8mm;
-  margin:0 3.4mm 1mm;
+  width:1.65mm;
+  height:1.65mm;
+  margin:0 3.2mm 1mm;
   border-radius:50%;
   background:var(--mp-gold);
   vertical-align:middle;
 }
 
 .mp-inside-est{
-  top:100.7mm;
+  top:99.8mm;
   left:50%;
   transform:translateX(-50%);
   display:flex;
   align-items:center;
   gap:6mm;
   color:var(--mp-gold);
-  font:900 12.6pt/1 var(--mp-body);
+  font:900 13pt/1 var(--mp-body);
   letter-spacing:.06em;
   text-transform:uppercase;
   white-space:nowrap;
@@ -227,7 +231,7 @@
   font-family:var(--mp-heading);
   font-weight:800;
   text-transform:uppercase;
-  letter-spacing:.018em;
+  letter-spacing:.014em;
   text-align:center;
 }
 
@@ -257,23 +261,30 @@
   height:19.5mm;
   border:.33mm solid rgba(214,168,79,.85);
   border-radius:50%;
-  background:rgba(255,253,247,.96);
+  background:rgba(255,253,247,.97);
   color:var(--mp-gold);
   display:grid;
   place-items:center;
-  font-family:var(--mp-heading);
-  font-size:14pt;
-  font-weight:800;
   z-index:3;
+}
+
+.mp-inside-icon svg{
+  width:10.8mm;
+  height:10.8mm;
+  stroke:currentColor;
+  fill:none;
+  stroke-width:1.7;
+  stroke-linecap:round;
+  stroke-linejoin:round;
 }
 
 .mp-inside-philosophy{
   left:30mm;
-  top:111.5mm;
+  top:106.8mm;
   width:150mm;
-  height:70mm;
+  height:77.2mm;
   border-radius:0 7mm 7mm 7mm;
-  padding:10.5mm 14.5mm 8mm;
+  padding:10.2mm 14.3mm 8mm;
 }
 
 .mp-inside-philosophy .mp-inside-icon{
@@ -282,27 +293,27 @@
 }
 
 .mp-inside-philosophy h2{
-  font-size:15.8pt;
+  font-size:16.7pt;
   line-height:1.05;
 }
 
 .mp-inside-philosophy p{
-  margin:1.2mm 0 0;
+  margin:1.4mm 0 0;
   color:#1f2933;
   font-family:var(--mp-body);
-  font-size:9.35pt;
-  line-height:1.48;
+  font-size:9.9pt;
+  line-height:1.52;
   font-weight:400;
   letter-spacing:.004em;
 }
 
 .mp-inside-anthem{
   left:30mm;
-  top:192mm;
+  top:193.2mm;
   width:150mm;
-  height:71.8mm;
+  height:77.2mm;
   border-radius:0 0 6mm 6mm;
-  padding:10mm 14mm 7.2mm;
+  padding:10.1mm 14mm 7.2mm;
   background:linear-gradient(180deg,rgba(244,248,252,.96),rgba(255,255,255,.86));
 }
 
@@ -332,11 +343,15 @@
 .mp-inside-anthem .mp-inside-icon{
   left:8mm;
   top:-12.2mm;
-  font-size:18pt;
+}
+
+.mp-inside-anthem .mp-inside-icon svg{
+  width:11.5mm;
+  height:11.5mm;
 }
 
 .mp-inside-anthem h2{
-  font-size:15.8pt;
+  font-size:16.2pt;
   line-height:1.05;
 }
 
@@ -346,12 +361,12 @@
 }
 
 .mp-inside-anthem p{
-  margin:.5mm 0 0;
+  margin:1mm 0 0;
   color:var(--mp-midnight);
   font-family:var(--mp-serif);
-  font-size:10.55pt;
+  font-size:11.05pt;
   font-style:italic;
-  line-height:1.27;
+  line-height:1.30;
   text-align:center;
   white-space:pre-line;
 }
