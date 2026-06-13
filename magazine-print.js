@@ -5,6 +5,8 @@
   const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNya2dvbHpzdHBwbnludHJrZW1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjg4MTAsImV4cCI6MjA5MjgwNDgxMH0.M1uVsgraBxXGDrLSqBgz9e3QFRmSjaZBgz7xoGlOo3c';
   const DB_SUBMISSION_COLUMNS='id,category,ts,created_at,status,reviewer_note,reviewed_at,data,photo_url,photo_name,photos';
   const DB_PAGE_SIZE=100;
+  const STATIC_PAGE_MIN_WIDTH=2480;
+  const STATIC_PAGE_MIN_HEIGHT=3508;
 
   const IDENTITY={
     schoolName:'Way to Success Standard Schools',
@@ -33,6 +35,24 @@
       }
     ]
   };
+
+  const staticPages=[
+    {id:'front-cover-final',title:'Front Cover',section:'front-cover',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'inside-cover-final',title:'Inside Cover / School Identity',section:'inside-cover',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'contents-final',title:'Contents Page',section:'contents',pageNumber:'01',imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'editorial-board-final',title:'Editorial Board / Magazine Crew',section:'editorial-board',pageNumber:'02',imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'editorial-chairman-address-final',title:"Editor-in-Chief / Editorial Chairman's Address",section:'editorial-chairman-address',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'school-history-final',title:'Brief History of the School',section:'school-history',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'proprietor-speech-final',title:"Proprietor's Speech",section:'proprietor-speech',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'senior-boy-speech-final',title:"Senior Boy's Speech",section:'senior-boy-speech',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'senior-girl-speech-final',title:"Senior Girl's Speech",section:'senior-girl-speech',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'interview-section-final',title:'Interview Section',section:'interview-section',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'graduating-class-message-final',title:'Graduating Class Message',section:'graduating-class-message',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'academic-designed-final',title:'Academic & Educational Contents',section:'academic-educational',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'advertisements-final',title:'Advertisements',section:'advertisements',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'appreciation-final',title:'Appreciation / Acknowledgement',section:'appreciation',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'},
+    {id:'back-cover-final',title:'Back Cover',section:'back-cover',pageNumber:null,imageUrl:'',hasBuiltInFooter:true,includeInPrint:false,status:'pending'}
+  ];
 
   const IDENTITY_COPY={
     philosophyTitle:'PHILOSOPHY OF THE SCHOOL',
@@ -78,6 +98,7 @@
     approved:[],
     settings:{},
     printSections:DEFAULT_PRINT_SECTIONS.slice(),
+    staticPages:staticPages.slice(),
     source:'local cache',
     errors:[]
   };
@@ -88,6 +109,7 @@
     setStatus('Loading production data...');
     await loadProductionData();
     state.printSections=normalizePrintSections(state.settings.printSectionOrder||readJson('me_print_section_order',null));
+    state.staticPages=normalizeStaticPages(state.settings.staticPages||readJson('me_static_pages',staticPages));
     state.approved=state.submissions.filter(isApproved);
     renderMagazine();
   }
@@ -131,7 +153,7 @@
 
   async function loadSettingsFromCloud(sb){
     const output={};
-    const {data,error}=await sb.from('settings').select('key,value').in('key',['ls_settings','print_section_order']);
+    const {data,error}=await sb.from('settings').select('key,value').in('key',['ls_settings','print_section_order','static_pages']);
     if(error)throw error;
     (data||[]).forEach(row=>{
       const value=parseSettingValue(row.value);
@@ -142,6 +164,10 @@
       if(row.key==='print_section_order'){
         output.printSectionOrder=value;
         try{localStorage.setItem('me_print_section_order',JSON.stringify(value));}catch(e){}
+      }
+      if(row.key==='static_pages'){
+        output.staticPages=value;
+        try{localStorage.setItem('me_static_pages',JSON.stringify(value));}catch(e){}
       }
     });
     return output;
@@ -232,16 +258,33 @@
     return merged.filter(section=>section.visible!==false);
   }
 
+  function normalizeStaticPages(pages){
+    const defaults=new Map(staticPages.map(page=>[page.id,page]));
+    const list=Array.isArray(pages)?pages:[];
+    const seen=new Set();
+    const merged=list.filter(page=>page&&page.id).map(page=>{
+      seen.add(page.id);
+      return Object.assign({},defaults.get(page.id)||{},page);
+    });
+    staticPages.forEach(page=>{if(!seen.has(page.id))merged.push(Object.assign({},page));});
+    return merged;
+  }
+
   function renderMagazine(){
     const pages=buildPageDefinitions();
     const html=pages.map((page,index)=>renderPage(page,index+1,pages)).join('');
     const pagesEl=document.getElementById('mpPages');
     if(pagesEl)pagesEl.innerHTML=html;
     setStatus(`${pages.length} A4 pages prepared from ${state.source}. Approved/finalized submissions available: ${state.approved.length}.`);
+    checkStaticPageQuality();
   }
 
   function buildPageDefinitions(){
     const pages=state.printSections.flatMap(section=>{
+      const staticPage=findStaticPageForSection(section.key);
+      if(staticPage){
+        return [{type:'static-page',section:Object.assign({},section,{title:staticPage.title||section.title}),staticPage}];
+      }
       if(section.key==='contents')return [{type:'contents',section}];
       return [{type:section.key,section}];
     });
@@ -253,24 +296,32 @@
         return;
       }
       logicalPage+=1;
-      page.pageLabel=String(logicalPage).padStart(2,'0');
+      const explicit=page.staticPage?normalizePageLabel(page.staticPage.pageNumber):'';
+      page.pageLabel=explicit||String(logicalPage).padStart(2,'0');
     });
     return pages;
   }
 
   function renderPage(page,pageNumber,allPages){
     const section=page.section;
-    const renderer=SECTION_RENDERERS[section.key]||renderPendingSection;
+    const isStatic=page.type==='static-page';
+    const renderer=isStatic?renderStaticPage:(SECTION_RENDERERS[section.key]||renderPendingSection);
     const content=renderer({page,section,pageNumber,allPages});
     const pageLabel=page.pageLabel||'';
     const unnumbered=pageLabel?'':' mp-page--unnumbered';
-    return `
-      <section class="mp-page mp-page--${escapeAttr(section.key)}${unnumbered}" data-section-key="${escapeAttr(section.key)}" data-page-number="${escapeAttr(pageLabel)}">
-        <div class="mp-page__content">${content}</div>
+    const builtInFooter=!!(isStatic&&page.staticPage&&page.staticPage.hasBuiltInFooter);
+    const staticClass=isStatic?' mp-page--static':'';
+    const footerClass=builtInFooter?' mp-page--built-in-footer':'';
+    const contentClass=builtInFooter?'mp-page__content mp-page__content--full':'mp-page__content';
+    const footerHtml=builtInFooter?'':`
         <footer class="mp-page__footer">
           <span>${escapeHtml(IDENTITY.footer)}</span>
           <span class="mp-page__number">${escapeHtml(pageLabel)}</span>
-        </footer>
+        </footer>`;
+    return `
+      <section class="mp-page mp-page--${escapeAttr(section.key)}${unnumbered}${staticClass}${footerClass}" data-section-key="${escapeAttr(section.key)}" data-page-number="${escapeAttr(pageLabel)}" ${isStatic?`data-static-page-id="${escapeAttr(page.staticPage.id)}"`:''}>
+        <div class="${contentClass}">${content}</div>
+        ${footerHtml}
       </section>
     `;
   }
@@ -290,6 +341,16 @@
         <div class="mp-rule"></div>
         <p class="mp-cover-theme">${escapeHtml(IDENTITY.theme)}</p>
       </section>
+    `;
+  }
+
+  function renderStaticPage(ctx){
+    const page=ctx.page.staticPage;
+    const image=imageUrlOnly(page.imageUrl);
+    return `
+      <figure class="mp-static-page" data-static-status="${escapeAttr(page.status||'locked')}">
+        <img class="mp-static-page__image" src="${escapeAttr(image)}" alt="${escapeAttr(page.title||ctx.section.title)}" loading="eager" decoding="sync" data-static-page-id="${escapeAttr(page.id)}"/>
+      </figure>
     `;
   }
 
@@ -490,6 +551,19 @@
     return state.approved.filter(sub=>categories.includes(sub.category)).length;
   }
 
+  function findStaticPageForSection(sectionKey){
+    return (state.staticPages||[]).find(page=>{
+      return page&&page.section===sectionKey&&page.includeInPrint!==false&&imageUrlOnly(page.imageUrl);
+    })||null;
+  }
+
+  function normalizePageLabel(pageNumber){
+    if(pageNumber===null||pageNumber===undefined||pageNumber==='')return '';
+    const raw=String(pageNumber).trim();
+    if(!raw)return '';
+    return /^\d+$/.test(raw)?raw.padStart(2,'0'):raw;
+  }
+
   function readJson(key,fallback){
     try{
       const raw=localStorage.getItem(key);
@@ -506,6 +580,36 @@
     if(!status)return;
     const suffix=state.errors.length?` Last fallback note: ${state.errors[state.errors.length-1]}`:'';
     status.textContent=message+suffix;
+  }
+
+  function checkStaticPageQuality(){
+    const imgs=Array.from(document.querySelectorAll('.mp-static-page__image'));
+    if(!imgs.length)return;
+    const warnings=[];
+    let pending=imgs.length;
+    const done=()=>{
+      pending-=1;
+      if(pending>0)return;
+      if(warnings.length){
+        setStatus(`${document.querySelectorAll('.mp-page').length} A4 pages prepared from ${state.source}. Approved/finalized submissions available: ${state.approved.length}. Static page warning: ${warnings.join('; ')}`);
+      }
+    };
+    imgs.forEach(img=>{
+      const inspect=()=>{
+        const tooSmall=img.naturalWidth<STATIC_PAGE_MIN_WIDTH||img.naturalHeight<STATIC_PAGE_MIN_HEIGHT;
+        const page=img.closest('.mp-page');
+        if(tooSmall){
+          if(page)page.dataset.staticQuality='below-300dpi-target';
+          warnings.push(`${img.dataset.staticPageId||'static page'} is ${img.naturalWidth}x${img.naturalHeight}px`);
+        }
+        done();
+      };
+      if(img.complete)inspect();
+      else{
+        img.addEventListener('load',inspect,{once:true});
+        img.addEventListener('error',()=>{warnings.push(`${img.dataset.staticPageId||'static page'} failed to load`);done();},{once:true});
+      }
+    });
   }
 
   function imageUrlOnly(url){

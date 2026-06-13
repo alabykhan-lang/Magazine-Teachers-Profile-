@@ -118,30 +118,37 @@
 
     const inside = document.querySelector('.mp-page[data-section-key="inside-cover"]');
     const contents = document.querySelector('.mp-page[data-section-key="contents"]');
+    let liveOpenersApplied = false;
 
-    if (inside && !inside.dataset.openersApplied) {
+    if (inside && !inside.dataset.openersApplied && !isStaticPage(inside)) {
       const existingLogo = inside.querySelector('img');
       inside.classList.add('mp-opening-ready', 'mp-opening-inside');
       inside.dataset.openersApplied = 'true';
       const content = inside.querySelector('.mp-page__content');
       if (content) content.innerHTML = renderInsideCover(existingLogo ? existingLogo.getAttribute('src') : '');
+      liveOpenersApplied = true;
     }
 
-    if (contents && !contents.dataset.openersApplied) {
+    if (contents && !contents.dataset.openersApplied && !isStaticPage(contents)) {
       contents.classList.add('mp-opening-ready', 'mp-opening-contents');
       contents.dataset.openersApplied = 'true';
       const content = contents.querySelector('.mp-page__content');
       if (content) content.innerHTML = renderContentsPage();
+      liveOpenersApplied = true;
     }
 
     renumberMagazinePages();
-    updateStatusNote();
+    updateStatusNote(liveOpenersApplied);
     applying = false;
   }
 
   function removePendingFrontCover(){
     const front = document.querySelector('.mp-page[data-section-key="front-cover"]');
-    if (front) front.remove();
+    if (front && !isStaticPage(front)) front.remove();
+  }
+
+  function isStaticPage(page){
+    return !!(page && (page.classList.contains('mp-page--static') || page.dataset.staticPageId));
   }
 
   function renumberMagazinePages(){
@@ -274,9 +281,12 @@
     return `<div class="lh-fallback-emblem">WAY TO<br>SUCCESS<br>SCHOOLS</div>`;
   }
 
-  function updateStatusNote(){
+  function updateStatusNote(liveOpenersApplied){
     const status = document.getElementById('mpStatus');
-    if (!status || status.dataset.openersNote) return;
+    if (!status) return;
+    const currentCount = document.querySelectorAll('.mp-page').length;
+    status.textContent = status.textContent.replace(/^\d+ A4 pages/, currentCount + ' A4 pages');
+    if (!liveOpenersApplied || status.dataset.openersNote) return;
     status.dataset.openersNote = 'true';
     status.textContent = status.textContent + ' Opening pages override active: Inside Cover and Contents are styled from approved references.';
   }

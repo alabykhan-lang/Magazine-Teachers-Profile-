@@ -147,6 +147,11 @@ body{
   z-index:1;
 }
 
+.mp-page__content--full{
+  inset:0;
+  overflow:hidden;
+}
+
 .mp-page__footer{
   position:absolute;
   left:var(--mp-page-pad-x);
@@ -239,6 +244,34 @@ body{
 .mp-image--safe img{
   object-fit:contain;
   object-position:center center;
+}
+
+.mp-static-page{
+  width:100%;
+  height:100%;
+  margin:0;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  background:#fff;
+}
+
+.mp-static-page__image{
+  width:100%;
+  height:100%;
+  max-width:100%;
+  max-height:100%;
+  object-fit:contain;
+  object-position:center center;
+  display:block;
+  image-rendering:auto;
+  filter:none !important;
+  opacity:1 !important;
+  mix-blend-mode:normal !important;
+}
+
+.mp-page--static[data-static-quality="below-300dpi-target"]::before{
+  border:0;
 }
 
 .mp-pending{
