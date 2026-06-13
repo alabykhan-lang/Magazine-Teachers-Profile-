@@ -1,0 +1,396 @@
+/* Locked digital reconstruction for Inside Cover / School Identity.
+   Source of truth: approved Legacy Horizon inside-cover reference.
+   This keeps the page as live HTML/CSS while matching the fixed A4 design. */
+
+.mp-page--inside-cover.mp-page--inside-cover-locked{
+  background:#fffaf2;
+}
+
+.mp-page--inside-cover.mp-page--inside-cover-locked .mp-page__content{
+  inset:0 !important;
+  overflow:hidden !important;
+  z-index:1;
+}
+
+.mp-page--inside-cover.mp-page--inside-cover-locked::before,
+.mp-page--inside-cover.mp-page--inside-cover-locked::after{
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  border-radius:50%;
+  z-index:0;
+}
+
+/* top-left horizon bands */
+.mp-page--inside-cover.mp-page--inside-cover-locked::before{
+  width:176mm;
+  height:176mm;
+  left:-101mm;
+  top:-92mm;
+  border:1.05mm solid var(--mp-gold);
+  box-shadow:
+    3.0mm 2.7mm 0 -1.10mm var(--mp-emerald),
+    6.0mm 5.7mm 0 -2.20mm var(--mp-white),
+    7.2mm 6.9mm 0 -2.75mm var(--mp-emerald);
+}
+
+/* bottom-right horizon bands */
+.mp-page--inside-cover.mp-page--inside-cover-locked::after{
+  width:191mm;
+  height:191mm;
+  right:-112mm;
+  bottom:-106mm;
+  border:1.05mm solid var(--mp-gold);
+  box-shadow:
+    -3.0mm -2.8mm 0 -1.10mm var(--mp-emerald),
+    -6.0mm -5.7mm 0 -2.20mm var(--mp-white),
+    -7.2mm -6.9mm 0 -2.75mm var(--mp-emerald);
+}
+
+.mp-inside-cover-exact{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 56%, rgba(214,168,79,.10) 0 20mm, transparent 69mm),
+    radial-gradient(circle at 50% 49%, rgba(11,31,58,.038) 0 44mm, transparent 78mm),
+    linear-gradient(180deg,#fffdf8 0%,#fbf4e6 58%,#fffaf4 100%);
+  color:var(--mp-charcoal);
+}
+
+.mp-inside-cover-exact::before,
+.mp-inside-cover-exact::after{
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* soft legacy watermark */
+.mp-inside-cover-exact::before{
+  left:22mm;
+  right:22mm;
+  top:62mm;
+  bottom:38mm;
+  opacity:.12;
+  background:
+    radial-gradient(ellipse at 20% 50%, transparent 0 21mm, rgba(214,168,79,.22) 21.3mm 21.8mm, transparent 22mm),
+    radial-gradient(ellipse at 80% 50%, transparent 0 21mm, rgba(214,168,79,.22) 21.3mm 21.8mm, transparent 22mm),
+    linear-gradient(90deg,transparent 0 43%, rgba(214,168,79,.16) 43.2% 43.7%, transparent 44% 56%, rgba(214,168,79,.16) 56.3% 56.8%, transparent 57%);
+  border-radius:50%;
+}
+
+/* bottom gold sweep */
+.mp-inside-cover-exact::after{
+  right:-1mm;
+  bottom:-3mm;
+  width:58mm;
+  height:46mm;
+  background:linear-gradient(135deg, transparent 0 49%, rgba(214,168,79,.94) 49.4% 100%);
+  opacity:.98;
+}
+
+.mp-inside-cover-exact > *{
+  position:absolute;
+  z-index:1;
+}
+
+.mp-inside-logo-exact{
+  left:50%;
+  top:9.5mm;
+  width:32mm;
+  height:32mm;
+  transform:translateX(-50%);
+  display:grid;
+  place-items:center;
+}
+
+.mp-inside-logo-exact img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:center;
+  filter:none !important;
+  opacity:1 !important;
+  mix-blend-mode:normal !important;
+}
+
+.mp-inside-logo-fallback{
+  width:28mm;
+  height:28mm;
+  border:.45mm solid rgba(214,168,79,.82);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  color:var(--mp-midnight);
+  font:800 7.4pt/1.1 var(--mp-heading);
+  text-align:center;
+  background:rgba(255,255,255,.7);
+}
+
+.mp-inside-top-diamond,
+.mp-inside-est-diamond,
+.mp-inside-footer-diamond{
+  width:3.2mm;
+  height:3.2mm;
+  transform:rotate(45deg);
+  background:var(--mp-gold);
+}
+
+.mp-inside-top-diamond{
+  left:calc(50% - 1.6mm);
+  top:45.3mm;
+}
+
+.mp-inside-est-diamond{
+  left:calc(50% - 1.55mm);
+  top:131.8mm;
+  width:3.1mm;
+  height:3.1mm;
+}
+
+.mp-inside-school-title{
+  left:21mm;
+  right:21mm;
+  top:55.5mm;
+  margin:0;
+  color:var(--mp-midnight);
+  font-family:var(--mp-heading);
+  font-size:28.2pt;
+  line-height:1.08;
+  font-weight:800;
+  letter-spacing:.018em;
+  text-align:center;
+  text-transform:uppercase;
+}
+
+.mp-inside-location-line{
+  top:86.7mm;
+  left:42mm;
+  right:42mm;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8mm;
+  color:var(--mp-emerald);
+  font:900 13pt/1.1 var(--mp-body);
+  letter-spacing:.01em;
+}
+
+.mp-inside-location-line::before,
+.mp-inside-location-line::after{
+  content:"";
+  width:31mm;
+  border-top:.35mm solid rgba(214,168,79,.86);
+}
+
+.mp-inside-location-line span::before,
+.mp-inside-location-line span::after{
+  content:"";
+  display:inline-block;
+  width:1.8mm;
+  height:1.8mm;
+  margin:0 3.4mm 1mm;
+  border-radius:50%;
+  background:var(--mp-gold);
+  vertical-align:middle;
+}
+
+.mp-inside-est{
+  top:100.4mm;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  align-items:center;
+  gap:6mm;
+  color:var(--mp-gold);
+  font:900 13pt/1 var(--mp-body);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+
+.mp-inside-est::before,
+.mp-inside-est::after{
+  content:"";
+  width:27mm;
+  border-top:.32mm solid rgba(214,168,79,.74);
+}
+
+.mp-inside-card{
+  background:rgba(255,255,255,.58);
+  border:.32mm solid rgba(214,168,79,.88);
+  box-shadow:0 3mm 13mm rgba(214,168,79,.06);
+}
+
+.mp-inside-card h2{
+  margin:0;
+  color:var(--mp-midnight);
+  font-family:var(--mp-heading);
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.018em;
+  text-align:center;
+}
+
+.mp-inside-heading-rule{
+  width:61mm;
+  height:5.2mm;
+  margin:2.4mm auto 0;
+  position:relative;
+  border-top:.32mm solid rgba(214,168,79,.74);
+}
+
+.mp-inside-heading-rule::after{
+  content:"";
+  position:absolute;
+  top:-1.75mm;
+  left:50%;
+  width:3.1mm;
+  height:3.1mm;
+  margin-left:-1.55mm;
+  transform:rotate(45deg);
+  background:var(--mp-gold);
+}
+
+.mp-inside-icon{
+  position:absolute;
+  width:19.5mm;
+  height:19.5mm;
+  border:.33mm solid rgba(214,168,79,.85);
+  border-radius:50%;
+  background:rgba(255,253,247,.96);
+  color:var(--mp-gold);
+  display:grid;
+  place-items:center;
+  font-family:var(--mp-heading);
+  font-size:14pt;
+  font-weight:800;
+  z-index:3;
+}
+
+.mp-inside-philosophy{
+  left:30mm;
+  top:111.8mm;
+  width:150mm;
+  height:70.5mm;
+  border-radius:0 7mm 7mm 7mm;
+  padding:10.5mm 14.5mm 8mm;
+}
+
+.mp-inside-philosophy .mp-inside-icon{
+  left:-.8mm;
+  top:-10.5mm;
+}
+
+.mp-inside-philosophy h2{
+  font-size:16pt;
+  line-height:1.05;
+}
+
+.mp-inside-philosophy p{
+  margin:1.2mm 0 0;
+  color:#1f2933;
+  font-family:var(--mp-body);
+  font-size:9.8pt;
+  line-height:1.53;
+  font-weight:400;
+  letter-spacing:.005em;
+}
+
+.mp-inside-anthem{
+  left:30mm;
+  top:193.8mm;
+  width:150mm;
+  height:75.5mm;
+  border-radius:0 0 6mm 6mm;
+  padding:10.6mm 14mm 8mm;
+  background:linear-gradient(180deg,rgba(244,248,252,.96),rgba(255,255,255,.86));
+}
+
+.mp-inside-anthem::before,
+.mp-inside-anthem::after{
+  content:"";
+  position:absolute;
+  top:-.35mm;
+  width:10mm;
+  height:10mm;
+  background:#fffaf2;
+  border-bottom:.32mm solid rgba(214,168,79,.88);
+}
+
+.mp-inside-anthem::before{
+  left:-.35mm;
+  border-right:.32mm solid rgba(214,168,79,.88);
+  border-bottom-right-radius:8mm;
+}
+
+.mp-inside-anthem::after{
+  right:-.35mm;
+  border-left:.32mm solid rgba(214,168,79,.88);
+  border-bottom-left-radius:8mm;
+}
+
+.mp-inside-anthem .mp-inside-icon{
+  left:8mm;
+  top:-12.2mm;
+  font-size:18pt;
+}
+
+.mp-inside-anthem h2{
+  font-size:16pt;
+  line-height:1.05;
+}
+
+.mp-inside-anthem .mp-inside-heading-rule{
+  width:58mm;
+  margin-top:2.2mm;
+}
+
+.mp-inside-anthem p{
+  margin:1.1mm 0 0;
+  color:var(--mp-midnight);
+  font-family:var(--mp-serif);
+  font-size:12.4pt;
+  font-style:italic;
+  line-height:1.34;
+  text-align:center;
+  white-space:pre-line;
+}
+
+.mp-inside-footer-diamond{
+  left:calc(50% - 1.6mm);
+  bottom:12.8mm;
+  z-index:4;
+}
+
+.mp-page--inside-cover.mp-page--inside-cover-locked .mp-page__footer{
+  left:9mm;
+  right:9mm;
+  bottom:5.5mm;
+  border-top:.36mm solid rgba(214,168,79,.62);
+  color:var(--mp-midnight);
+  font-size:7.6pt;
+  font-weight:900;
+  letter-spacing:.22em;
+  z-index:5;
+}
+
+.mp-page--inside-cover.mp-page--inside-cover-locked .mp-page__footer::before{
+  content:"";
+  position:absolute;
+  top:-.44mm;
+  left:0;
+  width:13mm;
+  border-top:.72mm solid var(--mp-emerald);
+}
+
+.mp-page--inside-cover.mp-page--inside-cover-locked .mp-page__number{
+  visibility:hidden;
+}
+
+@media print{
+  .mp-page--inside-cover.mp-page--inside-cover-locked .mp-page__content{
+    inset:0 !important;
+  }
+}
