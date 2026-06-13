@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lato:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="builder.css?v=production-workstation-2">
+  <link rel="stylesheet" href="builder.css?v=production-blueprint-2">
 </head>
 <body>
   <div class="builder-app">
@@ -42,6 +42,18 @@
           <h2 id="selectedPageLabel">No page selected</h2>
         </div>
         <div class="stage-buttons">
+          <div class="preview-controls" aria-label="Preview controls">
+            <button id="fitPreviewBtn" type="button">Fit</button>
+            <button data-preview-scale="75" type="button">75%</button>
+            <button data-preview-scale="100" type="button">100%</button>
+            <button data-preview-scale="125" type="button">125%</button>
+            <button id="fullscreenPreviewBtn" type="button">Fullscreen</button>
+          </div>
+          <select id="comparisonModeSelect" aria-label="Reference comparison mode">
+            <option value="side-by-side">Reference + Live</option>
+            <option value="live-only">Live Only</option>
+            <option value="reference-only">Reference Only</option>
+          </select>
           <button id="duplicatePageBtn" type="button">Duplicate</button>
           <button id="deletePageBtn" type="button">Delete</button>
           <button id="printSelectedBtn" type="button">Print Selected</button>
@@ -70,6 +82,6 @@
     </div>
   </template>
 
-  <script src="builder.js?v=production-workstation-2"></script>
+  <script src="builder.js?v=production-blueprint-2"></script>
 </body>
 </html>

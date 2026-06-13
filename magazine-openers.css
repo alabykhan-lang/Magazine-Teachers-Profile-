@@ -37,6 +37,8 @@
 
 .mp-page.mp-opening-ready .mp-page__content {
   z-index: 1;
+  top: 15mm;
+  bottom: 20mm;
 }
 
 .mp-page.mp-opening-ready .mp-page__footer {
@@ -75,13 +77,29 @@
   align-items: center;
   color: var(--mp-midnight);
   text-align: center;
-  padding-top: 1mm;
+  padding-top: 0;
+}
+
+.lh-inside-cover::before,
+.lh-contents::before {
+  content: "";
+  position: absolute;
+  inset: 42mm 14mm 42mm;
+  background: url("production-assets/magazine/school-logo.jpg") center/contain no-repeat;
+  opacity: .035;
+  pointer-events: none;
+}
+
+.lh-inside-cover > *,
+.lh-contents > * {
+  position: relative;
+  z-index: 1;
 }
 
 .lh-logo-wrap {
-  width: 39mm;
-  height: 39mm;
-  margin: 0 auto 5mm;
+  width: 34mm;
+  height: 34mm;
+  margin: 0 auto 4mm;
   display: grid;
   place-items: center;
 }
@@ -117,7 +135,7 @@
   height: .35mm;
   background: var(--mp-gold);
   position: relative;
-  margin: 0 auto 5mm;
+  margin: 0 auto 4mm;
 }
 
 .lh-mini-rule::after {
@@ -133,10 +151,10 @@
 
 .lh-school-name {
   margin: 0;
-  max-width: 150mm;
+  max-width: 154mm;
   color: var(--mp-midnight);
   font-family: var(--mp-heading);
-  font-size: 31pt;
+  font-size: 29pt;
   font-weight: 800;
   line-height: 1.08;
   letter-spacing: .02em;
@@ -144,12 +162,12 @@
 }
 
 .lh-location {
-  margin-top: 7mm;
+  margin-top: 5mm;
   display: flex;
   align-items: center;
-  gap: 7mm;
+  gap: 6mm;
   color: var(--mp-emerald);
-  font-size: 14pt;
+  font-size: 13.3pt;
   font-weight: 700;
   letter-spacing: .02em;
 }
@@ -165,7 +183,7 @@
 }
 
 .lh-est {
-  margin-top: 5mm;
+  margin-top: 3.5mm;
   display: flex;
   align-items: center;
   gap: 6mm;
@@ -177,7 +195,7 @@
 
 .lh-info-card {
   position: relative;
-  width: 168mm;
+  width: 166mm;
   background: rgba(255,255,255,.58);
   border: .35mm solid rgba(214,168,79,.8);
   color: var(--mp-charcoal);
@@ -188,7 +206,7 @@
   margin: 0;
   color: var(--mp-midnight);
   font-family: var(--mp-heading);
-  font-size: 18pt;
+  font-size: 17pt;
   line-height: 1;
   letter-spacing: .03em;
   text-transform: uppercase;
@@ -198,7 +216,7 @@
 .lh-card-rule {
   width: 70mm;
   height: .35mm;
-  margin: 4mm auto 6mm;
+  margin: 3mm auto 5mm;
   background: var(--mp-gold);
   position: relative;
 }
@@ -231,24 +249,24 @@
 }
 
 .lh-philosophy {
-  margin-top: 8mm;
-  min-height: 75mm;
-  padding: 10mm 13mm 8mm;
+  margin-top: 7mm;
+  min-height: 64mm;
+  padding: 9mm 12mm 7mm;
   border-radius: 0 8mm 8mm 8mm;
 }
 
 .lh-philosophy p {
   margin: 0;
-  font-size: 11.2pt;
-  line-height: 1.58;
+  font-size: 10.5pt;
+  line-height: 1.52;
   letter-spacing: .01em;
   color: #151b24;
 }
 
 .lh-anthem-card {
-  margin-top: 12mm;
-  min-height: 88mm;
-  padding: 9mm 14mm 7mm;
+  margin-top: 9mm;
+  min-height: 70mm;
+  padding: 8mm 14mm 6mm;
   text-align: center;
   border-radius: 0 0 9mm 9mm;
   background: rgba(232,238,246,.42);
@@ -263,9 +281,9 @@
   margin-top: 1mm;
   font-family: var(--mp-serif);
   color: #101a2c;
-  font-size: 12.4pt;
+  font-size: 11.7pt;
   font-style: italic;
-  line-height: 1.34;
+  line-height: 1.28;
 }
 
 .lh-anthem p {
@@ -275,7 +293,7 @@
 .lh-anthem br {
   display: block;
   content: "";
-  height: 4mm;
+  height: 3mm;
 }
 
 /* CONTENTS PAGE */
@@ -283,8 +301,10 @@
 .lh-contents {
   height: 100%;
   position: relative;
+  display: flex;
+  flex-direction: column;
   color: var(--mp-midnight);
-  padding-top: 10mm;
+  padding-top: 8mm;
 }
 
 .lh-contents-head {
@@ -307,10 +327,10 @@
 }
 
 .lh-contents-title {
-  margin: 7mm 0 0;
+  margin: 6mm 0 0;
   color: var(--mp-midnight);
   font-family: var(--mp-heading);
-  font-size: 39pt;
+  font-size: 38pt;
   font-weight: 800;
   line-height: 1;
 }
@@ -356,10 +376,11 @@
 }
 
 .lh-contents-body {
-  margin-top: 18mm;
+  flex: 1 1 auto;
+  margin-top: 15mm;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  column-gap: 18mm;
+  column-gap: 17mm;
   position: relative;
 }
 
@@ -376,36 +397,37 @@
 
 .lh-contents-col {
   display: grid;
-  gap: 12mm;
+  align-content: start;
+  gap: 10mm;
 }
 
 .lh-toc-group {
   position: relative;
   display: grid;
-  grid-template-columns: 22mm 1fr;
+  grid-template-columns: 20mm minmax(0, 1fr);
   column-gap: 5mm;
-  min-height: 34mm;
+  min-height: 31mm;
 }
 
 .lh-toc-num {
-  width: 18mm;
-  height: 18mm;
+  width: 17mm;
+  height: 17mm;
   border: .45mm solid var(--mp-gold);
   border-radius: 50%;
   display: grid;
   place-items: center;
   color: var(--mp-gold);
   font-family: var(--mp-heading);
-  font-size: 19pt;
+  font-size: 18pt;
   font-weight: 700;
   background: rgba(255,250,240,.82);
 }
 
 .lh-toc-line {
   position: absolute;
-  left: 8.9mm;
-  top: 17mm;
-  bottom: -10mm;
+  left: 8.4mm;
+  top: 16mm;
+  bottom: -8mm;
   width: .45mm;
   border-radius: 99px;
   background: var(--mp-emerald);
@@ -440,7 +462,7 @@
   margin: 4mm 0 2mm;
   color: var(--mp-midnight);
   font-family: var(--mp-heading);
-  font-size: 17pt;
+  font-size: 16.2pt;
   line-height: 1.05;
 }
 
@@ -468,22 +490,30 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 3.4mm;
+  gap: 3mm;
 }
 
 .lh-toc-group li {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 2.4mm;
-  align-items: baseline;
+  grid-template-columns: minmax(0, 1fr) minmax(5mm, 16mm) auto;
+  gap: 2mm;
+  align-items: end;
   color: #151b24;
-  font-size: 10pt;
-  line-height: 1;
+  font-size: 8.6pt;
+  line-height: 1.16;
+}
+
+.lh-toc-label {
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .lh-toc-dots {
   border-bottom: .25mm dotted rgba(31,41,51,.75);
-  transform: translateY(-.8mm);
+  min-height: 1em;
+  transform: translateY(-.6mm);
 }
 
 .lh-toc-page {
@@ -492,10 +522,10 @@
 }
 
 .lh-contents-quote {
-  position: absolute;
-  left: 50%;
-  bottom: 15mm;
-  transform: translateX(-50%);
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
   width: 103mm;
   min-height: 24mm;
   display: grid;
@@ -505,6 +535,7 @@
   border: .35mm solid rgba(15,124,92,.58);
   background: rgba(255,255,255,.46);
   padding: 5mm 8mm;
+  margin: auto auto 0;
 }
 
 .lh-contents-quote span {
@@ -522,6 +553,91 @@
   font-family: var(--mp-serif);
   font-size: 12.8pt;
   line-height: 1.35;
+}
+
+.lh-contents-body[data-group-count="1"] {
+  width: 96mm;
+  grid-template-columns: 1fr;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.lh-contents-body[data-group-count="1"]::after {
+  display: none;
+}
+
+.lh-contents--dense .lh-contents-title {
+  font-size: 34pt;
+}
+
+.lh-contents--dense .lh-contents-theme span {
+  font-size: 9.8pt;
+  letter-spacing: .22em;
+}
+
+.lh-contents--dense .lh-contents-theme em {
+  font-size: 12.2pt;
+}
+
+.lh-contents--dense .lh-contents-body {
+  margin-top: 10mm;
+  column-gap: 13mm;
+}
+
+.lh-contents--dense .lh-contents-col {
+  gap: 6mm;
+}
+
+.lh-contents--dense .lh-toc-group {
+  min-height: 25mm;
+  grid-template-columns: 17mm minmax(0, 1fr);
+  column-gap: 4mm;
+}
+
+.lh-contents--dense .lh-toc-num {
+  width: 14.5mm;
+  height: 14.5mm;
+  font-size: 15.5pt;
+}
+
+.lh-contents--dense .lh-toc-line {
+  left: 7.1mm;
+  top: 14mm;
+  bottom: -5mm;
+}
+
+.lh-contents--dense .lh-toc-group h2 {
+  margin-top: 2mm;
+  font-size: 13.6pt;
+}
+
+.lh-contents--dense .lh-toc-small-rule {
+  margin-bottom: 4mm;
+}
+
+.lh-contents--dense .lh-toc-group ol {
+  gap: 2mm;
+}
+
+.lh-contents--dense .lh-toc-group li {
+  grid-template-columns: minmax(0, 1fr) minmax(4mm, 12mm) auto;
+  gap: 1.6mm;
+  font-size: 8.1pt;
+}
+
+.lh-contents--dense .lh-contents-quote {
+  width: 92mm;
+  min-height: 18mm;
+  grid-template-columns: 12mm 1fr;
+  padding: 3.5mm 6mm;
+}
+
+.lh-contents--dense .lh-contents-quote span {
+  font-size: 24pt;
+}
+
+.lh-contents--dense .lh-contents-quote p {
+  font-size: 10.8pt;
 }
 
 @media print {

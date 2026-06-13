@@ -6,38 +6,73 @@ const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const STORAGE_BUCKET = "photos";
 
 const PAGE_STATUSES = [
+  "Pending Design",
   "Placeholder Design",
   "Awaiting Text",
   "Awaiting Images",
-  "Needs Revision",
-  "Final Design",
-  "Ready for PDF"
+  "In Production",
+  "Ready for Review",
+  "Locked for Print",
+  "Excluded from Print"
 ];
 
-const TEMPLATE_GROUPS = [
-  { id: "front-cover", label: "Front Cover", defaultTitle: "Maiden Magazine", defaultSubtitle: "The Making of Tomorrow: From Humble Beginnings to Limitless Horizons", unnumbered: true },
-  { id: "inside-cover", label: "Inside Cover / School Identity", defaultTitle: "Way To Success Standard Schools", defaultSubtitle: "Ifedapo Community, Ejigbo", unnumbered: true },
-  { id: "contents", label: "Contents Page", defaultTitle: "Contents", defaultSubtitle: "The Making of Tomorrow: From Humble Beginnings to Limitless Horizons" },
-  { id: "editorial-board", label: "Editorial Board / Magazine Crew", defaultTitle: "The Editorial Board", defaultSubtitle: "Magazine Crew & Production Team" },
-  { id: "eic-address", label: "Editor-in-Chief Address", defaultTitle: "From the Editor-in-Chief", defaultSubtitle: "Editorial Chairman's Address" },
-  { id: "brief-history", label: "Brief History of the School", defaultTitle: "Brief History of the School", defaultSubtitle: "" },
-  { id: "proprietor-speech", label: "Proprietor's Speech", defaultTitle: "Proprietor's Speech", defaultSubtitle: "Speech" },
-  { id: "senior-boy-speech", label: "Senior Boy's Speech", defaultTitle: "Senior Boy's Speech", defaultSubtitle: "Student Speech" },
-  { id: "senior-girl-speech", label: "Senior Girl's Speech", defaultTitle: "Senior Girl's Speech", defaultSubtitle: "Student Speech" },
-  { id: "interview-1", label: "Interview Template 1", defaultTitle: "Interview", defaultSubtitle: "A conversation that inspires, a vision that leads." },
-  { id: "interview-2", label: "Interview Template 2", defaultTitle: "Interview", defaultSubtitle: "" },
-  { id: "class-message", label: "Graduating Class Message", defaultTitle: "Graduating Class Message", defaultSubtitle: "Class of 2025/2026" },
-  { id: "ss3-profiles", label: "SS3 Graduate Profiles", defaultTitle: "SS3 Graduate Profiles", defaultSubtitle: "Celebrating Our Graduating Stars" },
-  { id: "jss3-profiles", label: "JSS3 Student Profiles", defaultTitle: "JSS3 Student Profiles", defaultSubtitle: "Celebrating Our Junior Graduates" },
-  { id: "primary5-profiles", label: "Primary 5 Graduate Profiles", defaultTitle: "Primary 5 Graduate Profiles", defaultSubtitle: "Celebrating Our Young Achievers" },
-  { id: "class-cross-section", label: "Cross Section of Classes", defaultTitle: "Cross Section of Classes", defaultSubtitle: "Primary Classes and Secondary Stages" },
-  { id: "staff-profiles", label: "Staff Profiles", defaultTitle: "Staff Profiles", defaultSubtitle: "The People Behind the Journey" },
-  { id: "academic-contents", label: "Academic & Educational Contents", defaultTitle: "Academic & Educational Contents", defaultSubtitle: "Ideas, Knowledge and Expressions from Our School Community" },
-  { id: "school-life", label: "School Life Events / Photo Splash", defaultTitle: "School Life Events", defaultSubtitle: "Moments from our school community" },
-  { id: "advert", label: "Advertisement Page", defaultTitle: "Advertisement", defaultSubtitle: "" },
-  { id: "appreciation", label: "Appreciation / Acknowledgement", defaultTitle: "Appreciation", defaultSubtitle: "Acknowledgement" },
-  { id: "back-cover", label: "Back Cover", defaultTitle: "Way To Success Standard Schools", defaultSubtitle: "God - Knowledge - Leadership", unnumbered: true }
+const REFERENCE_STATUSES = [
+  "No Reference Yet",
+  "Reference Uploaded",
+  "Needs Polishing",
+  "Approved Template",
+  "Locked for Print"
 ];
+
+const TEMPLATE_DESIGN_STATUSES = [
+  "Pending Design",
+  "Placeholder Design",
+  "No Reference Yet",
+  "Reference Uploaded",
+  "Needs Polishing",
+  "Approved Template",
+  "Locked for Print"
+];
+
+const REFERENCE_MODES = [
+  "Live Template Mode",
+  "Reference Mode",
+  "Static Final Page Mode"
+];
+
+const PRODUCTION_TEMPLATE_BLUEPRINTS = [
+  blueprint("front-cover", "front-cover", "Front Cover", "Maiden Magazine", "The Making of Tomorrow: From Humble Beginnings to Limitless Horizons", { designStatus: "Pending Design", allowedCategories: [], contentTypes: ["manual cover content only"], textSlots: ["schoolName", "theme", "session", "motto"], imageSlots: ["coverImage"], overflow: "manual review", continuation: "none", capacity: { maxChars: 900 }, unnumbered: true }),
+  blueprint("inside-cover", "inside-cover", "Inside Cover / School Identity", "Way To Success Standard Schools", "Ifedapo Community, Ejigbo", { designStatus: "Approved Template", referenceStatus: "Reference Uploaded", referenceImage: "production-assets/magazine/reference-inside-cover.jpg", allowedCategories: [], contentTypes: ["manual school identity only"], textSlots: ["schoolName", "location", "estYear", "philosophy", "anthem"], imageSlots: ["logo"], overflow: "manual continuation if final text changes", continuation: "manual", capacity: { maxChars: 1700 }, unnumbered: true }),
+  blueprint("contents", "contents", "Contents Page", "Contents", "The Making of Tomorrow: From Humble Beginnings to Limitless Horizons", { designStatus: "Approved Template", referenceStatus: "Reference Uploaded", referenceImage: "production-assets/magazine/reference-contents.jpg", allowedCategories: [], contentTypes: ["active included page order only"], textSlots: ["contentsQuote"], imageSlots: [], overflow: "regenerate from active included pages", continuation: "none", capacity: { maxItems: 24 } }),
+  blueprint("editorial-board", "editorial-board", "Editorial Board / Magazine Crew", "The Editorial Board", "Magazine Crew & Production Team", { designStatus: "Approved Template", allowedCategories: ["editor_board"], contentTypes: ["editor_board", "manual crew data"], textSlots: ["itemsJson"], imageSlots: ["portrait"], overflow: "continue crew cards by rows", continuation: "same section pattern", capacity: { itemsPerPage: 7 } }),
+  blueprint("eic-address", "editorial-chairman-address", "Editor-in-Chief / Editorial Chairman's Address", "From the Editor-in-Chief", "Editorial Chairman's Address", { designStatus: "Approved Template", allowedCategories: ["editorial-note", "speeches"], contentTypes: ["editorial-note", "Editor-in-Chief Address"], textSlots: ["sectionLabel", "name", "role", "body", "closing", "quote"], imageSlots: ["portrait"], overflow: "split paragraph then sentence", continuation: "same address pattern", capacity: { maxChars: 2300 } }),
+  blueprint("brief-history", "school-history", "Brief History of the School", "Brief History of the School", "", { designStatus: "Approved Template", allowedCategories: [], contentTypes: ["manual history content only"], textSlots: ["timelineItems", "section1Title", "section1Body", "section2Title", "section2Body", "section3Title", "section3Body", "section4Title", "section4Body", "closingQuote"], imageSlots: ["mainImage", "secondary1", "secondary2"], overflow: "split paragraph then sentence", continuation: "same history pattern", capacity: { maxChars: 2600 } }),
+  blueprint("proprietor-speech", "proprietor-speech", "Proprietor's Speech", "Proprietor's Speech", "Speech", speechBlueprint("Proprietor")),
+  blueprint("senior-boy-speech", "senior-boy-speech", "Senior Boy's Speech", "Senior Boy's Speech", "Student Speech", speechBlueprint("Senior Boy")),
+  blueprint("senior-girl-speech", "senior-girl-speech", "Senior Girl's Speech", "Senior Girl's Speech", "Student Speech", speechBlueprint("Senior Girl")),
+  blueprint("interview-1", "interview-section", "Interview Template 1", "Interview", "A conversation that inspires, a vision that leads.", { designStatus: "Approved Template", allowedCategories: ["interviews"], contentTypes: ["interviews"], textSlots: ["name", "role", "intro", "qaBody", "caption", "closing"], imageSlots: ["portrait", "group"], overflow: "split Q&A by paragraph then sentence", continuation: "same interview pattern", capacity: { maxChars: 2700 } }),
+  blueprint("interview-2", "interview-section", "Interview Template 2", "Interview", "", { designStatus: "Approved Template", allowedCategories: ["interviews"], contentTypes: ["interviews"], textSlots: ["name", "role", "intro", "qaBody", "caption", "closing"], imageSlots: ["portrait"], overflow: "split Q&A by paragraph then sentence", continuation: "same interview pattern", capacity: { maxChars: 3100 } }),
+  blueprint("class-message", "graduating-class-message", "Graduating Class Message", "Graduating Class Message", "Class of 2025/2026", { designStatus: "Approved Template", allowedCategories: ["ss3_class_message"], contentTypes: ["ss3_class_message", "graduating class message"], textSlots: ["body", "caption", "closing"], imageSlots: ["group"], overflow: "split paragraph then sentence", continuation: "same class-message pattern", capacity: { maxChars: 1900 } }),
+  blueprint("ss3-profiles", "ss3-graduate-profiles", "SS3 Graduate Profiles", "SS3 Graduate Profiles", "Celebrating Our Graduating Stars", { designStatus: "Approved Template", allowedCategories: ["ss3"], contentTypes: ["ss3 submissions only"], textSlots: ["chunkStart", "itemsJson"], imageSlots: [], overflow: "create profile continuation pages", continuation: "2 columns x 5 rows", capacity: { itemsPerPage: 10, columns: 2, rows: 5 } }),
+  blueprint("jss3-profiles", "jss3-student-profiles", "JSS3 Student Profiles", "JSS3 Student Profiles", "Celebrating Our Junior Graduates", { designStatus: "Approved Template", allowedCategories: ["jss3"], contentTypes: ["jss3 submissions only"], textSlots: ["chunkStart", "itemsJson"], imageSlots: [], overflow: "create profile continuation pages", continuation: "4 columns x 5 rows", capacity: { itemsPerPage: 20, columns: 4, rows: 5 } }),
+  blueprint("primary5-profiles", "primary5-graduate-profiles", "Primary 5 Graduate Profiles", "Primary 5 Graduate Profiles", "Celebrating Our Young Achievers", { designStatus: "Approved Template", allowedCategories: ["primary5"], contentTypes: ["primary5 submissions only"], textSlots: ["chunkStart", "itemsJson"], imageSlots: [], overflow: "create profile continuation pages", continuation: "4 columns x 5 rows", capacity: { itemsPerPage: 20, columns: 4, rows: 5 } }),
+  blueprint("class-cross-section", "cross-section-classes", "Cross Section of Classes", "Cross Section of Classes", "Primary Classes and Secondary Stages", { designStatus: "Approved Template", allowedCategories: ["class_photo", "primary5_class_photo", "jss3_class_photo", "gallery", "events"], contentTypes: ["explicitly assigned class section images"], textSlots: ["classPage", "itemsJson"], imageSlots: ["class1", "class2", "class3", "class4", "class5", "class6", "class7", "class8"], overflow: "create photo continuation pages", continuation: "same class grid pattern", capacity: { itemsPerPage: 8 } }),
+  blueprint("staff-profiles", "staff-profiles", "Staff Profiles", "Staff Profiles", "The People Behind the Journey", { designStatus: "Approved Template", allowedCategories: ["teachers", "staff"], contentTypes: ["Administrative Staff / School Leadership", "Full-Time Teachers", "Part-Time Teachers", "Non-Academic Staff"], textSlots: ["itemsJson"], imageSlots: [], overflow: "create staff continuation pages", continuation: "same staff group pattern", capacity: { itemsPerPage: 18 } }),
+  blueprint("academic-contents", "academic-educational", "Academic & Educational Contents", "Academic & Educational Contents", "Ideas, Knowledge and Expressions from Our School Community", { designStatus: "Approved Template", allowedCategories: ["academic"], contentTypes: ["academic submissions only"], textSlots: ["contentType", "contentTitle", "author", "authorRole", "body", "caption", "itemsJson"], imageSlots: ["contentImage"], overflow: "split paragraph then sentence", continuation: "same academic pattern", capacity: { maxChars: 2400, itemsPerPage: 3 } }),
+  blueprint("school-life", "school-life-events", "School Life Events / Photo Splash", "School Life Events", "Moments from our school community", { designStatus: "Pending Design", allowedCategories: ["events", "gallery"], contentTypes: ["events/gallery submissions only"], textSlots: ["eventTitle", "eventDate", "body", "itemsJson"], imageSlots: ["event1", "event2", "event3", "event4", "event5", "event6"], overflow: "flexible placeholder; final design pending", continuation: "photo splash continuation placeholder", capacity: { itemsPerPage: 6 } }),
+  blueprint("advert", "advertisements", "Advertisements", "Advertisement", "", { designStatus: "Pending Design", allowedCategories: ["advertisements"], contentTypes: ["advertisements", "manual advert assets"], textSlots: ["placement", "advertiser", "body", "contact"], imageSlots: ["advertImage"], overflow: "manual advert review", continuation: "none", capacity: { maxChars: 900 } }),
+  blueprint("appreciation", "appreciation", "Appreciation / Acknowledgement", "Appreciation", "Acknowledgement", { designStatus: "Pending Design", allowedCategories: ["appreciation"], contentTypes: ["appreciation", "manual acknowledgement text"], textSlots: ["body", "names"], imageSlots: [], overflow: "split paragraph then sentence", continuation: "same acknowledgement pattern", capacity: { maxChars: 2400 } }),
+  blueprint("back-cover", "back-cover", "Back Cover", "Way To Success Standard Schools", "God - Knowledge - Leadership", { designStatus: "Pending Design", allowedCategories: [], contentTypes: ["manual back cover content only"], textSlots: ["schoolName", "motto", "body"], imageSlots: ["logo"], overflow: "manual review", continuation: "none", capacity: { maxChars: 900 } })
+];
+
+const TEMPLATE_GROUPS = PRODUCTION_TEMPLATE_BLUEPRINTS.map(bp => ({
+  id: bp.id,
+  sectionKey: bp.sectionKey,
+  label: bp.title,
+  defaultTitle: bp.defaultTitle,
+  defaultSubtitle: bp.defaultSubtitle,
+  unnumbered: !!bp.printRules.unnumbered
+}));
 
 const CATEGORY_LABELS = {
   teachers: "Staff Profiles",
@@ -58,30 +93,7 @@ const CATEGORY_LABELS = {
   appreciation: "Appreciation"
 };
 
-const COMPATIBLE_CATEGORIES = {
-  "front-cover": [],
-  "inside-cover": [],
-  contents: [],
-  "editorial-board": ["editor_board"],
-  "eic-address": ["editorial-note", "speeches", "editor_board"],
-  "brief-history": [],
-  "proprietor-speech": ["speeches"],
-  "senior-boy-speech": ["speeches"],
-  "senior-girl-speech": ["speeches"],
-  "interview-1": ["interviews"],
-  "interview-2": ["interviews"],
-  "class-message": ["ss3_class_message"],
-  "ss3-profiles": ["ss3"],
-  "jss3-profiles": ["jss3"],
-  "primary5-profiles": ["primary5"],
-  "class-cross-section": [],
-  "staff-profiles": ["teachers"],
-  "academic-contents": ["academic", "creative", "motivational"],
-  "school-life": ["events", "gallery"],
-  advert: ["advertisements"],
-  appreciation: ["appreciation"],
-  "back-cover": []
-};
+const COMPATIBLE_CATEGORIES = Object.fromEntries(PRODUCTION_TEMPLATE_BLUEPRINTS.map(bp => [bp.id, bp.allowedCategories]));
 
 const TEMPLATE_FIELDS = {
   "front-cover": {
@@ -185,7 +197,7 @@ const TEMPLATE_FIELDS = {
     images: ["class1","class2","class3","class4","class5","class6","class7","class8"].map((key, i) => imageField(key, `Class Photo ${i + 1}`, "contain"))
   },
   "staff-profiles": {
-    fields: [longField("itemsJson", "Manual Staff JSON")],
+    fields: [textField("chunkStart", "Record Start Index"), longField("itemsJson", "Manual Staff JSON")],
     images: []
   },
   "academic-contents": {
@@ -243,6 +255,44 @@ document.addEventListener("DOMContentLoaded", () => {
   refreshApprovedSubmissions();
 });
 
+function blueprint(id, sectionKey, title, defaultTitle, defaultSubtitle, options = {}) {
+  return {
+    id,
+    sectionKey,
+    title,
+    defaultTitle,
+    defaultSubtitle: defaultSubtitle || "",
+    designStatus: options.designStatus || "Pending Design",
+    referenceStatus: options.referenceStatus || "No Reference Yet",
+    referenceImage: options.referenceImage || "",
+    referenceMode: options.referenceMode || "Live Template Mode",
+    allowedCategories: options.allowedCategories || [],
+    contentTypes: options.contentTypes || [],
+    textSlots: options.textSlots || [],
+    imageSlots: options.imageSlots || [],
+    overflowBehavior: options.overflow || "detect and warn",
+    continuationBehavior: options.continuation || "same section pattern",
+    capacity: options.capacity || {},
+    speechType: options.speechType || "",
+    printRules: {
+      includeByDefault: options.includeByDefault !== false,
+      unnumbered: !!options.unnumbered
+    }
+  };
+}
+function speechBlueprint(requiredType) {
+  return {
+    designStatus: "Approved Template",
+    allowedCategories: ["speeches"],
+    contentTypes: [`${requiredType} speech only`],
+    textSlots: ["name", "role", "quote", "body", "closing"],
+    imageSlots: ["portrait"],
+    overflow: "split paragraph then sentence",
+    continuation: "same speech pattern",
+    capacity: { maxChars: 2300 },
+    speechType: requiredType
+  };
+}
 function textField(key, label) { return { key, label, type: "text" }; }
 function longField(key, label) { return { key, label, type: "textarea" }; }
 function selectField(key, label, options) { return { key, label, type: "select", options }; }
@@ -285,6 +335,9 @@ function cacheEls() {
   els.printFullBtn = document.getElementById("printFullBtn");
   els.printRoot = document.getElementById("printRoot");
   els.previewWarnings = document.getElementById("previewWarnings");
+  els.fitPreviewBtn = document.getElementById("fitPreviewBtn");
+  els.fullscreenPreviewBtn = document.getElementById("fullscreenPreviewBtn");
+  els.comparisonModeSelect = document.getElementById("comparisonModeSelect");
 }
 
 function wireEvents() {
@@ -295,6 +348,14 @@ function wireEvents() {
   els.deletePageBtn.addEventListener("click", deleteSelectedPage);
   els.printSelectedBtn.addEventListener("click", () => printMagazine("selected"));
   els.printFullBtn.addEventListener("click", () => printMagazine("full"));
+  els.fitPreviewBtn.addEventListener("click", () => setPreviewScale("fit"));
+  document.querySelectorAll("[data-preview-scale]").forEach(btn => btn.addEventListener("click", () => setPreviewScale(btn.dataset.previewScale)));
+  els.fullscreenPreviewBtn.addEventListener("click", requestPreviewFullscreen);
+  els.comparisonModeSelect.addEventListener("change", () => {
+    state.preview.comparison = els.comparisonModeSelect.value;
+    saveBuilderState();
+    renderPreview();
+  });
 }
 
 function fillTemplateSelect() {
@@ -308,11 +369,13 @@ function loadBuilderState() {
   } catch (err) {
     console.warn("[Builder] State load failed", err);
   }
-  return { pages: [], updatedAt: new Date().toISOString() };
+  return { pages: [], templates: normalizeTemplateLibrary({}), preview: normalizePreviewState({}), updatedAt: new Date().toISOString() };
 }
 function normalizeState(raw) {
   return {
     pages: raw.pages.map((page, index) => normalizePage(page, index)),
+    templates: normalizeTemplateLibrary(raw.templates || raw.templateLibrary || {}),
+    preview: normalizePreviewState(raw.preview || {}),
     updatedAt: raw.updatedAt || new Date().toISOString()
   };
 }
@@ -322,16 +385,17 @@ function saveBuilderState() {
 }
 function normalizePage(page, index) {
   const tpl = getTemplate(page.templateType) || TEMPLATE_GROUPS[0];
+  const status = normalizePageStatus(page.status);
   return {
     id: page.id || createId(),
     templateType: page.templateType || tpl.id,
     title: page.title || tpl.defaultTitle,
     subtitle: page.subtitle || tpl.defaultSubtitle || "",
-    status: PAGE_STATUSES.includes(page.status) ? page.status : "Placeholder Design",
+    status,
     order: Number.isFinite(page.order) ? page.order : index,
     pageNumber: page.pageNumber || "",
-    includeInExport: page.includeInExport !== false,
-    hidden: !!page.hidden,
+    includeInExport: status === "Excluded from Print" ? false : page.includeInExport !== false,
+    hidden: status === "Excluded from Print" ? true : !!page.hidden,
     sourceType: page.sourceType || "manual",
     sourceSubmissionId: page.sourceSubmissionId || "",
     manualFields: page.manualFields && typeof page.manualFields === "object" ? page.manualFields : {},
@@ -340,6 +404,40 @@ function normalizePage(page, index) {
     createdAt: page.createdAt || new Date().toISOString(),
     updatedAt: page.updatedAt || new Date().toISOString()
   };
+}
+function normalizePageStatus(status) {
+  const legacy = {
+    "Needs Revision": "In Production",
+    "Final Design": "Ready for Review",
+    "Ready for PDF": "Ready for Review",
+    locked: "Locked for Print",
+    approved: "Ready for Review",
+    hidden: "Excluded from Print"
+  };
+  const mapped = legacy[status] || status;
+  return PAGE_STATUSES.includes(mapped) ? mapped : "Placeholder Design";
+}
+function normalizeTemplateLibrary(saved) {
+  const library = {};
+  PRODUCTION_TEMPLATE_BLUEPRINTS.forEach(bp => {
+    const current = saved[bp.id] || {};
+    let designStatus = TEMPLATE_DESIGN_STATUSES.includes(current.designStatus) ? current.designStatus : (TEMPLATE_DESIGN_STATUSES.includes(bp.designStatus) ? bp.designStatus : "Pending Design");
+    if (bp.designStatus === "Approved Template" && current.designStatus === "Pending Design") designStatus = "Approved Template";
+    library[bp.id] = {
+      designStatus,
+      referenceStatus: REFERENCE_STATUSES.includes(current.referenceStatus) ? current.referenceStatus : bp.referenceStatus,
+      referenceMode: REFERENCE_MODES.includes(current.referenceMode) ? current.referenceMode : bp.referenceMode,
+      referenceImage: current.referenceImage || bp.referenceImage || "",
+      notes: current.notes || "",
+      includeInPrint: current.includeInPrint !== undefined ? !!current.includeInPrint : bp.printRules.includeByDefault !== false
+    };
+  });
+  return library;
+}
+function normalizePreviewState(preview) {
+  const scale = ["fit", "75", "100", "125"].includes(String(preview.scale)) ? String(preview.scale) : "fit";
+  const comparison = ["side-by-side", "reference-only", "live-only"].includes(preview.comparison) ? preview.comparison : "side-by-side";
+  return { scale, comparison };
 }
 function normalizeImages(images) {
   const out = {};
@@ -350,9 +448,9 @@ function normalizeImages(images) {
 }
 function normalizeImageValue(value) {
   if (!value) return { url: "", caption: "", source: "placeholder" };
-  if (typeof value === "string") return { url: value, caption: "", source: "manual url" };
+  if (typeof value === "string") return { url: cleanImageUrl(value), caption: "", source: "manual url" };
   return {
-    url: value.url || "",
+    url: cleanImageUrl(value.url || ""),
     caption: value.caption || "",
     source: value.source || (value.url ? "manual url" : "placeholder"),
     sourceLabel: value.sourceLabel || ""
@@ -363,6 +461,8 @@ function createId() {
   return "builder-" + Date.now() + "-" + Math.random().toString(16).slice(2);
 }
 function getTemplate(id) { return TEMPLATE_GROUPS.find(t => t.id === id); }
+function getBlueprint(id) { return PRODUCTION_TEMPLATE_BLUEPRINTS.find(t => t.id === id); }
+function templateLibraryItem(templateType) { return state.templates?.[templateType] || normalizeTemplateLibrary({})[templateType] || {}; }
 function getSchema(type) { return TEMPLATE_FIELDS[type] || { fields: [], images: [imageField("mainImage", "Main Image", "contain")] }; }
 
 function addPage(templateType, options = {}) {
@@ -386,7 +486,7 @@ function seedStarterPages(confirmFirst) {
   if (confirmFirst && state.pages.length && !confirm("Add the starter Builder page set to the current collector?")) return;
   ["inside-cover", "contents", "editorial-board", "eic-address", "brief-history", "senior-girl-speech", "staff-profiles", "ss3-profiles", "academic-contents"].forEach(type => {
     const tpl = getTemplate(type);
-    state.pages.push(normalizePage({ id: createId(), templateType: type, title: tpl.defaultTitle, subtitle: tpl.defaultSubtitle, status: type === "contents" ? "Final Design" : "Placeholder Design" }, state.pages.length));
+    state.pages.push(normalizePage({ id: createId(), templateType: type, title: tpl.defaultTitle, subtitle: tpl.defaultSubtitle, status: type === "contents" ? "Ready for Review" : "Placeholder Design" }, state.pages.length));
   });
   selectedPageId = selectedPageId || state.pages[0]?.id || null;
   persistAndRender();
@@ -409,14 +509,16 @@ function renderAll() {
   renderPreview();
   renderEditor();
 }
-function visibleExportPages() { return orderedPages().filter(p => p.includeInExport && !p.hidden); }
+function visibleExportPages() { return orderedPages().filter(isPageIncluded); }
 function orderedPages() { return [...state.pages].sort((a, b) => (a.order || 0) - (b.order || 0)); }
+function isPageIncluded(page) { return !!(page && page.includeInExport && !page.hidden && page.status !== "Excluded from Print"); }
+function isPageLocked(page) { return page?.status === "Locked for Print"; }
 function renumberPages() {
   let next = 1;
   orderedPages().forEach((page, index) => {
     page.order = index;
     const tpl = getTemplate(page.templateType);
-    page.pageNumber = (!page.includeInExport || page.hidden || tpl?.unnumbered) ? "" : String(next++).padStart(2, "0");
+    page.pageNumber = (!isPageIncluded(page) || tpl?.unnumbered) ? "" : String(next++).padStart(2, "0");
   });
 }
 function updateSelectedLabel() {
@@ -464,7 +566,10 @@ function renderPageList() {
     event.stopPropagation();
     const page = state.pages.find(p => p.id === btn.dataset.toggleInclude);
     if (!page) return;
+    if (isPageLocked(page)) { alert("This page is locked for print. Change its status before changing print inclusion."); return; }
     page.includeInExport = !page.includeInExport;
+    if (!page.includeInExport) page.status = "Excluded from Print";
+    else if (page.status === "Excluded from Print") page.status = "In Production";
     page.updatedAt = new Date().toISOString();
     persistAndRender();
   }));
@@ -472,7 +577,10 @@ function renderPageList() {
     event.stopPropagation();
     const page = state.pages.find(p => p.id === btn.dataset.toggleHidden);
     if (!page) return;
+    if (isPageLocked(page)) { alert("This page is locked for print. Change its status before hiding or showing it."); return; }
     page.hidden = !page.hidden;
+    if (page.hidden) page.status = "Excluded from Print";
+    else if (page.status === "Excluded from Print") page.status = "In Production";
     page.updatedAt = new Date().toISOString();
     persistAndRender();
   }));
@@ -483,6 +591,7 @@ function movePage(index, delta) {
   const pages = orderedPages();
   const target = index + delta;
   if (target < 0 || target >= pages.length) return;
+  if (isPageLocked(pages[index])) { alert("This page is locked for print. Change its status before moving it."); return; }
   const moved = pages.splice(index, 1)[0];
   pages.splice(target, 0, moved);
   pages.forEach((page, idx) => page.order = idx);
@@ -492,6 +601,7 @@ function movePage(index, delta) {
 function duplicateSelectedPage() {
   const page = selectedPage();
   if (!page) return;
+  if (isPageLocked(page)) { alert("This page is locked for print. Change its status before duplicating it."); return; }
   const copy = normalizePage(JSON.parse(JSON.stringify(page)), state.pages.length);
   copy.id = createId();
   copy.title = `${copy.title} Copy`;
@@ -505,6 +615,7 @@ function duplicateSelectedPage() {
 function deleteSelectedPage() {
   const page = selectedPage();
   if (!page) return;
+  if (isPageLocked(page)) { alert("This page is locked for print. Change its status before deleting it."); return; }
   if (!confirm("Delete this Builder page only? Original submissions will not be changed.")) return;
   state.pages = state.pages.filter(p => p.id !== page.id);
   selectedPageId = orderedPages()[0]?.id || null;
@@ -514,19 +625,34 @@ function deleteSelectedPage() {
 function updatePageField(id, value, fullRender = true) {
   const page = selectedPage();
   if (!page) return;
+  if (isPageLocked(page) && id !== "status") {
+    alert("This page is locked for print. Change its status before editing it.");
+    renderEditor();
+    return;
+  }
   if (id === "templateType") {
     const oldTpl = getTemplate(page.templateType);
     const newTpl = getTemplate(value);
     if (newTpl && (!page.title || page.title === oldTpl?.defaultTitle)) page.title = newTpl.defaultTitle;
     if (newTpl && (!page.subtitle || page.subtitle === oldTpl?.defaultSubtitle)) page.subtitle = newTpl.defaultSubtitle || "";
   }
+  if (id === "status") value = normalizePageStatus(value);
   page[id] = value;
+  if (id === "status" && value === "Excluded from Print") {
+    page.includeInExport = false;
+    page.hidden = true;
+  }
+  if (id === "status" && value !== "Excluded from Print" && !page.includeInExport) {
+    page.includeInExport = true;
+    page.hidden = false;
+  }
   page.updatedAt = new Date().toISOString();
   if (fullRender) persistAndRender(); else persistAndRefreshPreview();
 }
 function updateManualField(key, value) {
   const page = selectedPage();
   if (!page) return;
+  if (isPageLocked(page)) { alert("This page is locked for print. Change its status before editing fields."); renderEditor(); return; }
   page.manualFields[key] = value;
   page.updatedAt = new Date().toISOString();
   persistAndRefreshPreview();
@@ -534,6 +660,7 @@ function updateManualField(key, value) {
 function setImageSlot(slot, patch, fullRender = false) {
   const page = selectedPage();
   if (!page) return;
+  if (isPageLocked(page)) { alert("This page is locked for print. Change its status before editing images."); renderEditor(); return; }
   const current = normalizeImageValue(page.images[slot]);
   page.images[slot] = { ...current, ...patch };
   page.updatedAt = new Date().toISOString();
@@ -554,10 +681,13 @@ function renderEditor() {
     return;
   }
   const tpl = getTemplate(page.templateType);
+  const blueprintData = getBlueprint(page.templateType);
+  const library = templateLibraryItem(page.templateType);
   const schema = getSchema(page.templateType);
   updateSelectedLabel();
   const compatible = compatibleSubmissions(page.templateType);
   const selectedSource = approvedSubmissions.find(s => String(s.id) === String(page.sourceSubmissionId));
+  const selectedAllowed = selectedSource ? canUseSubmissionForTemplate(selectedSource, page.templateType) : null;
   els.editorPanel.innerHTML = `
     <section class="editor-section">
       <h3>Page Setup</h3>
@@ -572,10 +702,33 @@ function renderEditor() {
       <div class="editor-field"><label>Notes</label><textarea data-editor-field="notes">${esc(page.notes)}</textarea></div>
     </section>
     <section class="editor-section">
+      <h3>Reference Template Library</h3>
+      <div class="blueprint-card">
+        <strong>${esc(blueprintData?.title || tpl?.label || page.templateType)}</strong>
+        <span>Section key: ${esc(blueprintData?.sectionKey || page.templateType)}</span>
+        <span>Allowed categories: ${esc((blueprintData?.allowedCategories || []).join(", ") || "manual only")}</span>
+        <span>Allowed content/type: ${esc((blueprintData?.contentTypes || []).join(", ") || "manual only")}</span>
+        <span>Overflow: ${esc(blueprintData?.overflowBehavior || "detect and warn")}</span>
+        <span>Continuation: ${esc(blueprintData?.continuationBehavior || "same section pattern")}</span>
+      </div>
+      <div class="editor-field"><label>Template Status</label><select data-template-library="designStatus">${TEMPLATE_DESIGN_STATUSES.map(status => `<option ${status === library.designStatus ? "selected" : ""}>${esc(status)}</option>`).join("")}</select></div>
+      <div class="editor-field"><label>Reference Status</label><select data-template-library="referenceStatus">${REFERENCE_STATUSES.map(status => `<option ${status === library.referenceStatus ? "selected" : ""}>${esc(status)}</option>`).join("")}</select></div>
+      <div class="editor-field"><label>Reference Mode</label><select data-template-library="referenceMode">${REFERENCE_MODES.map(mode => `<option ${mode === library.referenceMode ? "selected" : ""}>${esc(mode)}</option>`).join("")}</select></div>
+      <div class="editor-field"><label>Approved Reference Image URL / Path</label><input data-template-library="referenceImage" value="${escAttr(library.referenceImage)}" placeholder="Paste approved reference image URL or production asset path"></div>
+      <div class="reference-upload-row">
+        <input type="file" accept="image/*" data-reference-upload style="display:none;">
+        <button type="button" data-reference-upload-btn>Upload Reference</button>
+        <button type="button" data-reference-clear class="danger-btn">Clear Reference</button>
+      </div>
+      <div class="reference-thumb">${library.referenceImage ? `<img src="${escAttr(library.referenceImage)}" alt="${escAttr(blueprintData?.title || "Reference")}">` : "No reference uploaded yet"}</div>
+      <div class="editor-field"><label>Reference Notes</label><textarea data-template-library="notes">${esc(library.notes || "")}</textarea></div>
+    </section>
+    <section class="editor-section">
       <h3>Approved Source</h3>
       <div class="editor-field"><label>Source Type</label><select data-editor-field="sourceType">${["manual", "approved submission", "mixed"].map(type => `<option value="${type}" ${page.sourceType === type ? "selected" : ""}>${type}</option>`).join("")}</select></div>
       <div class="editor-field"><label>Approved Submission Source</label><select data-editor-field="sourceSubmissionId"><option value="">No linked source</option>${compatible.map(s => `<option value="${esc(s.id)}" ${String(page.sourceSubmissionId) === String(s.id) ? "selected" : ""}>${esc(submissionLabel(s))}</option>`).join("")}</select></div>
-      <div class="editor-note">Render priority: manual Builder fields, then correctly linked approved submission data, then clean placeholders. Original submissions are never overwritten.${selectedSource ? `<br>Linked source: ${esc(submissionLabel(selectedSource))}` : ""}</div>
+      <div class="editor-note">Render priority: manual Builder fields, then strictly matched linked approved submission data, then clean placeholders. Original submissions are never overwritten.${selectedSource ? `<br>Linked source: ${esc(submissionLabel(selectedSource))}<br>Routing: ${selectedAllowed?.allowed ? "accepted" : "blocked"}${selectedAllowed?.reason ? " - " + esc(selectedAllowed.reason) : ""}` : ""}</div>
+      ${renderRoutingAudit(page.templateType)}
       ${dynamicPageButton(page)}
     </section>
     <section class="editor-section">
@@ -602,7 +755,7 @@ function renderTemplateFieldInputs(page, fields) {
 
 function renderAssetRows(page, images) {
   if (!images.length) return `<div class="editor-note">This template does not need a direct image asset. It can still use approved submission photos where relevant.</div>`;
-  const approvedImages = approvedImageOptions();
+  const approvedImages = approvedImageOptions(page.templateType);
   return images.map(img => {
     const current = imageObj(page, img.key);
     const url = current.url || "";
@@ -637,6 +790,23 @@ function bindEditorEvents(page) {
     }
   });
   els.editorPanel.querySelectorAll("[data-editor-bool]").forEach(input => input.addEventListener("change", () => updatePageField(input.dataset.editorBool, input.checked)));
+  els.editorPanel.querySelectorAll("[data-template-library]").forEach(input => {
+    const key = input.dataset.templateLibrary;
+    const handler = () => updateTemplateLibraryField(page.templateType, key, input.value);
+    input.addEventListener("change", handler);
+  });
+  const refUploadBtn = els.editorPanel.querySelector("[data-reference-upload-btn]");
+  const refUpload = els.editorPanel.querySelector("[data-reference-upload]");
+  if (refUploadBtn && refUpload) refUploadBtn.addEventListener("click", () => refUpload.click());
+  if (refUpload) refUpload.addEventListener("change", () => {
+    const file = refUpload.files && refUpload.files[0];
+    if (file) uploadTemplateReference(page.templateType, file);
+  });
+  const refClear = els.editorPanel.querySelector("[data-reference-clear]");
+  if (refClear) refClear.addEventListener("click", () => {
+    updateTemplateLibraryField(page.templateType, "referenceImage", "");
+    updateTemplateLibraryField(page.templateType, "referenceStatus", "No Reference Yet");
+  });
   els.editorPanel.querySelectorAll("[data-manual-field]").forEach(input => input.addEventListener("input", () => updateManualField(input.dataset.manualField, input.value)));
   els.editorPanel.querySelectorAll("[data-image-url]").forEach(input => input.addEventListener("change", () => setImageSlot(input.dataset.imageUrl, { url: input.value.trim(), source: input.value.trim() ? "pasted URL" : "placeholder" }, true)));
   els.editorPanel.querySelectorAll("[data-image-caption]").forEach(input => input.addEventListener("input", () => setImageSlot(input.dataset.imageCaption, { caption: input.value }, false)));
@@ -656,11 +826,80 @@ function bindEditorEvents(page) {
   els.editorPanel.querySelectorAll("[data-image-remove]").forEach(btn => btn.addEventListener("click", () => clearImageSlot(btn.dataset.imageRemove)));
   const autoBtn = els.editorPanel.querySelector("[data-auto-pages]");
   if (autoBtn) autoBtn.addEventListener("click", () => autoGeneratePages(page.templateType));
+  const continuationBtn = els.editorPanel.querySelector("[data-create-continuations]");
+  if (continuationBtn) continuationBtn.addEventListener("click", createContinuationsForSelectedPage);
+}
+
+function updateTemplateLibraryField(templateType, key, value) {
+  if (!state.templates) state.templates = normalizeTemplateLibrary({});
+  const current = state.templates[templateType] || templateLibraryItem(templateType);
+  if (key === "designStatus" && !TEMPLATE_DESIGN_STATUSES.includes(value)) value = "Pending Design";
+  if (key === "referenceStatus" && !REFERENCE_STATUSES.includes(value)) value = "No Reference Yet";
+  if (key === "referenceMode" && !REFERENCE_MODES.includes(value)) value = "Live Template Mode";
+  state.templates[templateType] = { ...current, [key]: value };
+  if (key === "referenceImage" && value && current.referenceStatus === "No Reference Yet") state.templates[templateType].referenceStatus = "Reference Uploaded";
+  saveBuilderState();
+  renderPreview();
+  renderEditor();
+}
+
+async function uploadTemplateReference(templateType, file) {
+  if (!file || !file.type.startsWith("image/")) {
+    alert("Please choose an image file.");
+    return;
+  }
+  try {
+    const sb = getSupa();
+    if (!sb) throw new Error("Supabase client is unavailable");
+    const ext = imageExt(file);
+    const day = new Date().toISOString().slice(0, 10);
+    const safeTemplate = templateType.replace(/[^a-z0-9_-]/gi, "_");
+    const path = `builder-references/${day}/${safeTemplate}-${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, file, {
+      cacheControl: "31536000",
+      contentType: file.type || `image/${ext}`,
+      upsert: false
+    });
+    if (error) throw error;
+    const { data } = sb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+    if (!data?.publicUrl) throw new Error("Upload completed without a public URL");
+    updateTemplateLibraryField(templateType, "referenceImage", data.publicUrl);
+    updateTemplateLibraryField(templateType, "referenceStatus", "Reference Uploaded");
+  } catch (err) {
+    console.warn("[Builder] Reference upload failed, using local preview only", err);
+    const localUrl = URL.createObjectURL(file);
+    updateTemplateLibraryField(templateType, "referenceImage", localUrl);
+    updateTemplateLibraryField(templateType, "referenceStatus", "Reference Uploaded");
+    alert("Cloud upload failed, so this reference is local-only for this browser session. Paste or upload a final Storage URL before locking the template.");
+  }
 }
 
 function dynamicPageButton(page) {
-  if (!["ss3-profiles", "jss3-profiles", "primary5-profiles", "staff-profiles"].includes(page.templateType)) return "";
-  return `<button type="button" class="primary-btn" data-auto-pages="${esc(page.templateType)}">Auto-fill pages from approved records</button><div class="editor-note">Creates Builder pages only. Submitted records are not changed.</div>`;
+  const buttons = [];
+  if (["ss3-profiles", "jss3-profiles", "primary5-profiles", "staff-profiles"].includes(page.templateType)) {
+    buttons.push(`<button type="button" class="primary-btn" data-auto-pages="${esc(page.templateType)}">Auto-fill pages from approved records</button>`);
+  }
+  const bp = getBlueprint(page.templateType);
+  if (bp && bp.continuationBehavior !== "none" && primaryContinuationSlot(page.templateType)) {
+    buttons.push(`<button type="button" data-create-continuations>Create Continuation Pages</button>`);
+  }
+  return buttons.length ? `${buttons.join("")}<div class="editor-note">Creates Builder pages only. Submitted records are not changed.</div>` : "";
+}
+
+function renderRoutingAudit(templateType) {
+  const unassigned = unassignedSubmissions();
+  const compatibleCount = compatibleSubmissions(templateType).length;
+  return `
+    <div class="routing-audit">
+      <strong>${compatibleCount}</strong> approved source${compatibleCount === 1 ? "" : "s"} match this blueprint.
+      <br><strong>${unassigned.length}</strong> approved source${unassigned.length === 1 ? "" : "s"} are Unassigned / Needs Review.
+      ${unassigned.length ? `<details><summary>View unassigned</summary>${unassigned.slice(0, 18).map(sub => `<div>${esc(submissionLabel(sub))}</div>`).join("")}</details>` : ""}
+    </div>
+  `;
+}
+
+function unassignedSubmissions() {
+  return approvedSubmissions.filter(sub => !PRODUCTION_TEMPLATE_BLUEPRINTS.some(bp => canUseSubmissionForTemplate(sub, bp.id).allowed));
 }
 
 async function uploadBuilderImage(slot, file) {
@@ -709,16 +948,70 @@ function imageExt(file) {
 
 function renderPreview() {
   const page = selectedPage();
+  syncPreviewControls();
   if (!page) {
     els.previewCanvas.innerHTML = document.getElementById("emptyPageTemplate").innerHTML;
     showPreviewWarning("");
     return;
   }
-  els.previewCanvas.innerHTML = renderPage(page);
+  const library = templateLibraryItem(page.templateType);
+  const referenceHtml = renderReferencePanel(page, library);
+  const liveHtml = renderLivePreviewPanel(page, library);
+  const comparison = state.preview.comparison;
+  const panels = comparison === "reference-only" ? referenceHtml : comparison === "live-only" ? liveHtml : referenceHtml + liveHtml;
+  els.previewCanvas.dataset.scale = state.preview.scale;
+  els.previewCanvas.dataset.comparison = comparison;
+  els.previewCanvas.innerHTML = `<div class="preview-compare">${panels}</div>`;
   inspectRenderedPages(els.previewCanvas);
+}
+function syncPreviewControls() {
+  if (els.comparisonModeSelect) els.comparisonModeSelect.value = state.preview.comparison;
+  document.querySelectorAll("[data-preview-scale]").forEach(btn => btn.classList.toggle("active", state.preview.scale === btn.dataset.previewScale));
+  if (els.fitPreviewBtn) els.fitPreviewBtn.classList.toggle("active", state.preview.scale === "fit");
+}
+function setPreviewScale(scale) {
+  state.preview.scale = ["fit", "75", "100", "125"].includes(String(scale)) ? String(scale) : "fit";
+  saveBuilderState();
+  renderPreview();
+}
+function requestPreviewFullscreen() {
+  const target = els.previewCanvas;
+  if (!target) return;
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if (target.requestFullscreen) target.requestFullscreen();
+}
+function renderReferencePanel(page, library) {
+  const bp = getBlueprint(page.templateType);
+  const image = library.referenceImage || "";
+  return `
+    <section class="preview-panel reference-panel">
+      <header><span>Approved Reference</span><strong>${esc(bp?.title || page.title)}</strong></header>
+      <div class="reference-sheet">
+        ${image ? `<img src="${escAttr(image)}" alt="${escAttr((bp?.title || page.title) + " reference")}">` : `<div class="reference-empty">No approved reference image attached yet.</div>`}
+      </div>
+      <footer>${esc(library.referenceStatus || "No Reference Yet")} / ${esc(library.referenceMode || "Live Template Mode")}</footer>
+    </section>
+  `;
+}
+function renderLivePreviewPanel(page, library) {
+  return `
+    <section class="preview-panel live-panel">
+      <header><span>Live Template Preview</span><strong>${esc(page.title)}</strong></header>
+      <div class="live-sheet">${renderPage(page, { mode: library.referenceMode })}</div>
+      <footer>${esc(page.status)}${page.pageNumber ? " / page " + esc(page.pageNumber) : ""}</footer>
+    </section>
+  `;
 }
 function renderPage(page) {
   const tpl = getTemplate(page.templateType);
+  const library = templateLibraryItem(page.templateType);
+  if (library.referenceMode === "Static Final Page Mode" && library.referenceImage) {
+    return `
+      <section class="mag-page ${tpl?.unnumbered ? "unnumbered" : ""} mag-page--static-final" data-template="${esc(page.templateType)}">
+        <img src="${escAttr(library.referenceImage)}" alt="${escAttr(page.title)}">
+      </section>
+    `;
+  }
   return `
     <section class="mag-page ${tpl?.unnumbered ? "unnumbered" : ""}" data-template="${esc(page.templateType)}">
       <span class="mag-curve-top"></span>
@@ -802,7 +1095,7 @@ function renderInsideCover(page) {
   `;
 }
 function renderContents(page) {
-  const items = visibleExportPages().filter(p => !["front-cover", "inside-cover", "contents", "back-cover"].includes(p.templateType)).map(p => ({ title: p.title || getTemplate(p.templateType)?.label || "Untitled", page: p.pageNumber || "00", type: getTemplate(p.templateType)?.label || p.templateType }));
+  const items = visibleExportPages().filter(p => !["front-cover", "inside-cover", "contents"].includes(p.templateType)).map(p => ({ title: p.title || getTemplate(p.templateType)?.label || "Untitled", page: p.pageNumber || "00", type: getTemplate(p.templateType)?.label || p.templateType }));
   const groups = chunk(items, Math.ceil(Math.max(items.length, 1) / 6) || 1).slice(0, 6);
   while (groups.length < 6) groups.push([]);
   return `
@@ -818,7 +1111,7 @@ function renderContents(page) {
 }
 function renderEditorialBoard(page) {
   const manual = getManualItems(page);
-  const approved = approvedSubmissions.filter(s => s.category === "editor_board").map(subToPerson);
+  const approved = approvedSubmissions.filter(s => canUseSubmissionForTemplate(s, "editorial-board").allowed).map(subToPerson);
   const all = manual.length ? manual : approved;
   const editor = all.find(p => /editor[- ]?in[- ]?chief|editorial chairman/i.test(`${p.role || ""} ${p.title || ""}`));
   const members = all.filter(p => p !== editor).slice(0, 6);
@@ -892,7 +1185,7 @@ function renderClassMessage(page) {
 }
 function renderStudentProfiles(page, category, perPage, detailed) {
   const manual = getManualItems(page);
-  const approved = approvedSubmissions.filter(s => s.category === category).map(subToPerson);
+  const approved = approvedSubmissions.filter(s => canUseSubmissionForTemplate(s, page.templateType).allowed && s.category === category).map(subToPerson);
   const source = manual.length ? manual : approved;
   const start = Number(page.manualFields.chunkStart || 0);
   const entries = source.slice(start, start + perPage);
@@ -915,8 +1208,10 @@ function renderClassCrossSection(page) {
 }
 function renderStaffProfiles(page) {
   const manual = getManualItems(page);
-  const approved = approvedSubmissions.filter(s => s.category === "teachers").map(subToPerson);
-  const staff = manual.length ? manual : approved;
+  const approved = approvedSubmissions.filter(s => canUseSubmissionForTemplate(s, "staff-profiles").allowed).map(subToPerson);
+  const allStaff = manual.length ? manual : approved;
+  const start = Number(page.manualFields.chunkStart || 0);
+  const staff = allStaff.slice(start, start + 18);
   const buckets = [
     ["Administrative Staff / School Leadership", /principal|head|director|admin|bursar|lead/i],
     ["Full-Time Teachers", /full|teacher|subject|class/i],
@@ -939,7 +1234,7 @@ function renderStaffCard(person) {
 }
 function renderAcademicContents(page) {
   const manual = getManualItems(page);
-  const approved = approvedSubmissions.filter(s => ["academic", "creative", "motivational"].includes(s.category)).map(subToArticle);
+  const approved = approvedSubmissions.filter(s => canUseSubmissionForTemplate(s, "academic-contents").allowed).map(subToArticle);
   const single = {
     type: mf(page, "contentType", [], "Featured Content"),
     title: mf(page, "contentTitle", ["articleTitle", "contribTitle"], "Content Title"),
@@ -954,7 +1249,8 @@ function renderAcademicContents(page) {
 }
 function renderSchoolLife(page) {
   const manual = getManualItems(page);
-  const items = manual.length ? manual : [1,2,3,4,5,6].map(i => ({ title: mf(page, "eventTitle", [], "School Life"), photo: imageUrl(page, `event${i}`), caption: i === 1 ? mf(page, "body", [], "") : "" }));
+  const routed = approvedSubmissions.filter(s => canUseSubmissionForTemplate(s, "school-life").allowed).map(sub => ({ title: fieldValue(sub, ["eventTitle", "title"]) || submissionLabel(sub), photo: firstPhoto(sub, 0), caption: fieldValue(sub, ["caption", "body", "eventDescription"]) }));
+  const items = manual.length ? manual : (routed.length ? routed : [1,2,3,4,5,6].map(i => ({ title: mf(page, "eventTitle", [], "School Life"), photo: imageUrl(page, `event${i}`), caption: i === 1 ? mf(page, "body", [], "") : "" })));
   return `${pageHead(page, "School Life")}<div class="gallery-grid">${items.slice(0, 6).map(item => `<div class="gallery-item">${photoBox(item.photo, "group-img")}${(item.caption || item.title) ? `<div class="gallery-caption">${esc(item.caption || item.title)}</div>` : ""}</div>`).join("")}</div>`;
 }
 function renderAdvert(page) {
@@ -997,11 +1293,7 @@ function mf(page, manualKey, sourceKeys, fallback = "") {
 function sourceFor(page, templateType) {
   const sub = getSelectedSubmission(page);
   if (!sub) return null;
-  const cats = COMPATIBLE_CATEGORIES[templateType];
-  if (cats && !cats.includes(sub.category)) return null;
-  if (["proprietor-speech", "senior-boy-speech", "senior-girl-speech"].includes(templateType)) return speechSource(page, speechLabelForTemplate(templateType));
-  if (templateType === "eic-address" && sub.category === "speeches" && !/editor|chairman/i.test(fieldValue(sub, ["speechType", "speakerTitle", "title"]))) return null;
-  return sub;
+  return canUseSubmissionForTemplate(sub, templateType).allowed ? sub : null;
 }
 function speechLabelForTemplate(templateType) {
   if (templateType === "proprietor-speech") return "Proprietor";
@@ -1011,9 +1303,51 @@ function speechLabelForTemplate(templateType) {
 }
 function speechSource(page, requiredType) {
   const sub = getSelectedSubmission(page);
-  if (!sub || sub.category !== "speeches") return null;
-  const type = fieldValue(sub, ["speechType", "speakerTitle", "title"]).toLowerCase();
-  return type.includes(requiredType.toLowerCase()) ? sub : null;
+  if (!sub) return null;
+  return canUseSubmissionForTemplate(sub, page.templateType).allowed ? sub : null;
+}
+function canUseSubmissionForTemplate(sub, templateType) {
+  if (!sub) return { allowed: false, reason: "No submission selected" };
+  const bp = getBlueprint(templateType);
+  if (!bp) return { allowed: false, reason: "Unknown template" };
+  const cat = String(sub.category || "");
+  const typeText = [
+    cat,
+    fieldValue(sub, ["speechType", "speech_type", "contentType", "content_type", "contribType", "contrib_type", "assignment", "assignedSection", "assigned_section", "section", "title", "speechTitle", "speech_title", "speakerTitle", "speaker_title", "role"]),
+    fieldValue(sub, ["name", "speakerName", "speaker_name", "intervieweeName", "interviewee_name", "authorName", "author_name", "businessName", "business_name"])
+  ].join(" ").toLowerCase();
+
+  if (["front-cover", "inside-cover", "contents", "brief-history", "back-cover"].includes(templateType)) {
+    return { allowed: false, reason: "Manual-only section" };
+  }
+  if (["proprietor-speech", "senior-boy-speech", "senior-girl-speech"].includes(templateType)) {
+    if (cat !== "speeches") return { allowed: false, reason: "Not a speech submission" };
+    const required = speechLabelForTemplate(templateType).toLowerCase();
+    return typeText.includes(required) ? { allowed: true, reason: `Matched ${required} speech` } : { allowed: false, reason: `Speech type is not ${required}` };
+  }
+  if (templateType === "eic-address") {
+    if (cat === "editorial-note") return { allowed: true, reason: "Editorial note" };
+    if (cat === "speeches" && /editor|editor-in-chief|editorial chairman|chairman/.test(typeText)) return { allowed: true, reason: "Explicit Editor-in-Chief address" };
+    return { allowed: false, reason: "Not an Editor-in-Chief / Editorial Chairman address" };
+  }
+  if (templateType === "editorial-board") {
+    if (cat !== "editor_board") return { allowed: false, reason: "Not editorial board data" };
+    return { allowed: true, reason: "Editorial board submission" };
+  }
+  if (templateType === "class-message") {
+    if (cat === "ss3_class_message") return { allowed: true, reason: "SS3 class message" };
+    if (/graduating class|class message/.test(typeText)) return { allowed: true, reason: "Explicit graduating class message" };
+    return { allowed: false, reason: "Not a graduating class message" };
+  }
+  if (templateType === "class-cross-section") {
+    if (!["class_photo", "primary5_class_photo", "jss3_class_photo", "gallery", "events"].includes(cat)) return { allowed: false, reason: "Not a class/gallery/event image" };
+    return /class|cross section|cross-section/.test(typeText) ? { allowed: true, reason: "Explicit class section assignment" } : { allowed: false, reason: "Class image is not explicitly assigned" };
+  }
+  if (["ss3-profiles", "jss3-profiles", "primary5-profiles", "interview-1", "interview-2", "staff-profiles", "academic-contents", "school-life", "advert", "appreciation"].includes(templateType)) {
+    const cats = bp.allowedCategories || [];
+    return cats.includes(cat) ? { allowed: true, reason: "Category matched blueprint" } : { allowed: false, reason: `Category ${cat || "unknown"} is not allowed` };
+  }
+  return { allowed: false, reason: "No confident route" };
 }
 function getSelectedSubmission(page) {
   if (!page?.sourceSubmissionId) return null;
@@ -1060,10 +1394,10 @@ function subToArticle(sub) {
 }
 function firstPhoto(sub, index) {
   if (!sub) return "";
-  if (index === 0 && sub.photoData) return sub.photoData;
+  if (index === 0 && cleanImageUrl(sub.photoData)) return cleanImageUrl(sub.photoData);
   const photos = Array.isArray(sub.photos) ? sub.photos : [];
   const photo = photos[index] || photos[0];
-  return photo?.url || photo?.data || "";
+  return cleanImageUrl(photo?.url || photo?.data || "");
 }
 function getManualItems(page) {
   const raw = page.manualFields?.itemsJson;
@@ -1080,8 +1414,7 @@ function placeholderPeople(count, label) {
 }
 
 function compatibleSubmissions(templateType) {
-  const cats = COMPATIBLE_CATEGORIES[templateType];
-  const list = cats ? approvedSubmissions.filter(s => cats.includes(s.category)) : approvedSubmissions;
+  const list = approvedSubmissions.filter(s => canUseSubmissionForTemplate(s, templateType).allowed);
   return list.sort((a, b) => submissionLabel(a).localeCompare(submissionLabel(b)));
 }
 function sourceLabel(page) {
@@ -1095,17 +1428,22 @@ function submissionLabel(sub) {
   const name = fieldValue(sub, ["name", "speakerName", "intervieweeName", "authorName", "contribName", "className", "businessName", "title", "articleTitle"]) || sub.id;
   return `${CATEGORY_LABELS[sub.category] || sub.category}: ${name}`;
 }
-function approvedImageOptions() {
+function approvedImageOptions(templateType) {
   const opts = [];
-  approvedSubmissions.forEach(sub => {
+  approvedSubmissions.filter(sub => canUseSubmissionForTemplate(sub, templateType).allowed).forEach(sub => {
     const label = submissionLabel(sub);
-    if (sub.photoData) opts.push({ url: sub.photoData, label });
+    if (cleanImageUrl(sub.photoData)) opts.push({ url: cleanImageUrl(sub.photoData), label });
     (Array.isArray(sub.photos) ? sub.photos : []).forEach((p, i) => {
-      const url = p?.url || p?.data;
+      const url = cleanImageUrl(p?.url || p?.data || "");
       if (url) opts.push({ url, label: `${label} - photo ${i + 1}` });
     });
   });
   return opts;
+}
+function cleanImageUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw || /^data:image\//i.test(raw)) return "";
+  return raw;
 }
 function missingContent(page) {
   const misses = [];
@@ -1123,10 +1461,10 @@ function autoGeneratePages(templateType) {
     "ss3-profiles": { cat: "ss3", per: 10 },
     "jss3-profiles": { cat: "jss3", per: 20 },
     "primary5-profiles": { cat: "primary5", per: 20 },
-    "staff-profiles": { cat: "teachers", per: 30 }
+    "staff-profiles": { cat: "teachers", per: 18 }
   }[templateType];
   if (!cfg) return;
-  const records = approvedSubmissions.filter(s => s.category === cfg.cat);
+  const records = approvedSubmissions.filter(s => canUseSubmissionForTemplate(s, templateType).allowed);
   if (!records.length) { alert("No approved records found for this template yet."); return; }
   const tpl = getTemplate(templateType);
   const count = Math.ceil(records.length / cfg.per);
@@ -1139,7 +1477,8 @@ function autoGeneratePages(templateType) {
 
 function printMagazine(mode) {
   renumberPages();
-  const pages = mode === "selected" ? [selectedPage()].filter(Boolean) : visibleExportPages();
+  const basePages = mode === "selected" ? [selectedPage()].filter(Boolean) : visibleExportPages();
+  const pages = renumberTransientPages(expandPagesForContinuations(basePages));
   if (!pages.length) { alert("No pages available to print."); return; }
   els.printRoot.innerHTML = pages.map(page => renderPage(page)).join("");
   preloadImages(els.printRoot).then(warnings => {
@@ -1148,13 +1487,148 @@ function printMagazine(mode) {
     window.print();
   });
 }
+
+function renumberTransientPages(pages) {
+  let next = 1;
+  return pages.map(page => {
+    const clone = normalizePage(JSON.parse(JSON.stringify(page)), page.order || 0);
+    const tpl = getTemplate(clone.templateType);
+    clone.pageNumber = (!isPageIncluded(clone) || tpl?.unnumbered) ? "" : String(next++).padStart(2, "0");
+    return clone;
+  });
+}
+
+function createContinuationsForSelectedPage() {
+  const page = selectedPage();
+  if (!page) return;
+  if (isPageLocked(page)) { alert("This page is locked for print. Change its status before creating continuation pages."); return; }
+  const expanded = expandSinglePageForContinuations(page, true);
+  if (expanded.length <= 1) {
+    alert("No continuation was needed based on the current blueprint capacity.");
+    return;
+  }
+  const baseIndex = orderedPages().findIndex(p => p.id === page.id);
+  const pages = orderedPages().filter(p => p.id !== page.id);
+  expanded.forEach((p, offset) => {
+    p.order = baseIndex + offset / 10;
+    pages.splice(baseIndex + offset, 0, p);
+  });
+  state.pages = pages;
+  selectedPageId = expanded[0].id;
+  persistAndRender();
+}
+
+function expandPagesForContinuations(pages) {
+  return pages.flatMap(page => expandSinglePageForContinuations(page, false));
+}
+
+function expandSinglePageForContinuations(page, persistIds) {
+  const bp = getBlueprint(page.templateType);
+  const slot = primaryContinuationSlot(page.templateType);
+  if (!bp || bp.continuationBehavior === "none" || !slot) return [page];
+  const maxChars = bp.capacity.maxChars || 2400;
+  const text = resolvedContinuationText(page, slot);
+  if (!text || text.length <= maxChars) return [page];
+  const chunks = splitTextForContinuation(text, maxChars);
+  if (chunks.length <= 1) return [page];
+  return chunks.map((chunkText, index) => {
+    const clone = normalizePage(JSON.parse(JSON.stringify(page)), page.order + index / 10);
+    clone.id = index === 0 ? page.id : (persistIds ? createId() : `${page.id}-continuation-${index + 1}`);
+    clone.title = index === 0 ? page.title : `${page.title.replace(/\s+\(Continued\)$/i, "")} (Continued)`;
+    clone.status = index === 0 ? page.status : "In Production";
+    clone.manualFields = { ...clone.manualFields, [slot]: chunkText };
+    clone.sourceSubmissionId = "";
+    clone.sourceType = index === 0 ? page.sourceType : "continuation";
+    clone.notes = index === 0 ? page.notes : `Continuation page generated from ${page.title}.`;
+    clone.createdAt = index === 0 ? page.createdAt : new Date().toISOString();
+    clone.updatedAt = new Date().toISOString();
+    return clone;
+  });
+}
+
+function primaryContinuationSlot(templateType) {
+  return {
+    "eic-address": "body",
+    "brief-history": "section1Body",
+    "proprietor-speech": "body",
+    "senior-boy-speech": "body",
+    "senior-girl-speech": "body",
+    "interview-1": "qaBody",
+    "interview-2": "qaBody",
+    "class-message": "body",
+    "academic-contents": "body",
+    appreciation: "body"
+  }[templateType] || "";
+}
+
+function resolvedContinuationText(page, slot) {
+  if (page.manualFields?.[slot]) return String(page.manualFields[slot]);
+  if (slot === "body") return mf(page, "body", ["body", "speechBody", "message", "articleBody", "contribBody", "classMessage"], "");
+  if (slot === "qaBody") return mf(page, "qaBody", ["qaBody"], "");
+  if (slot === "section1Body") {
+    return ["section1Body", "section2Body", "section3Body", "section4Body"].map(key => page.manualFields[key]).filter(Boolean).join("\n\n") || mf(page, "section1Body", ["body", "history", "articleBody"], "");
+  }
+  return "";
+}
+
+function splitTextForContinuation(text, maxChars) {
+  const clean = String(text || "").replace(/\r\n/g, "\n").trim();
+  if (!clean) return [];
+  const paras = clean.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  const chunks = [];
+  let current = "";
+  paras.forEach(paragraph => {
+    const candidate = current ? `${current}\n\n${paragraph}` : paragraph;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+      return;
+    }
+    if (current) chunks.push(current);
+    if (paragraph.length <= maxChars) {
+      current = paragraph;
+      return;
+    }
+    splitLongParagraph(paragraph, maxChars).forEach(part => {
+      if (part.length > maxChars) chunks.push(part);
+      else if (!current) current = part;
+      else if ((current + " " + part).length <= maxChars) current += " " + part;
+      else { chunks.push(current); current = part; }
+    });
+  });
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+function splitLongParagraph(paragraph, maxChars) {
+  const sentences = String(paragraph).match(/[^.!?]+[.!?]+|\S.+$/g) || [paragraph];
+  const parts = [];
+  let current = "";
+  sentences.map(s => s.trim()).filter(Boolean).forEach(sentence => {
+    if ((current ? current + " " + sentence : sentence).length <= maxChars) {
+      current = current ? current + " " + sentence : sentence;
+      return;
+    }
+    if (current) parts.push(current);
+    if (sentence.length <= maxChars) current = sentence;
+    else {
+      for (let i = 0; i < sentence.length; i += maxChars) parts.push(sentence.slice(i, i + maxChars));
+      current = "";
+    }
+  });
+  if (current) parts.push(current);
+  return parts;
+}
 function preloadImages(root) {
   const images = Array.from(root.querySelectorAll("img"));
   const warnings = [];
   return Promise.all(images.map(img => new Promise(resolve => {
-    if (img.complete && img.naturalWidth) { resolve(); return; }
-    img.onload = () => resolve();
-    img.onerror = () => { warnings.push(img.src); resolve(); };
+    if (img.naturalWidth) { resolve(); return; }
+    const timer = setTimeout(() => {
+      if (!img.naturalWidth) warnings.push(img.src);
+      resolve();
+    }, 4500);
+    img.onload = () => { clearTimeout(timer); resolve(); };
+    img.onerror = () => { clearTimeout(timer); warnings.push(img.src); resolve(); };
   }))).then(() => warnings);
 }
 function inspectRenderedPages(root, showWarnings = true) {
