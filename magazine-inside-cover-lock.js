@@ -17,6 +17,9 @@
     'Way! Way!! Way!!!'
   ].join('\n');
 
+  const PHILOSOPHY_ICON='<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 16v21c5-3 10-3 14 0V16c-4-3-9-3-14 0Z"/><path d="M38 16v21c-5-3-10-3-14 0V16c4-3 9-3 14 0Z"/><path d="M24 16v21"/><path d="M24 9c-3 0-5 2-5 5 0 2 1 4 3 5h4c2-1 3-3 3-5 0-3-2-5-5-5Z"/><path d="M21 23h6"/></svg>';
+  const ANTHEM_ICON='<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 9v25"/><path d="M18 9h17v22"/><path d="M18 15h17"/><path d="M12 38c0-3 3-5 6-5s6 2 6 5-3 5-6 5-6-2-6-5Z"/><path d="M29 35c0-3 3-5 6-5s6 2 6 5-3 5-6 5-6-2-6-5Z"/></svg>';
+
   function escapeHtml(value){
     return String(value==null?'':value)
       .replace(/&/g,'&amp;')
@@ -33,7 +36,7 @@
     if(!content)return;
 
     page.classList.add('mp-page--inside-cover-locked');
-    page.dataset.insideCoverLocked='v2';
+    page.dataset.insideCoverLocked='v3';
     page.dataset.pageNumber='';
 
     content.innerHTML=`
@@ -47,14 +50,14 @@
         <div class="mp-inside-est">EST. 2017</div>
 
         <article class="mp-inside-card mp-inside-philosophy">
-          <div class="mp-inside-icon" aria-hidden="true">♕</div>
+          <div class="mp-inside-icon" aria-hidden="true">${PHILOSOPHY_ICON}</div>
           <h2>PHILOSOPHY OF THE SCHOOL</h2>
           <div class="mp-inside-heading-rule" aria-hidden="true"></div>
           <p>${escapeHtml(PHILOSOPHY_TEXT)}</p>
         </article>
 
         <article class="mp-inside-card mp-inside-anthem">
-          <div class="mp-inside-icon" aria-hidden="true">♬</div>
+          <div class="mp-inside-icon" aria-hidden="true">${ANTHEM_ICON}</div>
           <h2>THE SCHOOL ANTHEM</h2>
           <div class="mp-inside-heading-rule" aria-hidden="true"></div>
           <p>${escapeHtml(ANTHEM_TEXT)}</p>
@@ -82,7 +85,7 @@
   if(target){
     const observer=new MutationObserver(()=>{
       const page=document.querySelector('.mp-page--inside-cover');
-      if(page&&page.dataset.insideCoverLocked!=='v2')lockInsideCover();
+      if(page&&page.dataset.insideCoverLocked!=='v3')lockInsideCover();
     });
     observer.observe(target,{childList:true,subtree:true});
   }else{
@@ -91,7 +94,7 @@
       if(!pages)return;
       const observer=new MutationObserver(()=>{
         const page=document.querySelector('.mp-page--inside-cover');
-        if(page&&page.dataset.insideCoverLocked!=='v2')lockInsideCover();
+        if(page&&page.dataset.insideCoverLocked!=='v3')lockInsideCover();
       });
       observer.observe(pages,{childList:true,subtree:true});
     });
