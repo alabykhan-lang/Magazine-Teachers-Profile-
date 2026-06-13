@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Maiden Magazine | Print Production</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Lato:wght@300;400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="magazine-print.css"/>
+</head>
+<body>
+  <aside class="mp-control-bar" aria-label="Print magazine controls">
+    <div>
+      <div class="mp-control-title">Maiden Magazine Print Route</div>
+      <div class="mp-control-meta" id="mpStatus">Loading production data...</div>
+    </div>
+    <div class="mp-control-actions">
+      <a href="/" class="mp-link">Portal</a>
+      <a href="/builder/" class="mp-link">Builder</a>
+      <button type="button" class="mp-print-button" onclick="window.print()">Print / Save PDF</button>
+    </div>
+  </aside>
+
+  <main class="mp-stage" id="magazinePrintApp">
+    <div class="mp-screen-note" id="mpScreenNote">
+      Fixed A4 pages. Browser print should use A4, portrait, margins none, and background graphics enabled.
+    </div>
+    <div class="mp-pages" id="mpPages" aria-live="polite"></div>
+  </main>
+
+  <script src="magazine-print.js"></script>
+</body>
+</html>

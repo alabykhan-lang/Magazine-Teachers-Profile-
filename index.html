@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="admin-final-magazine.css">
 <style>
   /* Failsafe: auto-show force-open button after 5s via CSS animation */
   @keyframes showForceBtn { from { opacity:0; pointer-events:none; } to { opacity:1; pointer-events:auto; } }
@@ -209,8 +210,9 @@
         <button class="admin-tab" onclick="setCategory('gallery')" id="tab-gallery">Gallery <span class="tab-count" id="count-gallery">0</span></button>
         <button class="admin-tab" onclick="setCategory('editorial')" id="tab-editorial" style="color:var(--gold);font-style:italic;">✎ Editorial <span class="tab-count" id="count-editorial">0</span></button>
         <button class="admin-tab" onclick="openWorkspace()" id="tab-layout" style="color:var(--ws-accent);font-weight:700;">🛠 Open Workspace</button>
+        <button class="admin-tab" onclick="openFinalMagazineAdmin()" id="tab-final-magazine" style="color:#0B1F3A;font-weight:800;">Final Magazine Print</button>
         <a class="admin-tab" href="/builder/" onclick="openMagazineBuilder(event)" id="tab-magazine-builder" style="color:var(--mag-emerald);font-weight:700;text-decoration:none;">📖 Open Magazine Builder</a>
-        <div style="font-size:11px;line-height:1.45;color:var(--ink3);padding:0 14px 8px 18px;">Use this workspace to arrange approved magazine pages, edit production content, preview pages, and prepare print/PDF output.</div>
+        <div style="font-size:11px;line-height:1.45;color:var(--ink3);padding:0 14px 8px 18px;">Use Final Magazine Print as the main Codex production route. Builder remains available as a secondary/internal tool.</div>
         <button class="admin-tab" onclick="openShareLinks()" id="tab-sharelinks">🔗 Share Links</button>
         <button class="admin-tab" onclick="openSettings()" id="tab-settings">⚙ Settings</button>
       </div>
@@ -540,6 +542,25 @@
             <div id="aiContentSummary" style="font-size:13px;color:var(--ink2);background:#fff;padding:12px;border-radius:8px;border:1px solid var(--school-mint2);white-space:pre-line;"></div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Final Magazine Print Route -->
+    <div id="adminModeFinalMagazine" class="final-mag-admin" style="display:none;">
+      <div class="final-mag-admin-head">
+        <div>
+          <div class="final-mag-kicker">Codex Production Engine</div>
+          <h2>Final Magazine Print Route</h2>
+          <p>Isolated live HTML/CSS A4 magazine preview. Builder remains available as a secondary tool.</p>
+        </div>
+        <div class="final-mag-actions">
+          <button class="btn btn-primary" onclick="reloadFinalMagazineFrame()">Refresh Preview</button>
+          <button class="btn btn-gold" onclick="printFinalMagazineFrame()">Print / Save PDF</button>
+          <button class="btn" onclick="openFinalMagazineRoute()">Open Full Page</button>
+        </div>
+      </div>
+      <div class="final-mag-frame-wrap">
+        <iframe id="finalMagazineFrame" title="Final magazine print preview" src="about:blank" loading="lazy"></iframe>
       </div>
     </div>
 
@@ -1298,8 +1319,22 @@
     const win = window.open(target, '_blank', 'noopener');
     if (!win) window.location.href = target;
   };
+  window.openFinalMagazineRoute = async function openFinalMagazineRoute(event) {
+    if (event) event.preventDefault();
+    const primary = '/magazine-print';
+    const fallback = '/magazine-print.html';
+    let target = primary;
+    try {
+      const res = await fetch(primary, { method: 'HEAD', cache: 'no-store' });
+      if (!res.ok) target = fallback;
+    } catch (e) {
+      target = fallback;
+    }
+    const win = window.open(target, '_blank', 'noopener');
+    if (!win) window.location.href = target;
+  };
 </script>
-<script src="script.js?v=19"></script>
+<script src="script.js?v=20"></script>
 <script>
   (function landingFallback(){
     const cards = [
