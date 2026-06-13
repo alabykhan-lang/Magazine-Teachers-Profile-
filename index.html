@@ -209,6 +209,8 @@
         <button class="admin-tab" onclick="setCategory('gallery')" id="tab-gallery">Gallery <span class="tab-count" id="count-gallery">0</span></button>
         <button class="admin-tab" onclick="setCategory('editorial')" id="tab-editorial" style="color:var(--gold);font-style:italic;">✎ Editorial <span class="tab-count" id="count-editorial">0</span></button>
         <button class="admin-tab" onclick="openWorkspace()" id="tab-layout" style="color:var(--ws-accent);font-weight:700;">🛠 Open Workspace</button>
+        <a class="admin-tab" href="/builder/" onclick="openMagazineBuilder(event)" id="tab-magazine-builder" style="color:var(--mag-emerald);font-weight:700;text-decoration:none;">📖 Open Magazine Builder</a>
+        <div style="font-size:11px;line-height:1.45;color:var(--ink3);padding:0 14px 8px 18px;">Use this workspace to arrange approved magazine pages, edit production content, preview pages, and prepare print/PDF output.</div>
         <button class="admin-tab" onclick="openShareLinks()" id="tab-sharelinks">🔗 Share Links</button>
         <button class="admin-tab" onclick="openSettings()" id="tab-settings">⚙ Settings</button>
       </div>
@@ -1282,6 +1284,20 @@
       overlay.remove(); // Completely remove from DOM to prevent click blocking
     }
   }
+  window.openMagazineBuilder = async function openMagazineBuilder(event) {
+    if (event) event.preventDefault();
+    const primary = '/builder/';
+    const fallback = '/builder.html';
+    let target = primary;
+    try {
+      const res = await fetch(primary, { method: 'HEAD', cache: 'no-store' });
+      if (!res.ok) target = fallback;
+    } catch (e) {
+      target = fallback;
+    }
+    const win = window.open(target, '_blank', 'noopener');
+    if (!win) window.location.href = target;
+  };
 </script>
 <script src="script.js?v=19"></script>
 <script>

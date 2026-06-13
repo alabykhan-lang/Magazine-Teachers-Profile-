@@ -2121,6 +2121,10 @@ function renderAdminTabs(){
         <button class="admin-tab" onclick="openShareLinks()" id="tab-sharelinks">🔗 Share Links</button>
         <button class="admin-tab" onclick="openSettings()" id="tab-settings">⚙ Settings</button>`;
   c.innerHTML=html;
+  const builderTab=document.getElementById('tab-layout');
+  if(builderTab&&!document.getElementById('tab-magazine-builder')){
+    builderTab.insertAdjacentHTML('afterend','<a class="admin-tab" href="/builder/" onclick="openMagazineBuilder(event)" id="tab-magazine-builder" style="color:var(--mag-emerald);font-weight:700;text-decoration:none;">📖 Open Magazine Builder</a><div style="font-size:11px;line-height:1.45;color:var(--ink3);padding:0 14px 8px 18px;">Use this workspace to arrange approved magazine pages, edit production content, preview pages, and prepare print/PDF output.</div>');
+  }
   // Restore active
   const act=document.getElementById(curActive);
   if(act)act.classList.add('active');
