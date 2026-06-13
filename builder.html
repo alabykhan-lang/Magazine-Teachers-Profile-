@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Magazine Builder | Way To Success Standard Schools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lato:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="builder.css">
+</head>
+<body>
+  <div class="builder-app">
+    <aside class="builder-sidebar">
+      <div class="builder-brand">
+        <span>Magazine Builder</span>
+        <h1>File Collector</h1>
+        <p>Final production workspace. Content collection remains in the old portal.</p>
+      </div>
+
+      <div class="builder-actions">
+        <select id="templateSelect" aria-label="Choose template"></select>
+        <button id="addPageBtn" class="primary-btn" type="button">Add Page</button>
+        <button id="refreshSubmissionsBtn" type="button">Refresh Approved Data</button>
+      </div>
+
+      <div class="collector-head">
+        <div>
+          <strong>Page Order</strong>
+          <span id="collectorCount">0 pages</span>
+        </div>
+        <button id="seedPagesBtn" type="button">Starter Set</button>
+      </div>
+      <div id="pageList" class="page-list" aria-label="Magazine pages"></div>
+    </aside>
+
+    <main class="builder-stage">
+      <div class="stage-toolbar">
+        <div>
+          <span class="kicker">Legacy Horizon Editorial System</span>
+          <h2 id="selectedPageLabel">No page selected</h2>
+        </div>
+        <div class="stage-buttons">
+          <button id="duplicatePageBtn" type="button">Duplicate</button>
+          <button id="deletePageBtn" type="button">Delete</button>
+          <button id="printSelectedBtn" type="button">Print Selected</button>
+          <button id="printFullBtn" class="primary-btn" type="button">Print Full Magazine</button>
+        </div>
+      </div>
+      <div id="previewWarnings" class="preview-warnings" aria-live="polite"></div>
+      <div id="previewCanvas" class="preview-canvas"></div>
+    </main>
+
+    <aside class="builder-editor">
+      <div class="editor-head">
+        <span class="kicker">Selected Page</span>
+        <h2>Production Fields</h2>
+      </div>
+      <div id="editorPanel" class="editor-panel"></div>
+    </aside>
+  </div>
+
+  <div id="printRoot" aria-hidden="true"></div>
+
+  <template id="emptyPageTemplate">
+    <div class="empty-state">
+      <h2>No Builder page selected</h2>
+      <p>Add a page from the template library or select an existing page from the collector.</p>
+    </div>
+  </template>
+
+  <script src="builder.js"></script>
+</body>
+</html>
