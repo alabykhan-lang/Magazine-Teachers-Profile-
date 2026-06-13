@@ -28,12 +28,12 @@
 
   function lockInsideCover(){
     const page=document.querySelector('.mp-page--inside-cover');
-    if(!page||page.dataset.insideCoverLocked==='true')return;
+    if(!page)return;
     const content=page.querySelector('.mp-page__content');
     if(!content)return;
 
     page.classList.add('mp-page--inside-cover-locked');
-    page.dataset.insideCoverLocked='true';
+    page.dataset.insideCoverLocked='v2';
     page.dataset.pageNumber='';
 
     content.innerHTML=`
@@ -61,6 +61,7 @@
         </article>
 
         <span class="mp-inside-footer-diamond" aria-hidden="true"></span>
+        <footer class="mp-inside-custom-footer">WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</footer>
       </section>
     `;
   }
@@ -79,13 +80,19 @@
 
   const target=document.getElementById('mpPages');
   if(target){
-    const observer=new MutationObserver(()=>lockInsideCover());
+    const observer=new MutationObserver(()=>{
+      const page=document.querySelector('.mp-page--inside-cover');
+      if(page&&page.dataset.insideCoverLocked!=='v2')lockInsideCover();
+    });
     observer.observe(target,{childList:true,subtree:true});
   }else{
     document.addEventListener('DOMContentLoaded',()=>{
       const pages=document.getElementById('mpPages');
       if(!pages)return;
-      const observer=new MutationObserver(()=>lockInsideCover());
+      const observer=new MutationObserver(()=>{
+        const page=document.querySelector('.mp-page--inside-cover');
+        if(page&&page.dataset.insideCoverLocked!=='v2')lockInsideCover();
+      });
       observer.observe(pages,{childList:true,subtree:true});
     });
   }
