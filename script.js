@@ -2713,13 +2713,100 @@ function getProductionItemsPerPage(sec,settings){
   const s=settings||lsSettings||{};
   const key=sec?.key;
   if(key==='teachers')return Math.max(1,Math.min(30,parseInt(s.teachersPerPage)||9));
-  if(['primary5','jss3','ss3'].includes(key))return Math.max(1,Math.min(30,parseInt(s.studentsPerPage)||2));
+  if(key==='primary5'||key==='jss3')return 20;
+  if(key==='ss3')return Math.max(1,Math.min(12,parseInt(s.studentsPerPage)||6));
   if(key==='speeches')return Math.max(1,Math.min(2,parseInt(s.speechesPerPage)||1));
   if(key==='gallery')return 30;
   if(key==='creative')return Math.max(1,Math.min(6,parseInt(s.creativePerPage)||2));
   if(key==='events')return 30;
   if(['academic','interviews','motivational'].includes(key))return 2;
   return 1;
+}
+
+function wsNormalizeCategoryForRoute(sub){
+  const cat=String(sub?.category||'').toLowerCase();
+  if(cat==='gallery'||cat==='events'||cat==='primary5_class_photo'||cat==='jss3_class_photo'||cat==='ss3_class_message')return 'events';
+  return cat;
+}
+function wsSubmissionRoute(sub){
+  if(!sub)return 'unassigned';
+  const cat=wsNormalizeCategoryForRoute(sub);
+  if(cat==='editor_board')return 'editor_board';
+  if(cat==='editorial-note')return magIsEicAddressSub(sub)?'eic-address':'editorial-note';
+  if(magIsHistorySub(sub))return 'school-history';
+  const speechKind=magOpeningSpeechKind(sub);
+  if(speechKind)return speechKind==='proprietor'?'proprietor-speech':speechKind+'-speech';
+  if(cat==='speeches')return 'unassigned';
+  if(['primary5','jss3','ss3','teachers','academic','interviews','motivational','events','appreciation','advertisements','creative'].includes(cat))return cat;
+  return 'unassigned';
+}
+function wsSectionAllowsSubmission(secKey,sub){
+  const route=wsSubmissionRoute(sub);
+  if(secKey==='gallery'||secKey==='events'||secKey==='primary5_class_photo'||secKey==='jss3_class_photo'||secKey==='ss3_class_message')return route==='events';
+  return route===secKey;
+}
+function wsTextSplitLimitForPage(page){
+  const key=page?.sec?.key||page?.type||'';
+  if(['eic-address','school-history','proprietor-speech','senior-boy-speech','senior-girl-speech'].includes(key)||['eic-address','school-history','proprietor-speech','senior-boy-speech','senior-girl-speech'].includes(page?.type))return 1550;
+  if(key==='interviews')return 2300;
+  if(key==='academic'||key==='motivational')return 2100;
+  return 2600;
+}
+function wsSplitTextByFit(text,limit){
+  const clean=String(text||'').trim();
+  if(!clean||clean.length<=limit)return [clean];
+  const chunks=[],paragraphs=clean.split(/\n{2,}/).map(p=>p.trim()).filter(Boolean);
+  let buf='';
+  const pushBuf=()=>{if(buf.trim()){chunks.push(buf.trim());buf='';}};
+  paragraphs.forEach(p=>{
+    if((buf+'\n\n'+p).trim().length<=limit){buf=(buf?buf+'\n\n':'')+p;return;}
+    pushBuf();
+    if(p.length<=limit){buf=p;return;}
+    const sentences=p.match(/[^.!?]+[.!?]+|\S[\s\S]*$/g)||[p];
+    sentences.forEach(s=>{
+      const next=(buf?buf+' ':'')+s.trim();
+      if(next.length<=limit){buf=next;return;}
+      pushBuf();
+      if(s.length<=limit){buf=s.trim();return;}
+      for(let i=0;i<s.length;i+=limit)chunks.push(s.slice(i,i+limit).trim());
+    });
+  });
+  pushBuf();
+  return chunks.filter(Boolean);
+}
+function wsPrimaryTextKey(sub){
+  const keys=['speechBody','articleBody','contribBody','qaBody','eventReport','message','body','introParagraph','classMessage'];
+  return keys.find(k=>sub?.data?.[k]?.value)||'';
+}
+function wsCloneSubWithTextPart(sub,key,text,partIdx){
+  const clone=Object.assign({},sub,{id:String(sub.id)+'__part_'+partIdx,_wsOriginalId:String(sub.id),_wsTextOverrides:Object.assign({},sub._wsTextOverrides||{},{[key]:text})});
+  return clone;
+}
+function wsExpandOverflowPages(pages){
+  const out=[];
+  pages.forEach(page=>{
+    const key=page?.sec?.key||page?.type||'';
+    const applies=['eic-address','school-history','proprietor-speech','senior-boy-speech','senior-girl-speech','interviews','academic','motivational'].includes(key)||['eic-address','school-history','proprietor-speech','senior-boy-speech','senior-girl-speech'].includes(page?.type);
+    if(!applies){out.push(page);return;}
+    const limit=wsTextSplitLimitForPage(page);
+    if(page.sub){
+      const textKey=wsPrimaryTextKey(page.sub);
+      const parts=textKey?wsSplitTextByFit(magSubVal(page.sub,[textKey]),limit):[];
+      if(parts.length<=1){out.push(page);return;}
+      parts.forEach((part,i)=>out.push(Object.assign({},page,{sub:wsCloneSubWithTextPart(page.sub,textKey,part,i+1),isContinuation:i>0,pageInSection:(page.pageInSection||1)+i,label:(page.label||page.sec?.label||page.type)+(i>0?' (continued '+(i+1)+')':'')})));
+      return;
+    }
+    if(Array.isArray(page.items)&&page.items.length===1){
+      const sub=page.items[0],textKey=wsPrimaryTextKey(sub);
+      const original=textKey?String(sub.data?.[textKey]?.value||''):'';
+      const parts=wsSplitTextByFit(original,limit);
+      if(parts.length<=1){out.push(page);return;}
+      parts.forEach((part,i)=>out.push(Object.assign({},page,{items:[wsCloneSubWithTextPart(sub,textKey,part,i+1)],isContinuation:i>0,pageInSection:(page.pageInSection||1)+i,label:(page.label||page.sec?.label||page.type)+(i>0?' (continued '+(i+1)+')':'')})));
+      return;
+    }
+    out.push(page);
+  });
+  return out;
 }
 
 const LEGACY_HORIZON_MAG_CSS=`
@@ -2848,18 +2935,30 @@ function magIsEditorInChiefRole(role){
 function magBoardData(){const fromSubs=magCrewFromSubmissions();let chief=fromSubs.find(m=>magIsEditorInChiefRole(m.role))||null;let rest=fromSubs.filter(m=>m!==chief);if(!chief)chief={name:'{editor_in_chief_name}',role:'Editor-in-Chief',photo:''};while(rest.length<6)rest.push({name:'{crew_member_name}',role:'{crew_member_role}',photo:''});return {chief,crew:rest.slice(0,6)};}
 function magPhotoOrSilhouette(src,big){return src?`<img src="${esc(src)}" alt="Profile photo"/>`:`<div class="mag-silhouette"></div>`;}
 function renderEditorialBoardPage(ctx){const data=magBoardData();const pageNum=magNumberForIndex(ctx.index);return `${magOpeningCss()}<div class="mag-opening-page mag-horizon-page" style="min-height:${ctx.h||1123}px;height:${ctx.h||1123}px;"><div class="mag-horizon-curve-top"></div><div class="mag-horizon-curve-bottom"></div><div class="mag-watermark">W</div><div class="mag-page-shell"><header class="mag-board-head"><h1>The Editorial Board</h1><div class="mag-board-sub">Magazine Crew &amp; Production Team</div></header><section class="mag-feature-card"><div class="mag-feature-photo">${magPhotoOrSilhouette(data.chief.photo,true)}</div><div class="mag-feature-info"><div class="crown">&crown;</div><div class="role">Editor-in-Chief</div><h2>${esc(data.chief.name||'{editor_in_chief_name}')}</h2><span class="mag-chair-badge">Editorial Chairman</span></div></section><section class="mag-crew-grid">${data.crew.map(m=>`<article class="mag-crew-card"><div class="mag-crew-photo">${magPhotoOrSilhouette(m.photo,false)}</div><div class="mag-crew-rule"></div><h3>${esc(m.name||'{crew_member_name}')}</h3><span class="mag-crew-role">${esc(m.role||'{crew_member_role}')}</span></article>`).join('')}</section></div>${magFooterHtml(magSchoolNameWithLocation(ctx.s),pageNum)}</div>`;}
-function magSubVal(sub,keys){const d=sub?.data||{};for(const k of keys){const v=d[k]?.value;if(v)return String(v).trim();}return '';}
-function magSubHay(sub){const d=sub?.data||{};return [sub?.category,...['speechType','speechTitle','speakerTitle','speakerName','articleTitle','subjectArea','title','authorRole','name','message','quote','bio','body','speechBody','articleBody','contribBody'].map(k=>d[k]?.value||'')].join(' ').toLowerCase();}
-function magIsEicAddressSub(sub){const h=magSubHay(sub);return sub?.category!=='editor_board'&&(/editor.?in.?chief|editorial chairman/.test(h)||(/dear readers/.test(h)&&/(magazine|publication|editorial|school community)/.test(h)));}
-function magOpeningSpeechKind(sub){const h=magSubHay(sub);if(/proprietor/.test(h))return 'proprietor';if(/senior boy|head boy/.test(h))return 'senior-boy';if(/senior girl|head girl/.test(h))return 'senior-girl';return '';}
+function magSubVal(sub,keys){const d=sub?.data||{},over=sub?._wsTextOverrides||{};for(const k of keys){const v=over[k]!==undefined?over[k]:d[k]?.value;if(v)return String(v).trim();}return '';}
+function magSubHay(sub){const d=sub?.data||{};return [sub?.category,...['speechType','speechTitle','speakerTitle','speakerName','articleTitle','subjectArea','title','authorRole','name','message','quote','bio','body','speechBody','articleBody','contribBody','qaBody','introParagraph'].map(k=>d[k]?.value||'')].join(' ').toLowerCase();}
+function magIsEicAddressSub(sub){const h=magSubHay(sub);return sub?.category!=='editor_board'&&!magOpeningSpeechKind(sub)&&(/editor.?in.?chief|editorial chairman/.test(h)||(/dear readers/.test(h)&&/(magazine|publication|editorial|school community)/.test(h)));}
+function magOpeningSpeechKind(sub){
+  const d=sub?.data||{};
+  const signal=[d.speechType?.value,d.speechTitle?.value,d.speakerTitle?.value,d.speakerName?.value,d.title?.value].join(' ').toLowerCase();
+  if(/senior girl|head girl/.test(signal))return 'senior-girl';
+  if(/senior boy|head boy/.test(signal))return 'senior-boy';
+  if(/proprietor/.test(signal))return 'proprietor';
+  if(sub?.category!=='speeches')return '';
+  const h=magSubHay(sub);
+  if(/senior girl|head girl/.test(h))return 'senior-girl';
+  if(/senior boy|head boy/.test(h))return 'senior-boy';
+  if(/proprietor/.test(h))return 'proprietor';
+  return '';
+}
 function magIsHistorySub(sub){const h=magSubHay(sub);return /brief history|history of the school|school history/.test(h);}
 function magIsOpeningFeatureSub(sub){return magIsEicAddressSub(sub)||magOpeningSpeechKind(sub)||magIsHistorySub(sub);}
-function magOpeningFeaturePages(list){const find=fn=>(Array.isArray(list)?list:[]).find(s=>fn(s))||null;return [
-  {type:'eic-address',sub:find(magIsEicAddressSub),sec:{key:'eic-address',label:'Editor-in-Chief Address',layout:'eic-address'}},
-  {type:'school-history',sub:find(magIsHistorySub),sec:{key:'school-history',label:'Brief History of the School',layout:'school-history'}},
-  {type:'proprietor-speech',sub:find(s=>magOpeningSpeechKind(s)==='proprietor'),sec:{key:'proprietor-speech',label:"Proprietor's Speech",layout:'proprietor-speech'}},
-  {type:'senior-boy-speech',sub:find(s=>magOpeningSpeechKind(s)==='senior-boy'),sec:{key:'senior-boy-speech',label:"Senior Boy's Speech",layout:'senior-boy-speech'}},
-  {type:'senior-girl-speech',sub:find(s=>magOpeningSpeechKind(s)==='senior-girl'),sec:{key:'senior-girl-speech',label:"Senior Girl's Speech",layout:'senior-girl-speech'}}
+function magOpeningFeaturePages(list){const findRoute=route=>(Array.isArray(list)?list:[]).find(s=>wsSubmissionRoute(s)===route)||null;return [
+  {type:'eic-address',sub:findRoute('eic-address'),sec:{key:'eic-address',label:'Editor-in-Chief Address',layout:'eic-address'}},
+  {type:'school-history',sub:findRoute('school-history'),sec:{key:'school-history',label:'Brief History of the School',layout:'school-history'}},
+  {type:'proprietor-speech',sub:findRoute('proprietor-speech'),sec:{key:'proprietor-speech',label:"Proprietor's Speech",layout:'proprietor-speech'}},
+  {type:'senior-boy-speech',sub:findRoute('senior-boy-speech'),sec:{key:'senior-boy-speech',label:"Senior Boy's Speech",layout:'senior-boy-speech'}},
+  {type:'senior-girl-speech',sub:findRoute('senior-girl-speech'),sec:{key:'senior-girl-speech',label:"Senior Girl's Speech",layout:'senior-girl-speech'}}
 ];}
 function magRefPhoto(src,cls,label){return `<div class="mag-ref-photo ${cls||''}">${src?`<img src="${esc(src)}" alt="Portrait"/>`:`<div style="color:#6b7280;font-size:12px;font-weight:800;text-align:center;">${esc(label||'{photo}')}</div>`}</div>`;}
 function magSplitText(text,n){const words=String(text||'').trim().split(/\s+/).filter(Boolean);if(!words.length)return ['','',''];const size=Math.ceil(words.length/n);const out=[];for(let i=0;i<n;i++)out.push(words.slice(i*size,(i+1)*size).join(' '));return out;}
@@ -2883,15 +2982,23 @@ function generateMagPreview(){
   magPages.push({type:'toc',sec:Object.assign({key:'toc',label:'Contents',layout:'toc'},byKey('toc'))});
   magPages.push({type:'editorial-board',sec:Object.assign({key:'editor_board',label:'Editorial Board',layout:'editor-board'},byKey('editor_board'))});
   magOpeningFeaturePages(approved).forEach(p=>magPages.push(p));
+  const routedIds=new Set(magPages.filter(p=>p.sub).map(p=>String(p.sub._wsOriginalId||p.sub.id)));
   sectionOrder.filter(sec=>sec.visible).forEach(sec=>{
     if(['cover','toc','editor_board'].includes(sec.key))return;
-    const catSubs=approved.filter(sub=>sub.category===sec.key&&!magIsOpeningFeatureSub(sub));
+    const catSubs=approved.filter(sub=>wsSectionAllowsSubmission(sec.key,sub));
     if(sec.key==='editorial-note'){const sub=approved.find(sub=>sub.category==='editorial-note'&&!magIsOpeningFeatureSub(sub));if(sub)magPages.push({type:'editorial-note',sub,sec});return;}
     if(sec.key==='appreciation'){const sub=approved.find(sub=>sub.category==='appreciation');if(sub)magPages.push({type:'appreciation',sub,sec});return;}
     if(!catSubs.length)return;
     let perPage=getProductionItemsPerPage(sec,s);
     for(let i=0;i<catSubs.length;i+=perPage){magPages.push({type:'section-content',sec,items:catSubs.slice(i,i+perPage),isFirst:i===0,pageInSection:Math.floor(i/perPage)+1});}
   });
+  magPages.forEach(p=>(p.items||[]).forEach(sub=>routedIds.add(String(sub._wsOriginalId||sub.id))));
+  const unassigned=approved.filter(sub=>wsSubmissionRoute(sub)==='unassigned'&&!routedIds.has(String(sub.id)));
+  if(unassigned.length){
+    const sec={key:'unassigned',label:'Unassigned / Needs Review',icon:'!',layout:'single',visible:true};
+    unassigned.forEach((sub,i)=>magPages.push({type:'section-content',sec,items:[sub],isFirst:i===0,pageInSection:i+1}));
+  }
+  magPages=wsExpandOverflowPages(magPages);
   magPages=magPages.map((p,i)=>wsPageWithMeta(p,i)).filter(p=>!p.hidden);
   renderCurrentPage();renderTOC();updatePageNavUI();
 }
@@ -2906,7 +3013,7 @@ function renderCurrentPage(){
   const magTitle=s.magTitle||'The Torch',schoolName=s.schoolName||'Way To Success Standard Schools',edition=s.edition||'1st Edition',year=s.year||'2025/2026',pageBg=s.pageBg||'#ffffff',textColor=s.textColor||'#1c1c1e';
   const magazineTheme=s.theme||PRODUCTION_MAGAZINE_THEME;
   const foot=magFooterHtml(magSchoolNameWithLocation(s),magNumberForIndex(currentPageIdx));
-  const productionText=(sub,key)=>wsTextValue(page,String(sub?.id)+'|'+key,sub?.data?.[key]?.value||'');
+  const productionText=(sub,key)=>wsTextValue(page,String(sub?.id)+'|'+key,(sub?._wsTextOverrides&&sub._wsTextOverrides[key]!==undefined)?sub._wsTextOverrides[key]:(sub?.data?.[key]?.value||''));
   function findCoverImage(){
     const manual=(Array.isArray(page.manualBlocks)?page.manualBlocks:[]).find(b=>b&&b.type==='image'&&!b.hidden&&['cover-hero','feature','background'].includes(b.placement||''));
     if(manual?.src)return manual.src;
@@ -3053,12 +3160,12 @@ function renderCurrentPage(){
       const ed=Object.assign({},wsGlobalImageDefaults(),pageEdit);
       const fit=pageEdit.fit||style.fit||ed.fit||'contain';
       const pos=fit==='top'?'50% 0%':fit==='center'?'50% 50%':((ed.x??50)+'% '+(ed.y??50)+'%');
-      const objFit='contain';
+      const objFit=fit==='contain'?'contain':'cover';
       const zoom=Math.max(.5,Math.min(3,parseFloat(ed.zoom)||1));
       const rot=parseInt(ed.rotate)||0;
       const imgSrc=ed.replaceSrc||src;
       const imgStyle=`width:100%;height:100%;object-fit:${objFit};object-position:${pos};display:block;border:0;transform:scale(${zoom}) rotate(${rot}deg);transform-origin:center center;filter:none;mix-blend-mode:normal;`;
-      return `<div class="mag-image-frame" data-image-key="${esc(key)}" style="${style.frame||''}overflow:visible;position:relative;background:${style.bg||'#fff'};break-inside:avoid;page-break-inside:avoid;">
+      return `<div class="mag-image-frame" data-image-key="${esc(key)}" style="${style.frame||''}overflow:hidden;position:relative;background:${style.bg||'#fff'};break-inside:avoid;page-break-inside:avoid;">
         <img src="${esc(imgSrc)}" alt="${esc(alt||'Photo')}" style="${imgStyle}"/>
       </div>`;
     }
@@ -3099,6 +3206,59 @@ function renderCurrentPage(){
     }
 
     /* ── TEACHER GRID ─────────────────────────────────────────────────────── */
+    function parseInterviewQA(text){
+      const raw=String(text||'').trim();
+      if(!raw)return [];
+      const blocks=raw.split(/\n{2,}/).map(x=>x.trim()).filter(Boolean);
+      const qa=[];
+      for(let i=0;i<blocks.length;i++){
+        const b=blocks[i];let q='',a='';
+        if(/^Q(?:uestion)?[:.)-]/i.test(b)||/\nA(?:nswer)?[:.)-]/i.test(b)){
+          const parts=b.split(/\n+/);
+          q=(parts.shift()||'').replace(/^Q(?:uestion)?[:.)-]\s*/i,'').trim();
+          a=parts.join('\n').replace(/^A(?:nswer)?[:.)-]\s*/i,'').trim();
+        }else{
+          q=b;
+          const next=blocks[i+1]||'';
+          if(next&&!/^Q(?:uestion)?[:.)-]/i.test(next)){a=next;i++;}
+        }
+        if(q||a)qa.push({q:q||'Question',a:a||''});
+      }
+      return qa.length?qa:[{q:'Question',a:raw}];
+    }
+    function renderInterviewQA(item){
+      return `<div class="mag-q-label">Question</div><p class="mag-question">${esc(item.q)}</p><div class="mag-a-label">Answer</div><p class="mag-answer">${esc(item.a)}</p>`;
+    }
+    function renderInterviewTemplate(sub,variant){
+      const title=resolveContentTitle(sub)||productionText(sub,'interviewTitle')||'Interview';
+      const person=productionText(sub,'intervieweeName')||resolveName(sub);
+      const role=productionText(sub,'intervieweeTitle')||resolveSubtitle(sub);
+      const intro=productionText(sub,'introParagraph')||'';
+      const qa=parseInterviewQA(productionText(sub,'qaBody')||resolveMainText(sub));
+      const pull=productionText(sub,'pullQuote')||'A conversation that inspires a vision that leads.';
+      const closing=productionText(sub,'closingNote')||'Thank you for sharing your valuable insights with our school community.';
+      const middle=(Array.isArray(sub.photos)?sub.photos.find(p=>p?.role==='middle')||sub.photos[0]:null);
+      const middleCaption=middle?.caption||productionText(sub,'middleImageCaption')||'';
+      const portrait=sub.photoData?renderImageFrame(sub.photoData,'sub:'+sub.id+':photo',{frame:'width:132px;height:178px;border-radius:10px;border:2px solid rgba(214,168,79,.72);padding:5px;',fit:'contain',bg:'#fff'},person):'<div class="mag-interview-silhouette"></div>';
+      const qaBlocks=qa.map(item=>`<div class="mag-interview-qa">${renderInterviewQA(item)}</div>`).join('');
+      if(variant===2){
+        return `<article class="mag-interview-template mag-interview-template-2">
+          <div class="mag-interview-top"><main><div class="mag-interview-icon">I</div><div class="mag-interview-kicker">Interview</div><h1>${esc(title)}</h1><p class="mag-interview-intro">${esc(intro)}</p></main><aside>${portrait}<h2>${esc(person)}</h2><span>${esc(role)}</span></aside></div>
+          <div class="mag-interview-pull"><b>&ldquo;</b><em>${esc(pull)}</em><b>&rdquo;</b></div>
+          <div class="mag-interview-qa-grid">${qaBlocks}</div>
+          <div class="mag-interview-close">${esc(closing)}</div>
+        </article>`;
+      }
+      const first=qa.slice(0,3).map(item=>`<div class="mag-interview-qa">${renderInterviewQA(item)}</div>`).join('');
+      const rest=qa.slice(3).map(item=>`<div class="mag-interview-qa">${renderInterviewQA(item)}</div>`).join('');
+      return `<article class="mag-interview-template mag-interview-template-1">
+        <div class="mag-interview-top"><main><div class="mag-interview-icon">I</div><div class="mag-interview-kicker">Interview</div><h1>${esc(title)}</h1><h3>A conversation that inspires, a vision that leads.</h3><p class="mag-interview-intro">${esc(intro)}</p></main><aside>${portrait}<h2>${esc(person)}</h2><span>${esc(role)}</span></aside></div>
+        <div class="mag-interview-two">${first}</div>
+        ${middle?`<figure class="mag-interview-middle">${renderImageFrame(wsPhotoSrc(middle),'sub:'+sub.id+':photo:middle',{frame:'width:100%;height:162px;border-radius:9px;border:1px solid rgba(214,168,79,.55);',fit:'contain',bg:'#fff'},title)}${middleCaption?`<figcaption>${esc(middleCaption)}</figcaption>`:''}</figure>`:''}
+        <div class="mag-interview-two">${rest}</div>
+        <div class="mag-interview-pull small"><b>&ldquo;</b><em>${esc(pull)}</em></div>
+      </article>`;
+    }
     function profileStyleDefaults(page,itemCount){
       const ctl = page.sec?.profileControls || page.profileControls || {};
       const photo = {small:['46px','54px'],medium:['62px','74px'],large:['78px','92px']}[ctl.photoSize] || ['62px','74px'];
@@ -3126,7 +3286,11 @@ function renderCurrentPage(){
       const fieldIds=style.ctl.fieldsMode==='custom'?style.ctl.fieldIds:null;
       return renderAllFields(sub, {skipFirst:true, maxChars, maxFields:style.maxFields, fieldIds, textColor, bFont});
     }
-    if(layout==='teacher-grid'){
+    if(layout==='interview-template-1'||layout==='interview-template-2'){
+      const variant=layout==='interview-template-2'?2:1;
+      contentHtml=items.map(sub=>renderInterviewTemplate(sub,variant)).join('');
+    }
+    else if(layout==='teacher-grid'){
       const style = profileStyleDefaults(page,items.length);
       const cols = items.length >= 24 ? 6 : items.length >= 18 ? 5 : items.length > 9 ? 4 : 3;
       contentHtml = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${style.gap};">
@@ -3460,7 +3624,8 @@ function openPrintView(){
     .mag-item,.mag-item-gallery,.mag-item-event,.mag-item-teacher,.mag-item-student,.mag-image-frame,figure{break-inside:avoid;page-break-inside:avoid;}
     figcaption{break-before:avoid;page-break-before:avoid;}
     p,.mag-item-field-value,.mag-item-body{orphans:3;widows:3;}
-    img{max-width:100%;height:auto;object-fit:contain!important;object-position:center top;image-rendering:auto!important;-ms-interpolation-mode:bicubic;}
+    img{max-width:100%;height:auto;image-rendering:auto!important;-ms-interpolation-mode:bicubic;}
+    ${wsProductionPreviewCss()}
     /* AI-injected styles carried to print */
     ${(document.getElementById('ai-custom-css')?.textContent||'').replace(/</g,'\u003c')}
   </style>
@@ -4100,10 +4265,16 @@ function wsDefaultProfileFieldIds(secKey){const fields=(CATEGORIES[secKey]?.fiel
 function wsDefaultProfileControls(secKey){return secKey==='teachers'?{photoSize:'medium',photoShape:'rounded',nameSize:'small',cardSpacing:'normal',cardDesign:'classic',fieldsMode:'all',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'staff-detailed'}:{photoSize:'medium',photoShape:'rounded',nameSize:'medium',cardSpacing:'normal',cardDesign:'classic',fieldsMode:'key',fieldIds:wsDefaultProfileFieldIds(secKey),photoBg:'#ffffff',preset:'student-balanced'};}
 function wsIsProfilePage(page){const key=page?.sec?.key;return page?.type==='section-content'&&(key==='teachers'||['primary5','jss3','ss3'].includes(key)||page?.sec?.layout==='teacher-grid'||page?.sec?.layout==='grid');}
 function wsGetProfileControls(page,meta){const prod=wsEnsureProduction();const key=page?.sec?.key;return Object.assign({},wsDefaultProfileControls(key),prod.profileDefaults?.[key]||{},meta?.profileControls||{});}
-function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));const meta=Object.assign({status:'draft',template:page?.sec?.layout||page?.type||'single',title:baseTitle,locked:false,hidden:false,itemOrder:null,removedItemIds:[],addedItemIds:[],manualBlocks:[],textLimit:null,textEdits:{},imageEdits:{},selectedImageKey:'',namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});meta.production_edits=wsProductionEditShape(meta);return meta;}
+function wsDefaultPageTemplate(page){
+  if(page?.sec?.key==='interviews'&&(!page.sec.layout||page.sec.layout==='single'))return 'interview-template-1';
+  if(page?.sec?.key==='academic'&&(!page.sec.layout||page.sec.layout==='single'))return 'article-columns';
+  if(page?.sec?.key==='motivational'&&(!page.sec.layout||page.sec.layout==='single'))return 'article-feature';
+  return page?.sec?.layout||page?.type||'single';
+}
+function wsGetPageMeta(page,idx){const prod=wsEnsureProduction();const key=wsPageKey(page,idx);const baseTitle=page?.label||page?.sec?.label||page?.type||('Page '+(idx+1));const meta=Object.assign({status:'draft',template:wsDefaultPageTemplate(page),title:baseTitle,locked:false,hidden:false,itemOrder:null,removedItemIds:[],addedItemIds:[],manualBlocks:[],textLimit:null,textEdits:{},imageEdits:{},selectedImageKey:'',namePlacement:'side',profileControls:wsDefaultProfileControls(page?.sec?.key)},prod.pages[key]||{});if(page?.sec?.key==='interviews'&&meta.template==='single')meta.template='interview-template-1';meta.production_edits=wsProductionEditShape(meta);return meta;}
 function wsSavePageMeta(idx,patch){if(!wsPages[idx])return;const prod=wsEnsureProduction();const key=wsPageKey(wsPages[idx],idx);const meta=Object.assign({},wsGetPageMeta(wsPages[idx],idx),patch||{},{updatedAt:new Date().toISOString()});meta.production_edits=wsProductionEditShape(meta);prod.pages[key]=meta;saveLsSettingsToStorage(lsSettings);wsMarkDirty();}
 function wsApplyItemOrder(items,order){if(!Array.isArray(items)||!Array.isArray(order)||!order.length)return items;const rank=new Map(order.map((id,i)=>[String(id),i]));return items.slice().sort((a,b)=>{const ar=rank.has(String(a.id))?rank.get(String(a.id)):9999;const br=rank.has(String(b.id))?rank.get(String(b.id)):9999;return ar-br;});}
-function magPageAllowsSub(page,sub){if(!sub||magIsOpeningFeatureSub(sub))return false;const key=page?.sec?.key;if(['primary5','jss3','ss3','teachers'].includes(key))return sub.category===key;return true;}
+function magPageAllowsSub(page,sub){if(!sub)return false;const key=page?.sec?.key||page?.type;return wsSectionAllowsSubmission(key,sub);}
 function wsPageWithMeta(page,idx){const meta=wsGetPageMeta(page,idx);const profileControls=wsGetProfileControls(page,meta);const copy=Object.assign({},page,{label:meta.title,productionStatus:meta.status,locked:!!meta.locked,hidden:!!meta.hidden,manualBlocks:Array.isArray(meta.manualBlocks)?meta.manualBlocks:[],textLimit:meta.textLimit,textEdits:meta.textEdits||{},imageEdits:meta.imageEdits||{},namePlacement:meta.namePlacement,profileControls});if(copy.items){const removed=new Set((meta.removedItemIds||[]).map(String));const added=(meta.addedItemIds||[]).map(id=>loadAll().find(s=>String(s.id)===String(id))).filter(sub=>magPageAllowsSub(copy,sub));const seen=new Set();copy.items=copy.items.concat(added).filter(x=>x&&!removed.has(String(x.id))&&magPageAllowsSub(copy,x)).filter(x=>{const id=String(x.id);if(seen.has(id))return false;seen.add(id);return true;});copy.items=wsApplyItemOrder(copy.items,meta.itemOrder);}if(copy.sec)copy.sec=Object.assign({},copy.sec,{layout:meta.template,label:meta.title,namePlacement:meta.namePlacement,profileControls});return copy;}
 function wsCurrentMeta(){return wsGetPageMeta(wsPages[wsPageIdx],wsPageIdx);}
 function wsTextEditRecord(page,id){
@@ -4163,10 +4334,11 @@ function wsGeneratePreview(){
   wsPages.push({type:'toc',sec:Object.assign({key:'toc',label:'Contents',layout:'toc'},byKey('toc')),label:'Contents'});
   wsPages.push({type:'editorial-board',sec:Object.assign({key:'editor_board',label:'Editorial Board',layout:'editor-board'},byKey('editor_board')),label:'Editorial Board'});
   magOpeningFeaturePages(finalized).forEach(p=>wsPages.push(Object.assign({},p,{label:p.sec.label})));
+  const routedIds=new Set(wsPages.filter(p=>p.sub).map(p=>String(p.sub._wsOriginalId||p.sub.id)));
 
   sectionOrder.filter(sec=>sec.visible).forEach(sec=>{
     if(['cover','toc','editor_board'].includes(sec.key))return;
-    const catSubs=finalized.filter(sub=>sub.category===sec.key&&!magIsOpeningFeatureSub(sub));
+    const catSubs=finalized.filter(sub=>wsSectionAllowsSubmission(sec.key,sub));
     if(sec.key==='editorial-note'){const sub=finalized.find(sub=>sub.category==='editorial-note'&&!magIsOpeningFeatureSub(sub));if(sub)wsPages.push({type:'editorial-note',sub,sec,label:'Editorial Note'});return;}
     if(sec.key==='appreciation'){const sub=finalized.find(sub=>sub.category==='appreciation');if(sub)wsPages.push({type:'appreciation',sub,sec,label:'Appreciation'});return;}
     if(!catSubs.length)return;
@@ -4175,6 +4347,13 @@ function wsGeneratePreview(){
       wsPages.push({type:'section-content',sec,items:catSubs.slice(i,i+perPage),isFirst:i===0,pageInSection:Math.floor(i/perPage)+1,label:getLabel('section_'+sec.key,sec.label)+(i>0?' (p'+(Math.floor(i/perPage)+1)+')':'')});
     }
   });
+  wsPages.forEach(p=>(p.items||[]).forEach(sub=>routedIds.add(String(sub._wsOriginalId||sub.id))));
+  const unassigned=finalized.filter(sub=>wsSubmissionRoute(sub)==='unassigned'&&!routedIds.has(String(sub.id)));
+  if(unassigned.length){
+    const sec={key:'unassigned',label:'Unassigned / Needs Review',icon:'!',layout:'single',visible:true};
+    for(let i=0;i<unassigned.length;i+=1)wsPages.push({type:'section-content',sec,items:unassigned.slice(i,i+1),isFirst:i===0,pageInSection:i+1,label:'Unassigned / Needs Review'+(i>0?' (p'+(i+1)+')':'')});
+  }
+  wsPages=wsExpandOverflowPages(wsPages);
   (wsEnsureProduction().duplicates||[]).forEach(d=>{
     const items=(d.itemIds||[]).map(id=>finalized.find(s=>String(s.id)===String(id))).filter(Boolean);
     const dMeta=wsEnsureProduction().pages?.['duplicate|'+d.id]||{};
@@ -4226,6 +4405,34 @@ function wsUpdateNavUI(){
 }
 
 /* ── Render Preview using Print-Ready Iframe ── */
+function wsProductionPreviewCss(){
+  return `
+    .mag-interview-template{height:100%;min-height:0;position:relative;background:#F8F3E7;color:#1F2933;font-family:'Lato',sans-serif;padding:12px 4px 0;overflow:hidden;}
+    .mag-interview-template:before{content:'';position:absolute;left:-72px;top:-82px;width:260px;height:260px;border:8px solid #0F7C5C;border-right-color:transparent;border-bottom-color:transparent;border-radius:50%;box-shadow:0 0 0 2px rgba(214,168,79,.55);}
+    .mag-interview-template:after{content:'';position:absolute;right:-72px;bottom:-82px;width:260px;height:260px;border:8px solid #0F7C5C;border-left-color:transparent;border-top-color:transparent;border-radius:50%;box-shadow:0 0 0 2px rgba(214,168,79,.55);}
+    .mag-interview-top{position:relative;z-index:1;display:grid;grid-template-columns:1fr 170px;gap:22px;align-items:start;margin-bottom:18px;}
+    .mag-interview-icon{width:22px;height:22px;margin:0 auto 7px;border:1px solid #D6A84F;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#D6A84F;font-family:'Playfair Display',serif;font-size:13px;}
+    .mag-interview-kicker{text-align:center;text-transform:uppercase;letter-spacing:3px;font-size:9px;color:#0F7C5C;font-weight:900;margin-bottom:10px;}
+    .mag-interview-top h1{font-family:'Playfair Display',serif;font-size:38px;line-height:.98;color:#0B1F3A;margin:0 0 12px;text-transform:none;overflow-wrap:anywhere;}
+    .mag-interview-template-1 .mag-interview-top h3{font-size:11px;line-height:1.45;letter-spacing:1.8px;text-transform:uppercase;color:#0F7C5C;margin:0 0 14px;max-width:290px;}
+    .mag-interview-intro{font-size:10.5px;line-height:1.65;color:#1F2933;text-align:justify;white-space:pre-line;}
+    .mag-interview-top aside{text-align:center;}
+    .mag-interview-top aside h2{font-family:'Playfair Display',serif;font-size:16px;line-height:1.15;color:#0B1F3A;margin:7px 0 5px;overflow-wrap:anywhere;}
+    .mag-interview-top aside span{display:inline-block;background:#D6A84F;color:#fff;font-size:8px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;padding:5px 8px;border-radius:3px;max-width:100%;overflow-wrap:anywhere;}
+    .mag-interview-silhouette{width:132px;height:178px;border-radius:10px;border:2px solid rgba(214,168,79,.72);background:#E8EEF6;margin:0 auto;}
+    .mag-interview-two,.mag-interview-qa-grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:12px 20px;}
+    .mag-interview-qa{break-inside:avoid;page-break-inside:avoid;border-bottom:1px dotted rgba(31,41,51,.38);padding-bottom:6px;margin-bottom:8px;}
+    .mag-q-label,.mag-a-label{font-size:8px;font-weight:900;letter-spacing:.5px;color:#D6A84F;text-transform:uppercase;}
+    .mag-question,.mag-answer{font-size:9.5px;line-height:1.55;margin:2px 0 5px;color:#1F2933;white-space:pre-line;}
+    .mag-answer{color:#0B1F3A;}
+    .mag-interview-middle{position:relative;z-index:1;margin:8px 0 12px;}
+    .mag-interview-middle figcaption{text-align:center;font-size:8px;color:#6b7280;margin-top:4px;}
+    .mag-interview-pull{position:relative;z-index:1;margin:14px 0;border:1px solid rgba(214,168,79,.55);background:#E8EEF6;padding:16px 24px;display:grid;grid-template-columns:32px 1fr 32px;align-items:center;color:#0B1F3A;font-family:'Playfair Display',serif;font-size:16px;line-height:1.35;}
+    .mag-interview-pull.small{grid-template-columns:36px 1fr;margin-top:10px;}
+    .mag-interview-pull b{font-size:32px;line-height:1;color:#D6A84F;}
+    .mag-interview-close{position:relative;z-index:1;margin-top:12px;border:1px solid rgba(214,168,79,.35);background:#E8EEF6;padding:14px 18px;font-size:10px;line-height:1.55;color:#1F2933;}
+  `;
+}
 function wsRenderCurrentPage(){
   const container = document.getElementById('wsPageContainer');
   if(!wsPages.length){
@@ -4308,7 +4515,8 @@ function wsRenderCurrentPage(){
     .mag-item,.mag-item-gallery,.mag-item-event,.mag-item-teacher,.mag-item-student,.mag-image-frame,figure{break-inside:avoid;page-break-inside:avoid;}
     figcaption{break-before:avoid;page-break-before:avoid;}
     p,.mag-item-field-value,.mag-item-body{orphans:3;widows:3;}
-    img{max-width:100%;height:auto;object-fit:contain!important;object-position:center top;image-rendering:auto!important;-ms-interpolation-mode:bicubic;}
+    img{max-width:100%;height:auto;image-rendering:auto!important;-ms-interpolation-mode:bicubic;}
+    ${wsProductionPreviewCss()}
     ${aiCSS}
   </style></head><body>${allPagesHtml}</body></html>`;
 
@@ -4535,6 +4743,15 @@ function wsSaveTextEdit(id,value){
 function wsSaveSelectedTextArea(){
   const e=wsSelectedTextEntry(),area=document.getElementById('wsTextEditArea');if(e&&area)wsSaveTextEdit(e.id,area.value);
 }
+function wsEraseSelectedText(){
+  const e=wsSelectedTextEntry();if(e)wsSaveTextEdit(e.id,'');
+}
+async function wsPasteReplaceSelectedText(){
+  const e=wsSelectedTextEntry();if(!e)return;
+  let text='';
+  try{text=await navigator.clipboard.readText();}catch(err){text=prompt('Paste replacement text:','')||'';}
+  wsSaveTextEdit(e.id,text);
+}
 function wsToggleSelectedTextHidden(hidden){
   const e=wsSelectedTextEntry();if(!e)return;
   const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before hiding text.');wsUpdateProductionControls();return;}
@@ -4608,7 +4825,14 @@ function wsRenderProfileFieldPicker(page,ctl){
   box.style.display='grid';
   box.innerHTML=fields.map(f=>`<label class="ws-field-check"><input type="checkbox" ${selected.includes(f.id)?'checked':''} onchange="wsToggleProfileField('${f.id}',this.checked)"/><span>${esc(f.label)}</span></label>`).join('');
 }
-function wsSetPageStatus(status){wsSavePageMeta(wsPageIdx,{status});wsRenderPageList();wsUpdateProductionControls();wsRunPreflight(false);}
+function wsSetPageStatus(status){
+  const patch={status};
+  if(status==='locked')patch.locked=true;
+  if(status==='excluded')patch.hidden=true;
+  if(status&&status!=='locked')patch.locked=false;
+  if(status&&status!=='excluded')patch.hidden=false;
+  wsSavePageMeta(wsPageIdx,patch);wsRenderPageList();wsRenderCurrentPage();wsUpdateProductionControls();wsRunPreflight(false);
+}
 function wsSetPageTemplate(template){const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before changing the template.');wsUpdateProductionControls();return;}wsSavePageMeta(wsPageIdx,{template});wsRenderPageList();wsRenderCurrentPage();wsRunPreflight(false);}
 function wsSetNamePlacement(namePlacement){const meta=wsCurrentMeta();if(meta.locked){alert('This page is locked for print. Unlock it before changing name placement.');wsUpdateProductionControls();return;}wsSavePageMeta(wsPageIdx,{namePlacement});wsRenderPageList();wsRenderCurrentPage();}
 function wsSetProfileControl(key,val){
@@ -4907,7 +5131,12 @@ function wsPreflightAction(action){
   }
 }
 function wsSetZoom(level){
-  wsZoom=Math.max(25,Math.min(200,level));
+  if(level==='fit'){
+    const canvas=document.getElementById('wsCanvas'),dims=getPageDimensions();
+    const available=Math.max(320,(canvas?.clientWidth||window.innerWidth)-96);
+    level=Math.floor((available/dims.w)*100);
+  }
+  wsZoom=Math.max(50,Math.min(150,parseInt(level)||100));
   document.getElementById('wsZoomLevel').textContent=wsZoom+'%';
   document.getElementById('wsStatusZoom').textContent=wsZoom+'%';
   wsRenderCurrentPage();
@@ -4929,6 +5158,13 @@ function wsToggleSpread(){
 
 /* ── Sidebar Panel Toggle ── */
 function wsTogglePanel(id){document.getElementById(id)?.classList.toggle('collapsed');}
+function wsToggleInspector(){
+  const layout=document.getElementById('wsLayout');if(!layout)return;
+  layout.classList.toggle('ai-collapsed');
+  const btn=document.getElementById('wsInspectorBtn');
+  if(btn)btn.textContent=layout.classList.contains('ai-collapsed')?'Inspector':'Hide Inspector';
+  setTimeout(()=>{if(String(wsZoom).toLowerCase()==='fit')wsSetZoom('fit');},50);
+}
 
 /* ── Assets Panel ── */
 function wsRenderAssets(){

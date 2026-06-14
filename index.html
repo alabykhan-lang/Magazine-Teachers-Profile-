@@ -210,9 +210,9 @@
         <button class="admin-tab" onclick="setCategory('gallery')" id="tab-gallery">Gallery <span class="tab-count" id="count-gallery">0</span></button>
         <button class="admin-tab" onclick="setCategory('editorial')" id="tab-editorial" style="color:var(--gold);font-style:italic;">✎ Editorial <span class="tab-count" id="count-editorial">0</span></button>
         <button class="admin-tab" onclick="openWorkspace()" id="tab-layout" style="color:var(--ws-accent);font-weight:700;">🛠 Open Workspace</button>
-        <button class="admin-tab" onclick="openFinalMagazineAdmin()" id="tab-final-magazine" style="color:#0B1F3A;font-weight:800;">Final Magazine Print</button>
+        <button class="admin-tab" onclick="openWorkspace()" id="tab-final-magazine" style="color:#0B1F3A;font-weight:800;">Open Design Workspace</button>
         <a class="admin-tab" href="/builder/" onclick="openMagazineBuilder(event)" id="tab-magazine-builder" style="color:var(--mag-emerald);font-weight:700;text-decoration:none;">📖 Open Magazine Builder</a>
-        <div style="font-size:11px;line-height:1.45;color:var(--ink3);padding:0 14px 8px 18px;">Use Final Magazine Print as the main Codex production route. Builder remains available as a secondary/internal tool.</div>
+        <div style="font-size:11px;line-height:1.45;color:var(--ink3);padding:0 14px 8px 18px;">Use The Torch — Design Workspace for production. Builder and magazine-print remain secondary/internal tools.</div>
         <button class="admin-tab" onclick="openShareLinks()" id="tab-sharelinks">🔗 Share Links</button>
         <button class="admin-tab" onclick="openSettings()" id="tab-settings">⚙ Settings</button>
       </div>
@@ -720,7 +720,7 @@
 
 <!-- WORKSPACE — VS Code-style Design Studio -->
 <div id="viewWorkspace" class="view">
-  <div class="ws-layout" id="wsLayout">
+  <div class="ws-layout ai-collapsed" id="wsLayout">
     <!-- Topbar -->
     <div class="ws-topbar">
       <span class="ws-topbar-logo">MagicEditor</span>
@@ -729,12 +729,13 @@
         <span class="ws-topbar-save" id="wsSaveIndicator">● Saved</span>
         <div class="ws-topbar-divider"></div>
         <button class="ws-topbar-btn mobile-toggle" onclick="document.querySelector('.ws-sidebar').classList.toggle('open')" style="display:none;" title="Menu">☰ Menu</button>
-        <button class="ws-topbar-btn mobile-toggle" onclick="document.querySelector('.ws-ai').classList.toggle('open')" style="display:none;" title="AI">✦ AI</button>
+        <button class="ws-topbar-btn mobile-toggle" onclick="document.querySelector('.ws-ai').classList.toggle('open')" style="display:none;" title="Inspector">Inspector</button>
         <button class="ws-topbar-btn" onclick="wsUndo()" title="Undo">↶ Undo</button>
         <button class="ws-topbar-btn" onclick="wsRedo()" title="Redo">↷ Redo</button>
         <div class="ws-topbar-divider"></div>
         <button class="ws-topbar-btn" onclick="wsToggleGuides()" id="wsGuidesBtn">☐ Guides</button>
         <button class="ws-topbar-btn" onclick="wsToggleSpread()" id="wsSpreadBtn">⊞ Spread</button>
+        <button class="ws-topbar-btn" onclick="wsToggleInspector()" id="wsInspectorBtn">Inspector</button>
         <div class="ws-topbar-divider"></div>
         <button class="ws-topbar-btn accent" onclick="wsGeneratePreview()">▶ Generate</button>
         <button class="ws-topbar-btn danger" onclick="closeWorkspace()">✕ Close</button>
@@ -759,12 +760,15 @@
           <label class="ws-font-label">Page status</label>
           <select class="ws-font-select" id="wsPageStatus" onchange="wsSetPageStatus(this.value)">
             <option value="draft">Draft</option>
+            <option value="in-production">In Production</option>
             <option value="needs-content">Needs content</option>
             <option value="needs-image">Needs image</option>
             <option value="text-overflow">Text overflow</option>
-            <option value="needs-review">Needs review</option>
-            <option value="approved">Approved</option>
+            <option value="needs-review">Needs Review</option>
+            <option value="ready-review">Ready for Review</option>
+            <option value="approved">Approved / Ready</option>
             <option value="locked">Locked for print</option>
+            <option value="excluded">Excluded from Print</option>
           </select>
           <label class="ws-font-label">Template</label>
           <select class="ws-font-select" id="wsPageTemplate" onchange="wsSetPageTemplate(this.value)">
@@ -776,6 +780,8 @@
             <option value="article-photo-break">Picture break article</option>
             <option value="article-briefs">Two/three content briefs</option>
             <option value="article-ribbon">Segmented ribbon story</option>
+            <option value="interview-template-1">Interview Template 1</option>
+            <option value="interview-template-2">Interview Template 2</option>
             <option value="grid">Student grid</option>
             <option value="teacher-grid">Staff grid</option>
             <option value="gallery">Gallery</option>
@@ -979,10 +985,10 @@
           <input type="file" id="wsImageReplaceInput" accept=".jpg,.jpeg,.png,.webp" style="display:none;" onchange="wsReplaceSelectedImage(event)"/>
           <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="document.getElementById('wsImageReplaceInput').click()">Replace</button>
-            <button class="ws-prod-btn" onclick="wsResetImageEdit()">Reset</button>
+            <button class="ws-prod-btn" onclick="wsResetImageEdit()">Restore Original</button>
           </div>
           <div class="ws-prod-actions">
-            <button class="ws-prod-btn" onclick="wsToggleSelectedImageHidden(true)">Hide Image</button>
+            <button class="ws-prod-btn" onclick="wsToggleSelectedImageHidden(true)">Delete / Hide</button>
             <button class="ws-prod-btn" onclick="wsToggleSelectedImageHidden(false)">Restore Image</button>
           </div>
           <div class="ws-prod-actions">
@@ -1005,6 +1011,13 @@
           <div id="wsTextStats" class="ws-empty-mini">No editable text on this page.</div>
           <textarea class="ws-text-edit-area" id="wsTextEditArea" rows="8" placeholder="Select text to edit the production version only." oninput="wsSaveSelectedTextArea()"></textarea>
           <label class="ws-field-check ws-hide-text-check"><input type="checkbox" id="wsTextHiddenCheck" onchange="wsToggleSelectedTextHidden(this.checked)"/><span>Hide this text in production output</span></label>
+          <div class="ws-prod-actions">
+            <button class="ws-prod-btn" onclick="wsEraseSelectedText()">Erase</button>
+            <button class="ws-prod-btn" onclick="wsPasteReplaceSelectedText()">Paste Replace</button>
+          </div>
+          <button class="ws-export-btn" onclick="wsSaveSelectedTextArea()">
+            <span class="ws-export-icon">Save</span><span>Save Production Text<span class="ws-export-desc">Selected page and section only</span></span>
+          </button>
           <div class="ws-prod-actions">
             <button class="ws-prod-btn" onclick="wsShortenSelectedText()">Shorten</button>
             <button class="ws-prod-btn" onclick="wsExpandSelectedText()">Expand</button>
@@ -1115,7 +1128,7 @@
         <button class="ws-zoom-btn" onclick="wsSetZoom(50)">50</button>
         <button class="ws-zoom-btn" onclick="wsSetZoom(75)">75</button>
         <span class="ws-zoom-level" id="wsZoomLevel">100%</span>
-        <button class="ws-zoom-btn" onclick="wsSetZoom(100)">Fit</button>
+        <button class="ws-zoom-btn" onclick="wsSetZoom('fit')">Fit</button>
         <button class="ws-zoom-btn" onclick="wsSetZoom(150)">150</button>
         <button class="ws-zoom-btn" onclick="wsSetZoom(wsZoom+25)">+</button>
       </div>
@@ -1124,7 +1137,7 @@
     <!-- Right AI Panel -->
     <div class="ws-ai">
       <div class="ws-ai-header">
-        <div class="ws-ai-title">✦ AI Design Assistant</div>
+        <div class="ws-ai-title">Inspector / AI Design Assistant</div>
         <div class="ws-ai-selectors">
           <select class="ws-ai-select" id="wsAIModel" title="AI Model">
             <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
